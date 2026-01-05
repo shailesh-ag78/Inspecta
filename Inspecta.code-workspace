@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "ScibeAgent"
+		},
+		{
+			"path": "../Library"
+		},
+		{
+			"path": "TranscriptionAgent"
+		}
+	],
+	"settings": {}
+}
