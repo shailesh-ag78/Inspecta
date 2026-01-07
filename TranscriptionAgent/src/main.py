@@ -10,8 +10,8 @@ from typing import List
 app = FastAPI()
 
 # Initialize Groq Service
-# Note: Ideally API Key should be injected securely. Code relies on env var or internal handling.
-groq_service = GroqService()
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+groq_service = GroqService(GROQ_API_KEY)
 
 TEMP_DIR = r"D:\code\Inspecta\TranscriptionAgent\temp_uploads"
 if not os.path.exists(TEMP_DIR):
@@ -40,7 +40,7 @@ async def _process_files(files: List[UploadFile], task_type: str):
                 
                 final_output["incidents"].append({
                     "file_name": file.filename,
-                    "verbose_json": incident_data
+                    "incident_data": incident_data
                 })
 
             finally:

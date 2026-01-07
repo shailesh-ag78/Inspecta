@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import PlainTextResponse
-from scribe_agent import ScribeAgent
+from audio_extractor_agent import AudioExtractorAgent
 from audio_utils import extract_audio
 import uvicorn
 import shutil
@@ -8,14 +8,14 @@ import os
 import uuid
 
 app = FastAPI()
-agent = ScribeAgent()
+agent = AudioExtractorAgent()
 REMOVE_AUDIO = False
-TEMP_DIR = r"D:\code\Inspecta\ScibeAgent\temp_uploads"
+TEMP_DIR = r"D:\code\Inspecta\AudioExtractorAgent\temp_uploads"
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 
-@app.post("/transcribe", response_class=PlainTextResponse)
-async def transcribe(file: UploadFile = File(...)):
+@app.post("/transcribeAudio", response_class=PlainTextResponse)
+async def transcribeAudio(file: UploadFile = File(...)):
     try:
         # Save upload to temp file
         file_ext = os.path.splitext(file.filename)[1]

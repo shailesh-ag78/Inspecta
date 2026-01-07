@@ -1,6 +1,6 @@
 import requests
 
-class ScribeAgent:
+class AudioExtractorAgent:
     def __init__(self, api_url="http://localhost:5678"):
         self.api_url = api_url
 

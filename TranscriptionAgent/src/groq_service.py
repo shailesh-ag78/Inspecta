@@ -162,3 +162,5 @@ class GroqService:
         
         # 3. Merge chunks
         return self.merge_incident_results(results, OVERLAP_SEC)
+
+    

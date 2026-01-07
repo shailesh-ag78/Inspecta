@@ -45,10 +45,10 @@ def main():
         print(f"Error: File '{input_file}' not found.")
         sys.exit(1)
     
-    api_url = "http://localhost:8000/transcribe"
+    api_url = "http://localhost:8000/transcribeAudio"
     
     try:
-        print(f"Testing Scribe Agent via FastAPI: {input_file}")
+        print(f"Testing AudioExtractor Agent via FastAPI: {input_file}")
         with open(input_file, "rb") as f:
             files = {"file": (os.path.basename(input_file), f)}
             response = requests.post(api_url, files=files)
@@ -57,7 +57,7 @@ def main():
             result_text = response.text
             
             # Save raw response (TSV) to response.txt in the same directory as output files
-            output_dir = r"D:\code\Inspecta\ScibeAgent\Test"
+            output_dir = r"D:\code\Inspecta\AudioExtractorAgent\Test"
             response_file_path = os.path.join(output_dir, "response.txt")
             with open(response_file_path, "w", encoding="utf-8") as f:
                 f.write(result_text)

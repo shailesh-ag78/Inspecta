@@ -50,27 +50,27 @@ def main():
         except Exception as e:
             print(f"Request failed: {e}")
 
-        # Rewind files for next request
-        for f in opened_files:
-            f.seek(0)
+        # # Rewind files for next request
+        # for f in opened_files:
+        #     f.seek(0)
             
-        # Test Translate
-        print(f"\n--- Testing Translate ({len(files_to_upload)} files) ---")
-        try:
-            response = requests.post(f"{base_url}/translate_incidents", files=files_to_upload)
-            if response.status_code == 200:
-                print("Success!")
-                # Print only summary to avoid clutter
-                res = response.json()
-                print(f"Processed {len(res['incidents'])} incidents.")
+        # # Test Translate
+        # print(f"\n--- Testing Translate ({len(files_to_upload)} files) ---")
+        # try:
+        #     response = requests.post(f"{base_url}/translate_incidents", files=files_to_upload)
+        #     if response.status_code == 200:
+        #         print("Success!")
+        #         # Print only summary to avoid clutter
+        #         res = response.json()
+        #         print(f"Processed {len(res['incidents'])} incidents.")
                 
-                # Save to file
-                with open("output_translate.json", "w", encoding="utf-8") as f:
-                    json.dump(res, f, indent=2, ensure_ascii=False)
-            else:
-                print(f"Error: {response.status_code} - {response.text}")
-        except Exception as e:
-            print(f"Request failed: {e}")
+        #         # Save to file
+        #         with open("output_translate.json", "w", encoding="utf-8") as f:
+        #             json.dump(res, f, indent=2, ensure_ascii=False)
+        #     else:
+        #         print(f"Error: {response.status_code} - {response.text}")
+        # except Exception as e:
+        #     print(f"Request failed: {e}")
 
     finally:
         for f in opened_files:
