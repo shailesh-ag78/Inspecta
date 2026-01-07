@@ -4,7 +4,7 @@ import requests
 import json
 
 def main():
-    # Force UTF-8 encoding for stdout
+    # Force UTF-8 encoding for stdout 
     sys.stdout.reconfigure(encoding='utf-8')
 
     if len(sys.argv) < 2:
@@ -34,7 +34,7 @@ def main():
             print("No valid files to process.")
             return
 
-        # Test Transcribe
+        # Testing Transcribe
         print(f"\n--- Testing Transcribe ({len(files_to_upload)} files) ---")
         try:
             response = requests.post(f"{base_url}/transcribe_incidents", files=files_to_upload)
