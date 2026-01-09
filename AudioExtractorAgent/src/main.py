@@ -1,60 +1,132 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import PlainTextResponse
-from audio_extractor_agent import AudioExtractorAgent
-from audio_utils import extract_audio
-import uvicorn
-import shutil
+import sys
 import os
-import uuid
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import uvicorn
+
+# --- Path Setup for Database ---
+# Assuming DataStore is at d:\code\Inspecta\DataStore relative to current setup
+# We append it to sys.path to import database.py
+DB_PATH = r"d:\code\Inspecta\DataStore"
+if DB_PATH not in sys.path:
+    sys.path.append(DB_PATH)
+
+try:
+    from database import InspectionRepository
+except ImportError:
+    print(f"Error: Could not import database from {DB_PATH}. Ensure the path is correct.")
+    sys.exit(1)
+
+from audio_utils import extract_audio
+from groq_client import GroqClient
+
+# --- Configuration ---
+DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=localhost port=5432"
+
+DATA_DIR = r"d:\code\Inspecta\Data"
+if not os.path.exists(DATA_DIR):
+    os.makedirs(DATA_DIR)
 
 app = FastAPI()
-agent = AudioExtractorAgent()
-REMOVE_AUDIO = False
-TEMP_DIR = r"D:\code\Inspecta\AudioExtractorAgent\temp_uploads"
-if not os.path.exists(TEMP_DIR):
-    os.makedirs(TEMP_DIR)
+groq_client = GroqClient()
+repo = InspectionRepository(DB_DSN)
 
-@app.post("/transcribeAudio", response_class=PlainTextResponse)
-async def transcribeAudio(file: UploadFile = File(...)):
+class ExtractAudioRequest(BaseModel):
+    inspection_id: str
+    industry_id: int
+
+@app.post("/extract_audio")
+async def extract_audio_endpoint(request: ExtractAudioRequest):
+    """
+    Extracts audio from the video associated with the inspection,
+    transcribes it using Groq, and updates the database.
+    """
+    print(f"Processing inspection: {request.inspection_id} for industry: {request.industry_id}")
+    
+    # 1. Get inspection details from DB
     try:
-        # Save upload to temp file
-        file_ext = os.path.splitext(file.filename)[1]
-        #temp_filename = f"{uuid.uuid4()}{ile_ext}"
-        temp_filename = os.path.basename(file.filename)
-        temp_file_path = os.path.join(TEMP_DIR, temp_filename)
-        
-        with open(temp_file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-            
-        processing_file_path = temp_file_path
-        
-        # Check if video (simple extension check)
-        video_extensions = ['.mp4', '.mov', '.avi', '.mkv']
-        if file_ext.lower() in video_extensions:
-            # Extract audio
-            try:
-                audio_path = extract_audio(temp_file_path)
-                processing_file_path = audio_path # Use the extracted audio for transcription
-            except Exception as e:
-                # Cleanup and raise
-                if (os.path.exists(temp_file_path) &  REMOVE_AUDIO):
-                    os.remove(temp_file_path)
-                raise HTTPException(status_code=500, detail=f"Audio extraction failed: {str(e)}")
-
-        # Transcribe
-        try:
-            with open(processing_file_path, "rb") as f:
-                result = agent.transcribe_audio(f, os.path.basename(processing_file_path))
-        finally:
-            # Cleanup temp files
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
-            if processing_file_path != temp_file_path and os.path.exists(processing_file_path):
-                os.remove(processing_file_path)
-
-        return result
+        with repo.session(request.industry_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT video_url, metadata FROM inspections WHERE id = %s", 
+                    (request.inspection_id,)
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="Inspection not found")
+                video_url = row['video_url']
+                current_metadata = row['metadata'] or {}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"DB Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    if not video_url:
+        raise HTTPException(status_code=400, detail="No video_url found for this inspection")
+
+    # 2. Determine paths
+    # Assuming video_url is a local path as per "High volume data... stored on disk"
+    # If it's a URL, we'd need to download it first. For now, assuming local path.
+    if not os.path.exists(video_url):
+         # If it's not a local file, maybe it's relative to Data dir? 
+         # Or maybe it's an actual URL we need to handle?
+         # User said "video_url TEXT -- Primary GCS link" in schema comments, 
+         # but also "High volume data... stored on disk under folder 'Data'".
+         # We will try to see if it exists locally, if not we assume fail for now 
+         # (or simplistic download if it starts with http).
+         raise HTTPException(status_code=400, detail=f"Video file not found at: {video_url}")
+
+    audio_filename = f"{request.inspection_id}.mp3"
+    audio_path = os.path.join(DATA_DIR, audio_filename)
+
+    # 3. Extract Audio
+    try:
+        print(f"Extracting audio from {video_url} to {audio_path}")
+        extract_audio(video_url, audio_path)
+    except Exception as e:
+        print(f"Extraction Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Audio extraction failed: {str(e)}")
+
+    # 4. Transcribe
+    try:
+        print("Transcribing audio...")
+        transcript_result = groq_client.transcribe(audio_path)
+        transcript_text = transcript_result.get("text", "")
+    except Exception as e:
+        print(f"Transcription Error: {e}")
+        # We might want to continue even if transcription fails, but updated functionality implies successful chain
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+    # 5. Update Database
+    try:
+        # Update metadata with transcript
+        current_metadata['transcript'] = transcript_text
+        
+        # We need to update audio_url and metadata
+        with repo.session(request.industry_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE inspections 
+                    SET audio_url = %s, metadata = %s 
+                    WHERE id = %s
+                    """,
+                    (audio_path, Json(current_metadata), request.inspection_id)
+                )
+    except Exception as e:
+         # Note: Json wrapper needed. Importing it from psycopg2.extras
+         # Wait, I didn't import Json in this file. I need to fix imports.
+         print(f"DB Update Error: {e}")
+         raise HTTPException(status_code=500, detail=f"Failed to update database: {str(e)}")
+
+    return {
+        "status": "success",
+        "inspection_id": request.inspection_id,
+        "audio_url": audio_path,
+        "transcript_preview": transcript_text[:100] + "..." if transcript_text else ""
+    }
+
+# Fix missing Json import for step 5
+from psycopg2.extras import Json
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

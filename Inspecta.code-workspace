@@ -14,6 +14,9 @@
 		},
 		{
 			"path": "DataStore"
+		},
+		{
+			"path": "Data"
 		}
 	],
 	"settings": {}

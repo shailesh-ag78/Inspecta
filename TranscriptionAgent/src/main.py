@@ -1,71 +1,89 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query
-from fastapi.responses import JSONResponse
-from groq_service import GroqService
-import uvicorn
-import shutil
+import sys
 import os
-import uuid
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+import uvicorn
 from typing import List
 
+# --- Path Setup for Database ---
+DB_PATH = r"d:\code\Inspecta\DataStore"
+if DB_PATH not in sys.path:
+    sys.path.append(DB_PATH)
+
+try:
+    from database import InspectionRepository
+except ImportError:
+    print(f"Error: Could not import database from {DB_PATH}. Ensure the path is correct.")
+    sys.exit(1)
+
+from openai_service import OpenAIService
+
+# --- Configuration ---
+DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=localhost port=5432"
+
 app = FastAPI()
+openai_service = OpenAIService()
+repo = InspectionRepository(DB_DSN)
 
-# Initialize Groq Service
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-groq_service = GroqService(GROQ_API_KEY)
+class GenerateTasksRequest(BaseModel):
+    inspection_id: str
+    industry_id: int
 
-TEMP_DIR = r"D:\code\Inspecta\TranscriptionAgent\temp_uploads"
-if not os.path.exists(TEMP_DIR):
-    os.makedirs(TEMP_DIR)
-
-async def _process_files(files: List[UploadFile], task_type: str):
+@app.post("/generate_tasks")
+async def generate_tasks_endpoint(request: GenerateTasksRequest):
     """
-    Helper to process list of files for a specific task type.
+    Generates actionable tasks from the inspection transcript using OpenAI
+    and stores them in the database.
     """
-    final_output = {"incidents": []}
+    print(f"Generating tasks for inspection: {request.inspection_id}, industry: {request.industry_id}")
+    
+    # 1. Fetch transcript from DB
+    try:
+        with repo.session(request.industry_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT metadata FROM inspections WHERE id = %s", 
+                    (request.inspection_id,)
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="Inspection not found")
+                
+                metadata = row['metadata'] or {}
+                transcript = metadata.get('transcript')
+                
+                if not transcript:
+                    raise HTTPException(status_code=400, detail="No transcript found for this inspection. Run AudioExtractorAgent first.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"DB Fetch Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+    # 2. Generate Tasks via OpenAI
+    try:
+        tasks = openai_service.generate_tasks_from_transcript(transcript)
+        print(f"Generated {len(tasks)} tasks.")
+    except Exception as e:
+        print(f"OpenAI Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Task generation failed: {str(e)}")
+
+    # 3. Store Tasks in DB
+    if not tasks:
+        return {"status": "success", "message": "No tasks generated.", "task_count": 0}
 
     try:
-        for file in files:
-            # 1. Save uploaded file to temp
-            file_ext = os.path.splitext(file.filename)[1]
-            temp_filename = f"{uuid.uuid4()}{file_ext}" # Use UUID to avoid collisions
-            temp_file_path = os.path.join(TEMP_DIR, temp_filename)
-            
-            try:
-                with open(temp_file_path, "wb") as buffer:
-                    shutil.copyfileobj(file.file, buffer)
-                
-                # 2. Process incident via GroqService
-                # We pass the original filename for metadata, but use temp_file_path for reading
-                incident_data = groq_service.process_incident(temp_file_path, task_type)
-                
-                final_output["incidents"].append({
-                    "file_name": file.filename,
-                    "incident_data": incident_data
-                })
-
-            finally:
-                # Cleanup per file
-                if os.path.exists(temp_file_path):
-                    os.remove(temp_file_path)
-
-        return final_output
-
+        # bulk_add_tasks expects inspection_id and list of dicts
+        repo.bulk_add_tasks(request.industry_id, request.inspection_id, tasks)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        print(f"DB Insert Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to store tasks: {str(e)}")
 
-@app.post("/transcribe_incidents", response_class=JSONResponse)
-async def transcribe_incidents(files: List[UploadFile] = File(...)):
-    """
-    Transcribes audio files as-is (English with mixed Hindi/Marathi).
-    """
-    return await _process_files(files, task_type="transcribe")
-
-@app.post("/translate_incidents", response_class=JSONResponse)
-async def translate_incidents(files: List[UploadFile] = File(...)):
-    """
-    Translates audio files into professional English.
-    """
-    return await _process_files(files, task_type="translate")
+    return {
+        "status": "success",
+        "inspection_id": request.inspection_id,
+        "task_count": len(tasks)
+    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)

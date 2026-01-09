@@ -15,9 +15,9 @@ def call_audio_extractor(file_path: str, filename: str) -> str:
     which returns text (simple transcription) or we might just use it to get audio.
     
     Based on exploration:
-    AudioExtractorAgent has /transcribeAudio that returns PlainTextResponse.
+    AudioExtractorAgent has /extract_audio that returns PlainTextResponse.
     """
-    url = f"{AUDIO_EXTRACTOR_URL}/transcribeAudio"
+    url = f"{AUDIO_EXTRACTOR_URL}/extract_audio"
     
     # We need to send the file.
     # Note: In a real cloud env, we might pass a URL or S3 path.
