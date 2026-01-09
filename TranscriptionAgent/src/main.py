@@ -39,21 +39,15 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
     
     # 1. Fetch transcript from DB
     try:
-        with repo.session(request.industry_id) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "SELECT metadata FROM inspections WHERE id = %s", 
-                    (request.inspection_id,)
-                )
-                row = cur.fetchone()
-                if not row:
-                    raise HTTPException(status_code=404, detail="Inspection not found")
-                
-                metadata = row['metadata'] or {}
-                transcript = metadata.get('transcript')
-                
-                if not transcript:
-                    raise HTTPException(status_code=400, detail="No transcript found for this inspection. Run AudioExtractorAgent first.")
+        inspection = repo.get_inspection(request.industry_id, request.inspection_id)
+        if not inspection:
+             raise HTTPException(status_code=404, detail="Inspection not found")
+
+        metadata = inspection.get('metadata') or {}
+        transcript = metadata.get('transcript')
+        
+        if not transcript:
+            raise HTTPException(status_code=400, detail="No transcript found for this inspection.")
     except HTTPException:
         raise
     except Exception as e:
@@ -75,6 +69,11 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
     try:
         # bulk_add_tasks expects inspection_id and list of dicts
         repo.bulk_add_tasks(request.industry_id, request.inspection_id, tasks)
+        
+        # Verify extraction as requested: Fetch back tasks
+        created_tasks = repo.get_tasks_for_inspection(request.industry_id, request.inspection_id)
+        print(f"Verified: {len(created_tasks)} tasks currently in DB for this inspection.")
+        
     except Exception as e:
         print(f"DB Insert Error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to store tasks: {str(e)}")
@@ -82,7 +81,8 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
     return {
         "status": "success",
         "inspection_id": request.inspection_id,
-        "task_count": len(tasks)
+        "task_count": len(tasks),
+        "tasks_preview": [t.get('task_title') for t in tasks[:3]]
     }
 
 if __name__ == "__main__":

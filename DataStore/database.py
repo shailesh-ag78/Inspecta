@@ -122,6 +122,30 @@ class InspectionRepository:
                 )
                 return [dict(row) for row in cur.fetchall()]
 
+    def get_inspection(self, industry_id: int, inspection_id: str) -> Optional[Dict]:
+        """Fetches inspection details by ID."""
+        with self.session(industry_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT * FROM inspections WHERE id = %s", 
+                    (inspection_id,)
+                )
+                row = cur.fetchone()
+                return dict(row) if row else None
+
+    def update_inspection_audio(self, industry_id: int, inspection_id: str, audio_path: str, metadata: dict):
+        """Updates inspection with audio path and metadata."""
+        with self.session(industry_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    UPDATE inspections 
+                    SET audio_url = %s, metadata = %s 
+                    WHERE id = %s
+                    """,
+                    (audio_path, Json(metadata), inspection_id)
+                )
+
     def update_task_review(self, industry_id: int, task_id: str, comments: str, status_id: int):
         """Human-in-the-loop: Update task after expert review."""
         with self.session(industry_id) as conn:
