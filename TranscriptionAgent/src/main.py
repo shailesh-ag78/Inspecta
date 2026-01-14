@@ -3,7 +3,6 @@ import os
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 import uvicorn
-from typing import List
 
 # --- Path Setup for Database ---
 DB_PATH = r"d:\code\Inspecta\DataStore"
@@ -16,75 +15,68 @@ except ImportError:
     print(f"Error: Could not import database from {DB_PATH}. Ensure the path is correct.")
     sys.exit(1)
 
-from openai_service import OpenAIService
+from groq_service import GroqService
 
 # --- Configuration ---
 DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=localhost port=5432"
+DATA_DIR = r"d:\code\Inspecta\Data"
 
 app = FastAPI()
-openai_service = OpenAIService()
+groq_service = GroqService()
 repo = IncidentRepository(DB_DSN)
 
-class GenerateTasksRequest(BaseModel):
+class TranscribeRequest(BaseModel):
     incident_id: str
     company_id: int
 
-@app.post("/generate_tasks")
-async def generate_tasks_endpoint(request: GenerateTasksRequest):
+@app.post("/transcribe")
+async def transcribe_endpoint(request: TranscribeRequest):
     """
-    Generates actionable tasks from the incident transcript using OpenAI
-    and stores them in the database.
+    Transcribes the audio file associated with the incident.
+    Reads from local disk, writes transcript to local disk.
     """
-    print(f"Generating tasks for incident: {request.incident_id}, company: {request.company_id}")
+    print(f"Transcribing incident: {request.incident_id}, company: {request.company_id}")
     
-    # 1. Fetch transcript from DB
-    try:
-        incident = repo.get_incident(request.company_id, request.incident_id)
-        if not incident:
-             raise HTTPException(status_code=404, detail="Incident not found")
+    # 1. Locate Audio File
+    # Convention: Data/<incident_id>.mp3
+    audio_filename = f"{request.incident_id}.mp3"
+    audio_path = os.path.join(DATA_DIR, audio_filename)
+    
+    if not os.path.exists(audio_path):
+        raise HTTPException(status_code=400, detail=f"Audio file not found at: {audio_path}")
 
-        metadata = incident.get('metadata') or {}
-        transcript = metadata.get('transcript')
+    # 2. Transcribe via Groq
+    try:
+        # process_incident handles chunking and merging
+        # Defaults to "transcribe" mode
+        result = groq_service.process_incident(audio_path, task_type="transcribe")
+        transcript_text = result.get("text", "")
         
-        if not transcript:
-            raise HTTPException(status_code=400, detail="No transcript found for this incident.")
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"DB Fetch Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-    # 2. Generate Tasks via OpenAI
-    try:
-        tasks = openai_service.generate_tasks_from_transcript(transcript)
-        print(f"Generated {len(tasks)} tasks.")
-    except Exception as e:
-        print(f"OpenAI Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Task generation failed: {str(e)}")
-
-    # 3. Store Tasks in DB
-    if not tasks:
-        return {"status": "success", "message": "No tasks generated.", "task_count": 0}
-
-    try:
-        # bulk_add_incident_tasks expects incident_id and list of dicts. 
-        # Needs inspection_id now. We have it in 'incident' dict from step 1, assuming get_incident returns it.
-        inspection_id = incident.get('inspection_id')
-        repo.bulk_add_incident_tasks(request.company_id, request.incident_id, inspection_id, tasks)
-        
-        # Verify extraction as requested: Fetch back tasks
-        created_tasks = repo.get_tasks_for_incident(request.company_id, request.incident_id)
-        print(f"Verified: {len(created_tasks)} tasks currently in DB for this incident.")
+        if not transcript_text:
+             raise HTTPException(status_code=500, detail="Transcription resulted in empty text.")
+             
+        print(f"Transcription complete (Length: {len(transcript_text)} chars)")
         
     except Exception as e:
-        print(f"DB Insert Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to store tasks: {str(e)}")
+        print(f"Groq Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Transcription failed: {str(e)}")
+
+    # 3. Save Transcript to Disk
+    transcript_filename = f"{request.incident_id}.txt"
+    transcript_path = os.path.join(DATA_DIR, transcript_filename)
+    
+    try:
+        with open(transcript_path, "w", encoding="utf-8") as f:
+            f.write(transcript_text)
+        print(f"Saved transcript to {transcript_path}")
+    except Exception as e:
+         print(f"Disk Write Error: {e}")
+         raise HTTPException(status_code=500, detail=f"Failed to save transcript: {str(e)}")
 
     return {
         "status": "success",
         "incident_id": request.incident_id,
-        "task_count": len(tasks),
-        "tasks_preview": [t.get('task_title') for t in tasks[:3]]
+        "transcript_path": transcript_path
     }
 
 if __name__ == "__main__":

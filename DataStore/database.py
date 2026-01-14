@@ -149,17 +149,17 @@ class IncidentRepository:
                 row = cur.fetchone()
                 return dict(row) if row else None
 
-    def update_incident_audio(self, company_id: int, incident_id: str, audio_path: str, metadata: dict):
+    def update_incident_audio(self, company_id: int, incident_id: str, audio_path: str):
         """Updates incident with audio path and metadata."""
         with self.session(company_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
                     UPDATE incidents 
-                    SET audio_url = %s, metadata = %s 
+                    SET audio_url = %s 
                     WHERE id = %s
                     """,
-                    (audio_path, Json(metadata), incident_id)
+                    (audio_path, incident_id)
                 )
 
     def update_task_review(self, company_id: int, task_id: str, comments: str, status_id: int):

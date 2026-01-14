@@ -2,6 +2,8 @@ import subprocess
 import os
 import shutil
 
+#ToDo:P3: Extract inspector audio only and makes multiple small Audio chunks with overlap of 5 sec
+
 def extract_audio(input_path: str, output_path: str = None) -> str:
     """
     Extracts audio from a video file using ffmpeg.
@@ -16,7 +18,7 @@ def extract_audio(input_path: str, output_path: str = None) -> str:
     """
     if output_path is None:
         base, _ = os.path.splitext(input_path)
-        output_path = f"{base}.wav"
+        output_path = f"{base}.mp3"
 
     # Ensure ffmpeg is available
     if not shutil.which("ffmpeg"):
