@@ -11,7 +11,7 @@ if DB_PATH not in sys.path:
     sys.path.append(DB_PATH)
 
 try:
-    from database import InspectionRepository
+    from database import IncidentRepository
 except ImportError:
     print(f"Error: Could not import database from {DB_PATH}. Ensure the path is correct.")
     sys.exit(1)
@@ -23,31 +23,31 @@ DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=lo
 
 app = FastAPI()
 openai_service = OpenAIService()
-repo = InspectionRepository(DB_DSN)
+repo = IncidentRepository(DB_DSN)
 
 class GenerateTasksRequest(BaseModel):
-    inspection_id: str
-    industry_id: int
+    incident_id: str
+    company_id: int
 
 @app.post("/generate_tasks")
 async def generate_tasks_endpoint(request: GenerateTasksRequest):
     """
-    Generates actionable tasks from the inspection transcript using OpenAI
+    Generates actionable tasks from the incident transcript using OpenAI
     and stores them in the database.
     """
-    print(f"Generating tasks for inspection: {request.inspection_id}, industry: {request.industry_id}")
+    print(f"Generating tasks for incident: {request.incident_id}, company: {request.company_id}")
     
     # 1. Fetch transcript from DB
     try:
-        inspection = repo.get_inspection(request.industry_id, request.inspection_id)
-        if not inspection:
-             raise HTTPException(status_code=404, detail="Inspection not found")
+        incident = repo.get_incident(request.company_id, request.incident_id)
+        if not incident:
+             raise HTTPException(status_code=404, detail="Incident not found")
 
-        metadata = inspection.get('metadata') or {}
+        metadata = incident.get('metadata') or {}
         transcript = metadata.get('transcript')
         
         if not transcript:
-            raise HTTPException(status_code=400, detail="No transcript found for this inspection.")
+            raise HTTPException(status_code=400, detail="No transcript found for this incident.")
     except HTTPException:
         raise
     except Exception as e:
@@ -67,12 +67,14 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
         return {"status": "success", "message": "No tasks generated.", "task_count": 0}
 
     try:
-        # bulk_add_tasks expects inspection_id and list of dicts
-        repo.bulk_add_tasks(request.industry_id, request.inspection_id, tasks)
+        # bulk_add_incident_tasks expects incident_id and list of dicts. 
+        # Needs inspection_id now. We have it in 'incident' dict from step 1, assuming get_incident returns it.
+        inspection_id = incident.get('inspection_id')
+        repo.bulk_add_incident_tasks(request.company_id, request.incident_id, inspection_id, tasks)
         
         # Verify extraction as requested: Fetch back tasks
-        created_tasks = repo.get_tasks_for_inspection(request.industry_id, request.inspection_id)
-        print(f"Verified: {len(created_tasks)} tasks currently in DB for this inspection.")
+        created_tasks = repo.get_tasks_for_incident(request.company_id, request.incident_id)
+        print(f"Verified: {len(created_tasks)} tasks currently in DB for this incident.")
         
     except Exception as e:
         print(f"DB Insert Error: {e}")
@@ -80,7 +82,7 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
 
     return {
         "status": "success",
-        "inspection_id": request.inspection_id,
+        "incident_id": request.incident_id,
         "task_count": len(tasks),
         "tasks_preview": [t.get('task_title') for t in tasks[:3]]
     }

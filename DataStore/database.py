@@ -29,22 +29,22 @@ class TaskType(IntEnum):
     CLEAR = 4
 
 # --- 2. The Repository ---
-class InspectionRepository:
+class IncidentRepository:
     def __init__(self, dsn: str):
         """DSN: 'dbname=... user=... password=... host=... port=...'"""
         self.dsn = dsn
 
     @contextmanager
-    def session(self, industry_id: int):
+    def session(self, company_id: int):
         """
         Maintains Row-Level Security by setting the session-level 
-        industry_id variable before any query is executed.
+        company_id variable before any query is executed.
         """
         conn = psycopg2.connect(self.dsn, cursor_factory=DictCursor)
         try:
             with conn.cursor() as cur:
-                # Security: Force RLS context for integer industry_id
-                cur.execute("SET LOCAL app.current_industry_id = %s", (industry_id,))
+                # Security: Force RLS context for integer company_id
+                cur.execute("SET LOCAL app.current_company_id = %s", (company_id,))
             yield conn
             conn.commit()
         except Exception as e:
@@ -53,30 +53,45 @@ class InspectionRepository:
         finally:
             conn.close()
 
-    def create_inspection(
-        self, 
-        industry_id: int, 
-        inspector_id: int, 
-        site_id: int, 
-        video_url: str, 
-        audio_url: Optional[str] = None,
-        metadata: dict = None
-    ) -> str:
-        """Creates the header inspection record."""
-        with self.session(industry_id) as conn:
+    def create_inspection(self, company_id: int, site_id: int) -> str:
+        """Creates a grouping inspection record."""
+        with self.session(company_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    """
-                    INSERT INTO inspections 
-                    (industry_id, inspector_id, site_id, video_url, audio_url, metadata) 
-                    VALUES (%s, %s, %s, %s, %s, %s) 
-                    RETURNING id
-                    """,
-                    (industry_id, inspector_id, site_id, video_url, audio_url, Json(metadata or {}))
+                    "INSERT INTO inspections (company_id, site_id) VALUES (%s, %s) RETURNING id",
+                    (company_id, site_id)
                 )
                 return cur.fetchone()['id']
 
-    def bulk_add_tasks(self, industry_id: int, inspection_id: str, tasks: List[Dict[str, Any]]):
+    def create_incident(
+        self, 
+        company_id: int,
+        inspection_id: str,
+        inspector_id: int, 
+        video_url: str, 
+        site_id: Optional[int] = None,
+        gps_coordinates: Optional[tuple] = None, # (lat, long)
+        audio_url: Optional[str] = None,
+        metadata: dict = None
+    ) -> str:
+        """Creates the incident record linked to an inspection."""
+        with self.session(company_id) as conn:
+            with conn.cursor() as cur:
+                # Note: 'point' in postgres can be inserted as string '(x,y)' or tuple
+                gps_val = f"({gps_coordinates[0]},{gps_coordinates[1]})" if gps_coordinates else None
+                
+                cur.execute(
+                    """
+                    INSERT INTO incidents 
+                    (inspection_id, company_id, inspector_id, site_id, video_url, audio_url, metadata, gps_coordinates) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
+                    RETURNING id
+                    """,
+                    (inspection_id, company_id, inspector_id, site_id, video_url, audio_url, Json(metadata or {}), gps_val)
+                )
+                return cur.fetchone()['id']
+
+    def bulk_add_incident_tasks(self, company_id: int, incident_id: str, inspection_id: str, tasks: List[Dict[str, Any]]):
         """
         High-performance bulk insert for Agent 2. 
         Expects a list of dictionaries containing task details.
@@ -84,8 +99,9 @@ class InspectionRepository:
         # Mapping dict to tuple for execute_values
         data = [
             (
+                incident_id,
+                company_id,
                 inspection_id,
-                industry_id,
                 t.get('task_title'),
                 t.get('task_description'),
                 t.get('task_original_description'),
@@ -101,58 +117,58 @@ class InspectionRepository:
         ]
 
         query = """
-            INSERT INTO inspection_tasks (
-                inspection_id, industry_id, task_title, task_description, 
+            INSERT INTO incident_tasks (
+                incident_id, company_id, inspection_id, task_title, task_description, 
                 task_original_description, video_url, video_start_ms, video_end_ms,
                 task_artifacts, status_id, severity_id, task_type_id
             ) VALUES %s
         """
 
-        with self.session(industry_id) as conn:
+        with self.session(company_id) as conn:
             with conn.cursor() as cur:
                 execute_values(cur, query, data)
 
-    def get_tasks_for_inspection(self, industry_id: int, inspection_id: str) -> List[Dict]:
-        """Fetches all tasks for a specific inspection, filtered by RLS."""
-        with self.session(industry_id) as conn:
+    def get_tasks_for_incident(self, company_id: int, incident_id: str) -> List[Dict]:
+        """Fetches all tasks for a specific incident, filtered by RLS."""
+        with self.session(company_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM inspection_tasks WHERE inspection_id = %s ORDER BY created_at ASC", 
-                    (inspection_id,)
+                    "SELECT * FROM incident_tasks WHERE incident_id = %s ORDER BY created_at ASC", 
+                    (incident_id,)
                 )
                 return [dict(row) for row in cur.fetchall()]
 
-    def get_inspection(self, industry_id: int, inspection_id: str) -> Optional[Dict]:
-        """Fetches inspection details by ID."""
-        with self.session(industry_id) as conn:
+    def get_incident(self, company_id: int, incident_id: str) -> Optional[Dict]:
+        """Fetches incident details by ID."""
+        with self.session(company_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT * FROM inspections WHERE id = %s", 
-                    (inspection_id,)
+                    "SELECT * FROM incidents WHERE id = %s", 
+                    (incident_id,)
                 )
                 row = cur.fetchone()
                 return dict(row) if row else None
 
-    def update_inspection_audio(self, industry_id: int, inspection_id: str, audio_path: str, metadata: dict):
-        """Updates inspection with audio path and metadata."""
-        with self.session(industry_id) as conn:
+    def update_incident_audio(self, company_id: int, incident_id: str, audio_path: str, metadata: dict):
+        """Updates incident with audio path and metadata."""
+        with self.session(company_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE inspections 
+                    UPDATE incidents 
                     SET audio_url = %s, metadata = %s 
                     WHERE id = %s
                     """,
-                    (audio_path, Json(metadata), inspection_id)
+                    (audio_path, Json(metadata), incident_id)
                 )
 
-    def update_task_review(self, industry_id: int, task_id: str, comments: str, status_id: int):
+    def update_task_review(self, company_id: int, task_id: str, comments: str, status_id: int):
         """Human-in-the-loop: Update task after expert review."""
-        with self.session(industry_id) as conn:
+        with self.session(company_id) as conn:
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    UPDATE inspection_tasks 
+                    UPDATE incident_tasks 
                     SET task_review_comments = %s, status_id = %s 
                     WHERE id = %s
                     """,

@@ -147,9 +147,9 @@ class GroqService:
         """Handles logic for a single incident: chunking, parallel processing, and merging."""
         # Define prompts based on task
         if task_type == "translate":
-            prompt = "Translate this site inspection into professional English. Marathi and Hindi words should be translated to English."
+            prompt = "Translate this site incident into professional English. Marathi and Hindi words should be translated to English."
         else:
-            prompt = "Transcribe this inspection exactly as spoken. Keep original English, Hindi, and Marathi words verbatim."
+            prompt = "Transcribe this incident exactly as spoken. Keep original English, Hindi, and Marathi words verbatim."
 
         # 1. Chunk if necessary
         chunks = self.get_audio_chunks(file_path, max_size_mb=MAX_FILE_SIZE_MB, overlap_sec=OVERLAP_SEC)

@@ -1,7 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: inspection_db
+    container_name: incident_db
     environment:
       POSTGRES_USER: dev_user
       POSTGRES_PASSWORD: dev_password
@@ -18,7 +18,7 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4
-    container_name: inspection_ui
+    container_name: incident_ui
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin

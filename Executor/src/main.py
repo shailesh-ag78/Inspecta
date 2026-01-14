@@ -8,7 +8,7 @@ import uuid
 
 app = FastAPI()
 
-TEMP_DIR = r"D:\code\Inspecta\Executor\temp_uploads"
+TEMP_DIR = r"D:\code\Inspecta\Data\temp_uploads"
 if not os.path.exists(TEMP_DIR):
     os.makedirs(TEMP_DIR)
 

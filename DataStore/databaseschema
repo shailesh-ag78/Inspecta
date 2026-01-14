@@ -25,6 +25,7 @@ CREATE TABLE task_type_lookup (
 CREATE TABLE companies (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
+    industry_id INTEGER REFERENCES industries_lookup(id),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -39,16 +40,25 @@ CREATE TABLE sites (
     id SERIAL PRIMARY KEY,
     industry_id INTEGER REFERENCES industries_lookup(id),
     site_name TEXT NOT NULL,
-    address TEXT
+    address TEXT,
+    gps_coordinates POINT
 );
 
 --- 3. TRANSACTIONAL TABLES ---
 
 CREATE TABLE inspections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    industry_id INTEGER REFERENCES industries_lookup(id),
-    inspector_id INTEGER REFERENCES inspectors(id),
+    company_id INTEGER REFERENCES companies(id),
     site_id INTEGER REFERENCES sites(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE incidents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    inspection_id UUID REFERENCES inspections(id) ON DELETE CASCADE,
+    company_id INTEGER REFERENCES companies(id),
+    inspector_id INTEGER REFERENCES inspectors(id),
+    gps_coordinates POINT,
     
     -- Master Media References
     video_url TEXT, -- Primary GCS link
@@ -58,10 +68,11 @@ CREATE TABLE inspections (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE inspection_tasks (
+CREATE TABLE incident_tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    incident_id UUID REFERENCES incidents(id) ON DELETE CASCADE,
+    company_id INTEGER REFERENCES companies(id),
     inspection_id UUID REFERENCES inspections(id) ON DELETE CASCADE,
-    industry_id INTEGER REFERENCES industries_lookup(id),
     
     task_title TEXT NOT NULL,
     task_description TEXT,
@@ -85,3 +96,6 @@ CREATE TABLE inspection_tasks (
     
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+CREATE INDEX CONCURRENTLY idx_tasks_company_incident 
+ON incident_tasks (company_id, inspection_id);

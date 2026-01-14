@@ -19,7 +19,7 @@ class OpenAIService:
         Returns a list of dictionaries compatible with the database schema.
         """
         system_prompt = """
-        You are an expert industrial inspector helper. Your job is to analyze the audio transcript of an inspection
+        You are an expert industrial inspector helper. Your job is to analyze the audio transcript of an incident
         and extract a list of ACTIONABLE TASKS.
         
         For each task, identify:

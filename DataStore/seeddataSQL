@@ -30,7 +30,7 @@ INSERT INTO task_type_lookup (id, label) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- 5. Sample Master Data (For Testing)
-INSERT INTO companies (name) VALUES ('Global Inspections Corp');
+INSERT INTO companies (name, industry_id) VALUES ('Global Inspections Corp', 1);
 
 INSERT INTO inspectors (company_id, full_name, email) 
 VALUES (1, 'John Doe', 'john.doe@global.com');

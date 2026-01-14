@@ -125,7 +125,7 @@ class GroqClient:
         """
         Transcribes the audio file.
         """
-        prompt = "Transcribe this inspection exactly as spoken. Keep original English, Hindi, and Marathi words verbatim."
+        prompt = "Transcribe this incident exactly as spoken. Keep original English, Hindi, and Marathi words verbatim."
 
         # 1. Chunk if necessary
         chunks = self.get_audio_chunks(file_path, max_size_mb=MAX_FILE_SIZE_MB, overlap_sec=OVERLAP_SEC)

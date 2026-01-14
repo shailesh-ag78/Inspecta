@@ -12,7 +12,7 @@ if DB_PATH not in sys.path:
     sys.path.append(DB_PATH)
 
 try:
-    from database import InspectionRepository
+    from database import IncidentRepository
 except ImportError:
     print(f"Error: Could not import database from {DB_PATH}. Ensure the path is correct.")
     sys.exit(1)
@@ -23,46 +23,46 @@ from groq_client import GroqClient
 # --- Configuration ---
 DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=localhost port=5432"
 
-DATA_DIR = r"d:\code\Inspecta\Data"
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
+# DATA_DIR = r"d:\code\Inspecta\Data"
+# if not os.path.exists(DATA_DIR):
+#     os.makedirs(DATA_DIR)
 
 app = FastAPI()
 groq_client = GroqClient()
-repo = InspectionRepository(DB_DSN)
+repo = IncidentRepository(DB_DSN)
 
 class ExtractAudioRequest(BaseModel):
-    inspection_id: str
-    industry_id: int
+    incident_id: str
+    company_id: int
 
 @app.post("/extract_audio")
 async def extract_audio_endpoint(request: ExtractAudioRequest):
     """
-    Extracts audio from the video associated with the inspection,
+    Extracts audio from the video associated with the incident,
     transcribes it using Groq, and updates the database.
     """
-    print(f"Processing inspection: {request.inspection_id} for industry: {request.industry_id}")
+    print(f"Processing incident: {request.incident_id} for company: {request.company_id}")
     
-    # 1. Get inspection details from DB
+    # 1. Get incident details from DB
     try:
-        inspection = repo.get_inspection(request.industry_id, request.inspection_id)
-        if not inspection:
-            raise HTTPException(status_code=404, detail="Inspection not found")
+        incident = repo.get_incident(request.company_id, request.incident_id)
+        if not incident:
+            raise HTTPException(status_code=404, detail="Incident not found")
         
-        video_url = inspection.get('video_url')
-        current_metadata = inspection.get('metadata') or {}
+        video_url = incident.get('video_url')
+        current_metadata = incident.get('metadata') or {}
     except Exception as e:
         print(f"DB Error: {e}")
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     if not video_url:
-        raise HTTPException(status_code=400, detail="No video_url found for this inspection")
+        raise HTTPException(status_code=400, detail="No video_url found for this incident")
 
     # 2. Determine paths
     if not os.path.exists(video_url):
          raise HTTPException(status_code=400, detail=f"Video file not found at: {video_url}")
 
-    audio_filename = f"{request.inspection_id}.mp3"
+    audio_filename = f"{request.incident_id}.mp3"
     audio_path = os.path.join(DATA_DIR, audio_filename)
 
     # 3. Extract Audio
@@ -86,14 +86,14 @@ async def extract_audio_endpoint(request: ExtractAudioRequest):
     try:
         # Update metadata with transcript
         current_metadata['transcript'] = transcript_text
-        repo.update_inspection_audio(request.industry_id, request.inspection_id, audio_path, current_metadata)
+        repo.update_incident_audio(request.company_id, request.incident_id, audio_path, current_metadata)
     except Exception as e:
          print(f"DB Update Error: {e}")
          raise HTTPException(status_code=500, detail=f"Failed to update database: {str(e)}")
 
     return {
         "status": "success",
-        "inspection_id": request.inspection_id,
+        "incident_id": request.incident_id,
         "audio_url": audio_path,
         "transcript_preview": transcript_text[:100] + "..." if transcript_text else ""
     }

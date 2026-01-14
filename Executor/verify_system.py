@@ -18,7 +18,7 @@ def load_module(name, path):
     return mod
 
 try:
-    from database import InspectionRepository, Industry
+    from database import IncidentRepository, Industry
     
     # Load Main Modules
     audio_main = load_module("audio_agent_main", r"d:\code\Inspecta\AudioExtractorAgent\src\main.py")
@@ -49,7 +49,7 @@ mock_openai = MagicMock()
 mock_openai.generate_tasks_from_transcript.return_value = [
     {
         "task_title": "Repair Panel",
-        "task_description": "The panel is cracked as per inspection.",
+        "task_description": "The panel is cracked as per incident.",
         "task_original_description": "The panel is cracked.",
         "severity_id": 1,
         "status_id": 1,
@@ -59,8 +59,9 @@ mock_openai.generate_tasks_from_transcript.return_value = [
 trans_main.openai_service = mock_openai
 
 # --- DB Setup ---
+# --- DB Setup ---
 DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=localhost port=5432"
-repo = InspectionRepository(DB_DSN)
+repo = IncidentRepository(DB_DSN)
 
 async def verify():
     print("----------------------------------------------------------------")
@@ -76,25 +77,32 @@ async def verify():
     with open(dummy_video_path, "w") as f:
         f.write("dummy content")
 
-    # 2. Create Inspection
-    print("\n[Step 1] Creating Test Inspection in DB...")
+    # 2. Create Inspection & Incident
+    print("\n[Step 1] Creating Test Inspection & Incident in DB...")
     try:
-        inspection_id = repo.create_inspection(
-            industry_id=1, 
+        # A. Create Inspection
+        inspection_id = repo.create_inspection(company_id=1, site_id=1)
+        print(f"✅ Inspection Created ID: {inspection_id}")
+
+        # B. Create Incident
+        incident_id = repo.create_incident(
+            company_id=1,
+            inspection_id=inspection_id,
             inspector_id=1, 
             site_id=1,
             video_url=dummy_video_path,
+            gps_coordinates=(18.5204, 73.8567), # Pune
             metadata={"source": "verification_script"}
         )
-        print(f"✅ Inspection Created ID: {inspection_id}")
+        print(f"✅ Incident Created ID: {incident_id}")
     except Exception as e:
-        print(f"❌ Failed to create inspection: {e}")
+        print(f"❌ Failed to create inspection/incident: {e}")
         return
 
     # 3. Test AudioExtractor
     print("\n[Step 2] Testing AudioExtractorAgent...")
     try:
-        req = ExtractAudioRequest(inspection_id=str(inspection_id), industry_id=1)
+        req = ExtractAudioRequest(incident_id=str(incident_id), company_id=1)
         res = await extract_audio_endpoint(req)
         
         if res['status'] == 'success' and 'verified_test.mp3' in res['audio_url']:
@@ -102,9 +110,10 @@ async def verify():
         else:
              print(f"❌ Unexpected API Response: {res}")
              
+             
         with repo.session(1) as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT metadata FROM inspections WHERE id=%s", (inspection_id,))
+                cur.execute("SELECT metadata FROM incidents WHERE id=%s", (incident_id,))
                 meta = cur.fetchone()[0]
                 if meta.get('transcript') == "Verified transcript: The panel is cracked. Please repair it.":
                     print("✅ Database updated with Transcript")
@@ -117,7 +126,7 @@ async def verify():
     # 4. Test Transcription Agent
     print("\n[Step 3] Testing TranscriptionAgent...")
     try:
-        req = GenerateTasksRequest(inspection_id=str(inspection_id), industry_id=1)
+        req = GenerateTasksRequest(incident_id=str(incident_id), company_id=1)
         res = await generate_tasks_endpoint(req)
         
         if res['status'] == 'success' and res['task_count'] == 1:
@@ -125,7 +134,7 @@ async def verify():
         else:
             print(f"❌ Unexpected API Response: {res}")
             
-        tasks = repo.get_tasks_for_inspection(1, str(inspection_id))
+        tasks = repo.get_tasks_for_incident(1, str(incident_id))
         if len(tasks) == 1 and tasks[0]['task_title'] == "Repair Panel":
              print("✅ Task persisted in DB correctly")
         else:
