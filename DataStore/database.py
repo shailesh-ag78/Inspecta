@@ -53,16 +53,6 @@ class IncidentRepository:
         finally:
             conn.close()
 
-    def create_inspection(self, company_id: int, site_id: int) -> str:
-        """Creates a grouping inspection record."""
-        with self.session(company_id) as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    "INSERT INTO inspections (company_id, site_id) VALUES (%s, %s) RETURNING id",
-                    (company_id, site_id)
-                )
-                return cur.fetchone()['id']
-
     def create_incident(
         self, 
         company_id: int,
@@ -174,3 +164,31 @@ class IncidentRepository:
                     """,
                     (comments, status_id, task_id)
                 )
+
+    def create_inspection(self, company_id: int, site_id: int, inspector_id: int) -> str:
+            """Inserts a new inspection record and returns the UUID."""
+            with self.session(company_id) as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """
+                        INSERT INTO inspections (company_id, site_id, inspector_id) 
+                        VALUES (%s, %s, %s) 
+                        RETURNING id
+                        """,
+                        (company_id, site_id, inspector_id)
+                    )
+                    result = cur.fetchone()
+                    return str(result['id'])
+
+def verify_inspection_ownership(self, company_id: int, inspection_id: str) -> bool:
+        """
+        Verifies if an inspection belongs to the given company.
+        This is a critical security check to prevent ID injection.
+        """
+        with self.session(company_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM inspections WHERE id = %s AND company_id = %s",
+                    (inspection_id, company_id)
+                )
+                return cur.fetchone() is not None

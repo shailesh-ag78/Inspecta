@@ -10,18 +10,9 @@ TRANSCRIPTION_AGENT_URL = os.getenv("TRANSCRIPTION_AGENT_URL", "http://localhost
 @task
 def call_audio_extractor(file_path: str, filename: str) -> str:
     """
-    Calls the AudioExtractorAgent to extract audio or transcribe directly.
-    In this specific architecture, AudioExtractorAgent seems to have a /transcribeAudio endpoint
-    which returns text (simple transcription) or we might just use it to get audio.
-    
-    Based on exploration:
-    AudioExtractorAgent has /extract_audio that returns PlainTextResponse.
+    Calls the AudioExtractorAgent to extract audio 
     """
     url = f"{AUDIO_EXTRACTOR_URL}/extract_audio"
-    
-    # We need to send the file.
-    # Note: In a real cloud env, we might pass a URL or S3 path.
-    # Here we are simulating passing the file by re-uploading it from local temp.
     
     if not os.path.exists(file_path):
         return f"Error: File {file_path} not found."
@@ -69,32 +60,35 @@ def workflow(inputs: Dict[str, Any]) -> Dict[str, Any]:
     Orchestration logic.
     Inputs:
       - file_path: str
-      - filename: str
+      - org_filename: str
       - task_type: str (transcribe, translate, extract_audio)
     """
     file_path = inputs.get("file_path")
-    filename = inputs.get("filename")
+    org_filename = inputs.get("org_filename")
     task_type = inputs.get("task_type", "transcribe")
     
     results = {}
     
     # Routing Logic
-    # If task is 'simple_transcribe' (maybe audio extractor does this?), use AudioExtractor
-    # If task is 'incident_transcribe' or 'translate', use TranscriptionAgent
+    # If task is 'extract_audio', use AudioExtractor
+    # If task is 'transcribe' or 'translate', extract Audio and then use TranscriptionAgent
     
     # Validating task type against available agents
     
-    if task_type == "simple_transcribe":
-        # call_audio_extractor returns a Future-like object (Task) in LangGraph functional? 
-        # Actually with @task, it returns a value when awaited or resolved by the graph runner.
-        # In the functional API, we call it like a function.
-        extractor_result = call_audio_extractor(file_path, filename).result()
-        results["simple_transcription"] = extractor_result
-        
-    elif task_type in ["transcribe", "translate"]:
-        transcription_result = call_transcription_agent(file_path, filename, task_type).result()
-        results["incident_data"] = transcription_result
-    
+    if task_type.lower() in ["extract_audio", "transcribe", "translate"]:
+        # call_audio_extractor to extract audio.
+        extractor_result = call_audio_extractor(file_path, filename)
+        results["extracted_audio"] = extractor_result
+        # if task_type.lower() == "transcribe":
+        #     # call_audio_extractor to extract audio.
+        #     # call_transcription_agent to transcribe audio.
+        #     # Actually with @task, it returns a value when awaited or resolved by the graph runner.
+        #     # In the functional API, we call it like a function.
+        #     transcription_result = call_transcription_agent(file_path, filename, task_type)
+        #     results["transcription_result"] = transcription_result
+        # elif task_type.lower() == "translate":
+        #     transcription_result = call_transcription_agent(file_path, filename, task_type)
+        #     #results["incident_data"] = transcription_result
     else:
         results["error"] = f"Unknown task_type: {task_type}"
         
