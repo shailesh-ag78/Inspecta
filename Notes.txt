@@ -1,4 +1,6 @@
 Prompt for Antigravity 
 
-resolve all ToDo comments in the code
-add audit logs in the code
+- resolve all ToDo comments in the code
+- add audit logs in the code
+- implement firebase authentication. After validating companyid from firebase token, extract site id and inspector id from the token and pass it to the executor    
+- 

@@ -13,6 +13,10 @@ from langchain_core.runnables import RunnableConfig
 # Your provided Repository
 from database import IncidentRepository
 
+EXTRACT_AUDIO_NODE = "extract_audio"
+TRANSCRIBE_NODE = "transcribe"
+GENERATE_TASKS_NODE = "generate_tasks"
+
 # --- 1. Define the State ---
 # This is the "memory" passed between AI nodes
 class IncidentState(TypedDict):
@@ -20,7 +24,6 @@ class IncidentState(TypedDict):
     inspection_id: str
     incident_id: str
     video_path: str
-    audio_path: str
     transcript: str
     # 'operator.add' allows nodes to append to this list without overwriting
     generated_tasks: Annotated[List[dict], operator.add]
@@ -68,15 +71,15 @@ class WorkflowExecutor:
         retry_policy = {"max_attempts": 3, "backoff_factor": 2}
 
         # Define Nodes
-        builder.add_node("extract_audio", self._extract_audio_node)
-        builder.add_node("transcribe", self._transcribe_node, retry=retry_policy)
-        builder.add_node("generate_tasks", self._generate_tasks_node, retry=retry_policy)
+        builder.add_node(self.EXTRACT_AUDIO_NODE, self._extract_audio_node)
+        builder.add_node(self.TRANSCRIBE_NODE, self._transcribe_node, retry=retry_policy)
+        builder.add_node(self.GENERATE_TASKS_NODE, self._generate_tasks_node, retry=retry_policy)
 
         # Define Edges
-        builder.add_edge(START, "extract_audio")
-        builder.add_edge("extract_audio", "transcribe")
-        builder.add_edge("transcribe", "generate_tasks")
-        builder.add_edge("generate_tasks", END)
+        builder.add_edge(START, self.EXTRACT_AUDIO_NODE)
+        builder.add_edge(self.EXTRACT_AUDIO_NODE, self.TRANSCRIBE_NODE)
+        builder.add_edge(self.TRANSCRIBE_NODE, self.GENERATE_TASKS_NODE)
+        builder.add_edge(self.GENERATE_TASKS_NODE, END)
 
         # Compile with checkpointer for pause/resume capability
         return builder.compile(checkpointer=self.checkpointer)
@@ -85,40 +88,51 @@ class WorkflowExecutor:
 
     async def handle_incident_upload(
         self, 
-        auth_company_id: int, 
+        company_id: int, 
         inspection_id: str, 
         inspector_id: int, 
-        file_stream, 
-        filename: str
+        file_url: str,
+        existing_incident_id: str = None, # Optional: if re-uploading for an ID
+        site_id: Optional[int] = None,
+        gps_coordinates: Optional[tuple] = None, # (lat, long)
     ) -> str:
         # 1. VERIFY OWNERSHIP FIRST
         # Check if this inspection_id belongs to this company_id
-        is_valid = self.repo.verify_inspection_ownership(auth_company_id, inspection_id)
+        is_valid = self.repo.verify_inspection_ownership(company_id, inspection_id)
         if not is_valid:
             raise PermissionError("Security Violation: Inspection ownership mismatch.")
 
-        company_id = auth_company_id    
-        """
-        METHOD CALLED FROM UI:
-        1. Saves file to local/GCS
-        2. Creates DB record
-        3. Triggers LangGraph in background
-        """
-        # 1. STORAGE: Save file locally (GCS logic commented)
-        unique_filename = f"{uuid.uuid4()}_{filename}"
-        local_video_path = os.path.join(self.data_dir, unique_filename)
+        # 🛡️ SECURITY STEP 2: Validate the Incident (if ID is provided by UI)
+        if existing_incident_id:
+            if not self.repo.verify_incident_ownership(company_id, existing_incident_id):
+                raise PermissionError("Access Denied: Incident ownership mismatch.")
+            incident_id = existing_incident_id
+        else:
+            # Server generates ID to ensure uniqueness and security
+            # 2. PERSISTENCE: Create the initial incident record
+            # This ensures the UI can immediately see the incident exists
+            incident_id = self.repo.create_incident(
+                company_id=company_id,
+                inspection_id=inspection_id,
+                video_url=file_url,
+                inspector_id=inspector_id,
+                site_id=site_id,
+                gps_coordinates=gps_coordinates
+            )
+
+        # """
+        # METHOD CALLED FROM UI:
+        # 1. Saves file to local/GCS
+        # 2. Creates DB record
+        # 3. Triggers LangGraph in background
+        # """
+        # # 1. STORAGE: Save file locally (GCS logic commented)
+        # unique_filename = f"{uuid.uuid4()}_{filename}"
+        # local_video_path = os.path.join(self.data_dir, unique_filename)
         
-        with open(local_video_path, "wb") as buffer:
-            shutil.copyfileobj(file_stream, buffer)
+        # with open(local_video_path, "wb") as buffer:
+        #     shutil.copyfileobj(file_stream, buffer)
         
-        # 2. PERSISTENCE: Create the initial incident record
-        # This ensures the UI can immediately see the incident exists
-        incident_id = self.repo.create_incident(
-            company_id=company_id,
-            inspection_id=inspection_id,
-            video_url=local_video_path,
-            inspector_id=inspector_id
-        )
 
         # 3. BACKGROUND: Trigger LangGraph
         # We define a 'thread_id' so the checkpointer knows this specific execution
@@ -127,7 +141,9 @@ class WorkflowExecutor:
             "company_id": company_id,
             "inspection_id": inspection_id,
             "incident_id": incident_id,
-            "video_path": local_video_path
+            "video_path": file_url,
+            "transcript": "",         # Initialize as empty string
+            "generated_tasks": []     # Initialize the list for operator.add
         }
         
         # We do NOT 'await' this so the UI response is instant
@@ -161,6 +177,7 @@ class WorkflowExecutor:
         return {"transcript": transcript}
 
     async def _generate_tasks_node(self, state: IncidentState):
+
         """Node 3: Call Task Generator Agent."""
         # AGENT CALL: tasks = await task_generator_agent.ainvoke(state['transcript'])
         tasks = [{"task_title": "Fix Damaged Wire", "severity_id": 1, "task_type_id": 2}]
@@ -175,35 +192,59 @@ class WorkflowExecutor:
         
         return {"generated_tasks": tasks}
 
-async def create_new_inspection(self, company_id: int, site_id: int, inspector_id: int) -> str:
-        """
-        Creates a master inspection record in the DB.
-        The repository uses RLS to ensure the company_id is enforced.
-        """
-        # We use the repo you provided in database.py
-        # You'll need to ensure create_inspection exists in your IncidentRepository
-        inspection_id = self.repo.create_inspection(
-            company_id=company_id,
-            site_id=site_id,
-            inspector_id=inspector_id
-        )
-        return inspection_id
+    async def get_status(self, company_id: int, incident_id: str):
+            """
+            Interfaced from UI.
+            Provides granular status by checking DB and LangGraph state.
+            """
+            # 1. SECURITY CHECK (Ownership)
+            # If this fails, the user gets nothing.
+            db_record = self.repo.get_incident_progress(company_id, incident_id)
+            if not db_record:
+                raise PermissionError("Unauthorized: Incident does not belong to your company.")
 
-""" Sample UI Code
+            # 2. GRANULAR CHECK (LangGraph Checkpointer)
+            # We ask LangGraph: "Where is the thread for this incident_id?"
+            config = {"configurable": {"thread_id": incident_id}}
+            state = await self.workflow.aget_state(config)
+            
+           # 3. STATUS DERIVATION
+           # If state.next is empty, it means the graph reached END
+            if not state.next:
+                # We check if there's actually any history; if not, it hasn't started
+                if not state.values:
+                    status_key = "queued"
+                    message = "Incident is in queue for processing..."
+                else:
+                    status_key = "completed"
+                    message = "Analysis complete! Tasks generated."
+            else:
+                # state.next is a list of the nodes about to run
+                current_node = state.next[0] 
+                status_key = current_node
+                
+                messages = {
+                    self.EXTRACT_AUDIO_NODE: "Extracting audio from video...",
+                    self.TRANSCRIBE_NODE: "AI is transcribing speech...",
+                    self.GENERATE_TASKS_NODE: "Generating inspection tasks..."
+                }
+                message = messages.get(current_node, "Processing...")
 
-const formData = new FormData();
-formData.append('company_id', 101);
-formData.append('inspector_id', 5);
-formData.append('file', {
-  uri: videoLocalUri,
-  name: 'rust_inspection_video.mp4',
-  type: 'video/mp4',
-});
+            return {
+                "incident_id": incident_id,
+                "status": status_key,
+                "display_message": message,
+                "is_finished": status_key == "completed"
+            }
 
-fetch('https://your-api.com/inspections/XYZ-123/upload-incident', {
-  method: 'POST',
-  body: formData,
-  headers: { 'Content-Type': 'multipart/form-data' },
-}).then(response => response.json());
-"""
-
+    async def create_new_inspection(self, company_id: int, site_id: int, inspector_id: int) -> str:
+            """
+            Creates a master inspection record in the DB.
+            The repository uses RLS to ensure the company_id is enforced.
+            """
+            inspection_id = self.repo.create_inspection(
+                company_id=company_id,
+                site_id=site_id,
+                inspector_id=inspector_id
+            )
+            return inspection_id

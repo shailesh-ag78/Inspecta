@@ -192,3 +192,26 @@ def verify_inspection_ownership(self, company_id: int, inspection_id: str) -> bo
                     (inspection_id, company_id)
                 )
                 return cur.fetchone() is not None
+
+def verify_incident_ownership(self, company_id: int, incident_id: str) -> bool:
+        """
+        Security Check: Verifies the incident belongs to the company.
+        Used when the UI requests status or updates for an existing incident.
+        """
+        with self.session(company_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM incidents WHERE id = %s AND company_id = %s",
+                    (incident_id, company_id)
+                )
+                return cur.fetchone() is not None
+
+def get_incident_progress(self, company_id: int, incident_id: str):
+        """Fetches basic status from the incident table."""
+        with self.session(company_id) as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT status, audio_url FROM incidents WHERE id = %s AND company_id = %s",
+                    (incident_id, company_id)
+                )
+                return cur.fetchone()
