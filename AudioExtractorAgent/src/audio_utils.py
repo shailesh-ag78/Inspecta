@@ -1,6 +1,7 @@
 import subprocess
 import os
 import shutil
+import uuid
 
 #ToDo:P3: Extract inspector audio only and makes multiple small Audio chunks with overlap of 5 sec
 
@@ -18,7 +19,8 @@ def extract_audio(input_path: str, output_path: str = None) -> str:
     """
     if output_path is None:
         base, _ = os.path.splitext(input_path)
-        output_path = f"{base}.mp3"
+        audio_filename = f"{base}_{uuid.uuid4().hex[:8]}.mp3"
+        audio_path = os.path.join(DATA_DIR, audio_filename)
 
     # Ensure ffmpeg is available
     if not shutil.which("ffmpeg"):
