@@ -4,3 +4,35 @@ Prompt for Antigravity
 - add audit logs in the code
 - implement firebase authentication. After validating companyid from firebase token, extract site id and inspector id from the token and pass it to the executor    
 - 
+
+
+For testing
+- IN postman add custom headers
+X-Company-Id	101	Simulates your company_id
+X-Storage-Id	storage_alpha_99	Simulates your company_storage_id
+Content-Type	application/json	Standard for your POST/PUT requests
+
+import httpx
+import os
+
+class ExternalAgentClient:
+    """Standardized client for calling external inspection agents."""
+    def __init__(self, base_url: str):
+        self.base_url = base_url.rstrip("/")
+        self.timeout = httpx.Timeout(120.0, connect=60.0) # Long timeout for processing
+
+    async def call_agent(self, endpoint: str, payload: dict = None, files: dict = None):
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            try:
+                if files:
+                    # For Transcription (Sends the file stream)
+                    response = await client.post(f"{self.base_url}{endpoint}", files=files, data=payload)
+                else:
+                    # For Analysis (Sends JSON metadata/transcripts)
+                    response = await client.post(f"{self.base_url}{endpoint}", json=payload)
+                
+                response.raise_for_status() # Ensure we don't proceed on 500 errors
+                return response.json()
+            except Exception as e:
+                print(f"Agent Call Failed [{endpoint}]: {e}")
+                return {"error": str(e), "status": "failed"}

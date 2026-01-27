@@ -20,11 +20,21 @@ ALLOWED_TYPES = {
     "audio/x-wav": ".wav"
 }
 
+# Set this in your environment or .env file: ENV_MODE=local
+ENV_MODE = "local" # os.getenv("ENV_MODE", "local")
+# Define your local root (where files actually live on your PC)
+LOCAL_STORAGE_ROOT = os.path.abspath(r"d:\code\Inspecta\Data")
+
 # --- 1. Lifecycle Management ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # This runs ONCE when the server starts
-    db_dsn = os.getenv("DATABASE_URL", "dbname=yourdb user=postgres password=pass host=localhost")
+
+    # The "dbname" must match your -e POSTGRES_DB value
+    db_dsn = os.getenv(
+        "DATABASE_URL", 
+        "dbname=inspecta_local user=postgres password=passwd host=localhost port=5432"
+    )
     
     # Initialize Repository
     repo = IncidentRepository(db_dsn)
@@ -77,18 +87,24 @@ from firebase_admin import auth
 
 @app.middleware("http")
 async def verify_firebase_token(request: Request, call_next):
-    # 1. Grab the Token from the 'Authorization' Header
-    id_token = request.headers.get("Authorization", "").replace("Bearer ", "")
-    
     try:
-        # 2. Verify with Firebase
-        decoded_token = auth.verify_id_token(id_token)
-        
-        # 3. Extract the SECURE company_id from the token claims
-        # This CANNOT be faked by the UI
-        request.state.company_id = decoded_token.get("company_id")
-        request.state.company_storage_id = decoded_token.get("company_storage_id")
-        
+        # 1. Check if we are in local testing mode
+        if ENV_MODE == "local":
+            # Bypass Firebase and read IDs directly from headers for testing
+            request.state.company_id = request.headers.get("X-Company-Id")
+            request.state.company_storage_id = request.headers.get("X-Storage-Id")
+            return await call_next(request)
+        else:
+            # 1. Grab the Token from the 'Authorization' Header
+            id_token = request.headers.get("Authorization", "").replace("Bearer ", "")
+            
+            # 2. Verify with Firebase
+            decoded_token = auth.verify_id_token(id_token)
+            
+            # 3. Extract the SECURE company_id from the token claims
+            # This CANNOT be faked by the UI
+            request.state.company_id = decoded_token.get("company_id")
+            request.state.company_storage_id = decoded_token.get("company_storage_id")
     except Exception:
         # If token is fake or expired, we don't set the company_id
         request.state.company_id = None
@@ -111,7 +127,7 @@ async def create_inspection_endpoint(
     UI Endpoint: Initializes a new inspection session.
     The company_id is pulled from the authenticated session/state.
     """
-    # Extract auth_company_id (Grab the Token from the 'Authorization' Header)
+    # Extract company_id (Grab the Token from the 'Authorization' Header)
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -160,24 +176,42 @@ async def upload_incident_endpoint(
     if company_storage_id is None:
         raise HTTPException(status_code=401, detail="Invalid storage")
 
-    # 1. Check GCS Metadata: Does the file actually exist and have a sane size?
-    # This prevents the AI from trying to process a 'missing' or 'fake' file.
+    # 1. Security Check: Prevent Directory Traversal
+    if is_local:
+        # Resolve the path to its absolute form to handle any "../" tricks
+        data.file_url = os.path.abspath(data.file_url)
+        # Define the ONLY allowed directory for this company
+        allowed_prefix = os.path.join(LOCAL_STORAGE_ROOT, company_storage_id, UPLOADS_FOLDER)
+    else:
+        # Check GCS Metadata: Does the file actually exist and have a sane size?
+        # This prevents the AI from trying to process a 'missing' or 'fake' file.
+        # File name example : "gs://inspecta-file-bucket/f83k-92js/uploads/a1b2-c3d4.mp4"
+        #Format : full_gcp_path = f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/UPLOADS_FOLDER/{filename}"
+        # Define the ONLY allowed directory for this company
+        #if not data.file_url.startswith(f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"):
+        allowed_prefix =  f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"
 
-    # File name example : "gs://inspecta-file-bucket/f83k-92js/uploads/a1b2-c3d4.mp4"
-
-    #Format : full_gcp_path = f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/UPLOADS_FOLDER/{filename}"
-    if not data.file_url.startswith(f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"):
+    if not data.file_url.startswith(allowed_prefix):
         raise HTTPException(status_code=403, detail="Security Violation: Invalid storage path.")
 
     # 2. Check File name and size
-    blob_name = data.file_url.replace("gs://{INSPCTA_FILE_BUCKET}/", "")
-    bucket = storage_client.bucket(INSPCTA_FILE_BUCKET)
-    blob = bucket.get_blob(blob_name)
-    if not blob:
-        raise HTTPException(status_code=404, detail="File not found.")
-    if blob.size > (500 * 1024 * 1024):
-        raise HTTPException(status_code=413, detail="File too large (Max 500MB).")
-        
+    if is_local:
+        # 2. Local File Metadata Check (Existence and Size)
+        if not os.path.exists(data.file_url):
+            raise HTTPException(status_code=404, detail="File not found on local disk.")
+        file_size = os.path.getsize(data.file_url)
+    else:
+        # 2. GCS File Metadata Check (Existence and Size)
+        blob_name = data.file_url.replace("gs://{INSPCTA_FILE_BUCKET}/", "")
+        bucket = storage_client.bucket(INSPCTA_FILE_BUCKET)
+        blob = bucket.get_blob(blob_name)
+        if not blob:
+            raise HTTPException(status_code=404, detail="File not found.")
+        file_size = blob.size    
+
+    if file_size > (500 * 1024 * 1024):
+        raise HTTPException(status_code=413, detail="File too large (Max 500MB).")  
+
     """
     Called by Mobile UI (Multipart Form Data).
     Accepts the video file returns incident_id immediately.
@@ -235,22 +269,38 @@ async def get_upload_url():
     Server-side generation of the destination.
     The UI never decides the path.
     """
-    # 1. Dictate the path (Hardcoded logic)
-    # We use a UUID so the user can't guess other filenames
-    ext = ALLOWED_TYPES[content_type]
+    # 1. Standard Logic (Same for both)
+    ext = ALLOWED_TYPES.get(content_type, ".bin")
     unique_name = f"{uuid.uuid4()}{ext}"
+    
+    # This is the "relative" path inside the bucket or root folder
     blob_name = f"{company_storage_id}/{UPLOADS_FOLDER}/{unique_name}"
-    
-    # 2. Generate Signed URL (valid for 30 mins)
-    bucket = storage_client.bucket(INSPCTA_FILE_BUCKET)
-    blob = bucket.blob(blob_name)
-    
-    url = blob.generate_signed_url(
-        version="v4",
-        expiration=datetime.timedelta(minutes=30),
-        method="PUT", # UI must use PUT to upload
-        content_type=content_type
-    )
 
-    # We return the URL for upload AND the path for the DB
-    return {"upload_url": url, "storage_path": blob_name}
+    if is_local:
+        # 2. Local Logic: Return the absolute path on your hard drive
+        full_path = os.path.join(LOCAL_STORAGE_ROOT, blob_name)
+        
+        # Ensure the directory exists so the "Executor" or UI doesn't fail
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        
+        # We return the path as the "url" so the UI/Executor knows where to look
+        return {
+            "upload_url": full_path, 
+            "blob_name": blob_name,
+            "storage_type": "local"
+        }
+    else:
+        # 3. GCP Logic (Your original code)
+        bucket = storage_client.bucket(INSPCTA_FILE_BUCKET)
+        blob = bucket.blob(blob_name)
+        url = blob.generate_signed_url(
+            version="v4",
+            expiration=datetime.timedelta(minutes=30),
+            method="PUT",
+            content_type=content_type
+        )
+        return {
+            "upload_url": url, 
+            "blob_name": blob_name,
+            "storage_type": "gcs"
+        }

@@ -4,6 +4,9 @@ import uuid
 import asyncio
 from typing import TypedDict, Annotated, List
 import operator
+import httpx
+import os
+
 
 # LangChain / LangGraph imports
 from langgraph.graph import StateGraph, START, END
@@ -17,13 +20,20 @@ EXTRACT_AUDIO_NODE = "extract_audio"
 TRANSCRIBE_NODE = "transcribe"
 GENERATE_TASKS_NODE = "generate_tasks"
 
+# Define your external agents
+# TODO: Replace with actual external http links
+self.extract_audio_agent = ExternalAgentProxy(EXTRACT_AUDIO_NODE, "http://localhost:8000/extract_audio")
+self.transcribe_agent = ExternalAgentProxy(TRANSCRIBE_NODE, "http://localhost:8000/transcribe")
+self.task_generator_agent = ExternalAgentProxy(GENERATE_TASKS_NODE, "http://localhost:8000/generate_tasks")
+
+
 # --- 1. Define the State ---
 # This is the "memory" passed between AI nodes
 class IncidentState(TypedDict):
     company_id: int
     inspection_id: str
     incident_id: str
-    video_path: str
+    video_url: str
     transcript: str
     # 'operator.add' allows nodes to append to this list without overwriting
     generated_tasks: Annotated[List[dict], operator.add]
@@ -120,20 +130,6 @@ class WorkflowExecutor:
                 gps_coordinates=gps_coordinates
             )
 
-        # """
-        # METHOD CALLED FROM UI:
-        # 1. Saves file to local/GCS
-        # 2. Creates DB record
-        # 3. Triggers LangGraph in background
-        # """
-        # # 1. STORAGE: Save file locally (GCS logic commented)
-        # unique_filename = f"{uuid.uuid4()}_{filename}"
-        # local_video_path = os.path.join(self.data_dir, unique_filename)
-        
-        # with open(local_video_path, "wb") as buffer:
-        #     shutil.copyfileobj(file_stream, buffer)
-        
-
         # 3. BACKGROUND: Trigger LangGraph
         # We define a 'thread_id' so the checkpointer knows this specific execution
         config = {"configurable": {"thread_id": incident_id}}
@@ -141,7 +137,7 @@ class WorkflowExecutor:
             "company_id": company_id,
             "inspection_id": inspection_id,
             "incident_id": incident_id,
-            "video_path": file_url,
+            "video_url": file_url,
             "transcript": "",         # Initialize as empty string
             "generated_tasks": []     # Initialize the list for operator.add
         }
@@ -154,26 +150,35 @@ class WorkflowExecutor:
     # --- GRAPH NODES (The 'Intelligence' and 'DB Persistence' steps) ---
 
     async def _extract_audio_node(self, state: IncidentState):
-        """Node 1: Extract Audio using FFmpeg."""
-        audio_filename = f"audio_{state['incident_id']}.mp3"
-        local_audio_path = os.path.join(self.data_dir, audio_filename)
+        # 1. Prepare data for external agent
+        data = {
+            "video_url": state["video_url"],
+            "metadata": {
+                "company_id": state["company_id"],
+                "inspection_id": state["inspection_id"],
+                "incident_id": state["incident_id"]
+                # Shall add metadata for company details viz. domain, industry_type, etc.
+            }
+        }
         
-        # FFmpeg command logic...
-        # ... (implementation of FFmpeg call) ...
-
-        # PERSISTENCE: Update the record with the audio path
-        self.repo.update_incident_audio(state['company_id'], state['incident_id'], local_audio_path)
+        # 2. CALL EXTERNAL - LangGraph waits here!
+        # It won't move to next step until this returns.
+        result = await self.extract_audio_agent.post(data)
         
-        return {"audio_path": local_audio_path}
+        # 3. PERSISTENCE: Update the record with the audio path
+        self.repo.update_incident_audio(state['company_id'], state['incident_id'], result["audio_url"])
+        
+        return {"audio_url": result["audio_url"]}
 
     async def _transcribe_node(self, state: IncidentState):
         """Node 2: Call Transcription Agent."""
-        # AGENT CALL: transcript = await transcription_agent.ainvoke(...)
+        ## AGENT CALL: 
         transcript = "Sample text from the video audio..." 
+        # transcript = await transcription_agent.ainvoke(...)
         
-        # PERSISTENCE: Optional - Save transcript to a 'logs' or 'metadata' column
+        ## PERSISTENCE: Optional - Save transcript to a 'logs' or 'metadata' column
         # self.repo.update_incident_metadata(state['company_id'], state['incident_id'], {'transcript': transcript})
-        
+
         return {"transcript": transcript}
 
     async def _generate_tasks_node(self, state: IncidentState):
@@ -248,3 +253,15 @@ class WorkflowExecutor:
                 inspector_id=inspector_id
             )
             return inspection_id
+
+class ExternalAgentProxy:
+    def __init__(self, name: str, url: str):
+        self.name = name
+        self.url = url
+
+    async def post(self, payload: dict):
+        # We use a long timeout because agents might take time to think
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            resp = await client.post(self.url, json=payload)
+            resp.raise_for_status() # Ensure we don't proceed on 500 errors
+            return resp.json()

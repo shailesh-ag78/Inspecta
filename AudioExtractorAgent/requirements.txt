@@ -4,3 +4,4 @@ psycopg2-binary
 requests
 groq
 pydub
+google-cloud-storage

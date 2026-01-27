@@ -5,3 +5,7 @@ langchain-core
 requests
 python-multipart
 pydantic
+psycopg2-binary
+httpx
+google-cloud_storage
+firebase-admin
