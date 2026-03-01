@@ -105,12 +105,12 @@ async def extract_audio_endpoint(request: AudioExtractionRequest):
         # Downloading Video file locally
         temp_video_file_name = "temp_" + Path(blob_name).name
         video_url_path = os.path.join(LOCAL_TEMP_FOLDER, temp_video_file_name)
-        print(f"Downloading {video_url} to {video_url_path}...")
+        logger.info(f"Downloading {video_url} to {video_url_path}...")
         blob.download_to_filename(video_url_path)
         
     # 3. Extract Audio
     try:
-        print(f"Extracting audio from {video_url} to {audio_url_path}")
+        logger.info(f"Extracting audio from {video_url} to {audio_url_path}")
         audio_extraction(video_url_path, audio_url_path)
     except Exception as e:
         print(f"Extraction Error: {e}")
