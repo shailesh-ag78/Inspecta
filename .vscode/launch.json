@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug: Executor (8000)",
+            "name": "Debug: Executor",
             "type": "python",
             "request": "launch",
             "module": "uvicorn",
@@ -11,7 +11,7 @@
             "cwd": "${workspaceFolder}/Executor"
         },
         {
-            "name": "Debug: Audio Agent (8001)",
+            "name": "Debug: Audio Agent",
             "type": "python",
             "request": "launch",
             "module": "uvicorn",
@@ -31,7 +31,7 @@
     "compounds": [
         {
             "name": "Debug All Services",
-            "configurations": ["Debug: Orchestrator (8000)", "Debug: Audio Agent (8001)", "Debug: Integration Test"]
+            "configurations": ["Debug: Executor", "Debug: Audio Agent", "Debug: Integration Test"]
         }
     ],
     "terminal.integrated.env.windows": {
