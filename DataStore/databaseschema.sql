@@ -1,0 +1,128 @@
+--- 1. ENHANCED LOOKUP TABLES ---
+
+CREATE TABLE industries_lookup (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE -- e.g., 'Solar', 'Oil & Gas'
+);
+
+CREATE TABLE task_statuses_lookup (
+    id SMALLINT PRIMARY KEY, -- 1: Pending, 2: In Progress, 3: Review, 4: Completed, 5: Failed
+    label TEXT NOT NULL UNIQUE
+);
+
+CREATE TABLE task_severity_lookup (
+    id SMALLINT PRIMARY KEY, -- 1: Severe, 2: Regular, 3: Low
+    label TEXT NOT NULL
+);
+
+CREATE TABLE task_type_lookup (
+    id SMALLINT PRIMARY KEY, -- 1: Install, 2: Repair, 3: Verify, 4: Clear
+    label TEXT NOT NULL
+);
+
+--- 2. MASTER TABLES (Companies, Inspectors, Sites) ---
+
+CREATE TABLE companies (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    industry_id INTEGER REFERENCES industries_lookup(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE inspectors (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER REFERENCES companies(id),
+    full_name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL
+);
+
+CREATE TABLE sites (
+    id SERIAL PRIMARY KEY,
+    industry_id INTEGER REFERENCES industries_lookup(id),
+    site_name TEXT NOT NULL,
+    address TEXT,
+    company_id INTEGER REFERENCES companies(id),
+    gps_coordinates POINT
+);
+
+--- 3. TRANSACTIONAL TABLES ---
+
+CREATE TABLE inspections (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id INTEGER REFERENCES companies(id),
+    site_id INTEGER REFERENCES sites(id),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE incidents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    inspection_id UUID REFERENCES inspections(id) ON DELETE CASCADE,
+    company_id INTEGER REFERENCES companies(id),
+    inspector_id INTEGER REFERENCES inspectors(id),
+    gps_coordinates POINT,
+    
+    -- Master Media References
+    video_url TEXT, -- Primary GCS link
+    audio_url TEXT, -- Primary GCS link
+    
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE incident_tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    incident_id UUID REFERENCES incidents(id) ON DELETE CASCADE,
+    company_id INTEGER REFERENCES companies(id),
+    inspection_id UUID REFERENCES inspections(id) ON DELETE CASCADE,
+    
+    task_title TEXT NOT NULL,
+    task_description TEXT,
+    task_original_description TEXT,
+    task_review_comments TEXT,
+    task_notes TEXT,
+
+    -- Media & Timestamps
+    video_url TEXT,           -- Specific GCS video for this task
+    video_start_ms INTEGER,   -- Start offset in milliseconds
+    video_end_ms INTEGER,     -- End offset in milliseconds
+    
+    -- Flexible Artifact Container
+    -- Best for: [{"type": "image", "url": "gcs://..."}, {"type": "text_ref", "content": "Section 4.2"}]
+    task_artifacts JSONB DEFAULT '[]', 
+
+    -- Integer Lookups
+    status_id SMALLINT REFERENCES task_statuses_lookup(id) DEFAULT 1,
+    severity_id SMALLINT REFERENCES task_severity_lookup(id),
+    task_type_id SMALLINT REFERENCES task_type_lookup(id),
+    
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX CONCURRENTLY idx_tasks_company_incident 
+ON incident_tasks (company_id, inspection_id);
+
+--- Enable ROW LEVEL SECURITY POLICIES ---
+ALTER TABLE companies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inspectors ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inspections ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incidents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incident_tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY company_isolation_policy ON companies
+    USING (id = NULLIF(current_setting('app.current_company_id', TRUE), '')::integer);
+
+CREATE POLICY inspector_isolation_policy ON inspectors
+    USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::integer);
+
+CREATE POLICY inspection_isolation_policy ON inspections
+    USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::integer);
+
+CREATE POLICY incident_isolation_policy ON incidents
+    USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::integer);
+
+CREATE POLICY task_isolation_policy ON incident_tasks
+    USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::integer);
+
+CREATE POLICY site_isolation_policy ON sites
+    USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::integer);

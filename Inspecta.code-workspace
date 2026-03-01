@@ -1,0 +1,29 @@
+{
+    "folders": [
+        {
+            "path": "../Library"
+        },
+        {
+            "path": "TranscriptionAgent"
+        },
+        {
+            "path": "AudioExtractorAgent"
+        },
+        {
+            "path": "Executor"
+        },
+        {
+            "path": "DataStore"
+        },
+        {
+            "path": "FieldReporterAgent"
+        },
+        {
+            "path": ".vscode"
+        }
+    ],
+    "settings": {
+        "editor.fontSize": 14,
+        "powershell.cwd": "Executor",
+    },
+}

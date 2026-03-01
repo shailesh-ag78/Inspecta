@@ -1,0 +1,25 @@
+# Example environment file for local development -- DO NOT COMMIT SECRETS
+# Copy to Executor/.env and fill in real values (or use a secret manager)
+
+# LangSmith / LangChain
+LANGCHAIN_API_KEY=your_langsmith_api_key
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_PROJECT=inspecta-executor
+LANGCHAIN_SESSION=local
+
+# Optional: custom LangSmith endpoint (region-specific)
+# LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+
+# Optional: Set to 'debug' for verbose logging
+LANGSMITH_LOG_LEVEL=INFO
+
+# Database (PostgreSQL)
+#DATABASE_URL=dbname=inspecta_local user=postgres password=passwd host=localhost port=5432
+DATABASE_URL=postgresql://postgres:passwd@localhost:5432/inspecta_local
+
+# Environment Mode
+ENV_MODE=local
+
+# LLM Configuration (if using OpenAI or other LLMs in agents)
+# OPENAI_API_KEY=your_openai_api_key
+# OPENAI_MODEL=gpt-4

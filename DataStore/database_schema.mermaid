@@ -1,0 +1,87 @@
+erDiagram
+    industries_lookup {
+        int id PK
+        text name
+    }
+    task_statuses_lookup {
+        int id PK
+        text label
+    }
+    task_severity_lookup {
+        int id PK
+        text label
+    }
+    task_type_lookup {
+        int id PK
+        text label
+    }
+    companies {
+        int id PK
+        text name
+        int industry_id FK
+        timestamp created_at
+    }
+    inspectors {
+        int id PK
+        int company_id FK
+        text full_name
+        text email
+    }
+    sites {
+        int id PK
+        int industry_id FK
+        text site_name
+        text address
+        point gps_coordinates
+    }
+    inspections {
+        uuid id PK
+        int company_id FK
+        int site_id FK
+        timestamp created_at
+    }
+    incidents {
+        uuid id PK
+        uuid inspection_id FK
+        int company_id FK
+        int inspector_id FK
+        point gps_coordinates
+        text video_url
+        text audio_url
+        jsonb metadata
+        timestamp created_at
+    }
+    incident_tasks {
+        uuid id PK
+        uuid incident_id FK
+        int company_id FK
+        uuid inspection_id FK
+        text task_title
+        text task_description
+        text task_original_description
+        text task_review_comments
+        text task_notes
+        text video_url
+        int video_start_ms
+        int video_end_ms
+        jsonb task_artifacts
+        int status_id FK
+        int severity_id FK
+        int task_type_id FK
+        timestamp created_at
+    }
+
+    companies }|--|| industries_lookup : "industry_id"
+    inspectors }|--|| companies : "company_id"
+    sites }|--|| industries_lookup : "industry_id"
+    inspections }|--|| companies : "company_id"
+    inspections }|--|| sites : "site_id"
+    incidents }|--|| inspections : "inspection_id"
+    incidents }|--|| companies : "company_id"
+    incidents }|--|| inspectors : "inspector_id"
+    incident_tasks }|--|| incidents : "incident_id"
+    incident_tasks }|--|| companies : "company_id"
+    incident_tasks }|--|| inspections : "inspection_id"
+    incident_tasks }|--|| task_statuses_lookup : "status_id"
+    incident_tasks }|--|| task_severity_lookup : "severity_id"
+    incident_tasks }|--|| task_type_lookup : "task_type_id"

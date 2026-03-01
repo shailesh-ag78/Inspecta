@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+langgraph>=1.0.7
+langgraph-checkpoint-postgres>=2.0.0
+langchain-core>=0.1.30
+langsmith>=0.1.0  # LangSmith tracing and debugging
+langchain-openai>=0.1.0  # For LLM instrumentation
+requests
+python-multipart
+pydantic
+psycopg[binary]>=3.2.0  # Required for LangGraph Postgres Checkpointer
+httpx
+google-cloud-storage
+firebase-admin
+python-dotenv>=1.0.0  # Environment variable management
+pytest
