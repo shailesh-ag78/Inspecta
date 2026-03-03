@@ -1,7 +1,5 @@
 import os
-import math
 import tempfile
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
 from pydub import AudioSegment
@@ -13,7 +11,7 @@ MAX_FILE_SIZE_MB = 25
 OVERLAP_SEC = 5
 
 class GroqService:
-    def __init__(self, api_key: str = None):
+    def __init__(self):
         self.api_key = api_key or os.environ.get("GROQ_API_KEY")
         if not self.api_key:
              # Fallback for local testing if env not set, though not recommended for prod

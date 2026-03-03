@@ -1,4 +1,3 @@
-import sys
 import os
 import subprocess
 from fastapi import FastAPI, HTTPException
@@ -7,6 +6,7 @@ from pydantic import BaseModel
 import uvicorn
 from typing import Optional, Dict, Any
 from pathlib import Path
+from google.cloud import storage
 import logging
 
 logging.basicConfig(
@@ -59,7 +59,7 @@ class AudioExtractionRequest(BaseModel):
 async def extract_audio_endpoint(request: AudioExtractionRequest):
     """
     Extracts audio from the video_url.
-    Saves audio to disk at a specific location.
+    Saves audio to storage at a specific location.
     Returns the location of audio_url.
     """
     video_url = request.video_url
@@ -82,6 +82,7 @@ async def extract_audio_endpoint(request: AudioExtractionRequest):
         p = Path(video_url)
         #audio_filename = f"{p.stem}_audio.mp3"
         audio_url_path = str(p.with_name(f"{p.stem}_audio.mp3"))
+        audio_url = audio_url_path
         video_url_path = video_url
     else:
         # Check if file is available on GCS
@@ -113,11 +114,10 @@ async def extract_audio_endpoint(request: AudioExtractionRequest):
         logger.info(f"Extracting audio from {video_url} to {audio_url_path}")
         audio_extraction(video_url_path, audio_url_path)
     except Exception as e:
-        print(f"Extraction Error: {e}")
+        logger.error(f"Extraction Error: {e}")
         raise HTTPException(status_code=500, detail=f"Audio extraction failed: {str(e)}")
 
     # 4. Return Result
-    audio_url = audio_url_path
     if(ENV_MODE != "local"):
         # Upload Audio file in GCS storage folder and set audio_url
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
@@ -143,10 +143,12 @@ def audio_extraction(video_url_path: str, audio_url_path: str):
     try:
         # Run ffmpeg command
         # We use mono (ac 1) and 16kHz (ar 16000) for best AI recognition
+        # use pcm_s16le : For Wav file : High quality audio but high storage, 
+        # use libmp3lame : For MP3 : compressed audio but less storage
         subprocess.run([
             "ffmpeg", "-y", "-i", video_url_path,
             "-vn", "-ac", "1", "-ar", "16000", 
-            "-acodec", "pcm_s16le", audio_url_path
+            "-acodec", "libmp3lame", audio_url_path
         ], check=True, capture_output=True)
         
     except subprocess.CalledProcessError as e:

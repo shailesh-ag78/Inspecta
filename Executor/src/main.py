@@ -15,6 +15,10 @@ from pydantic import BaseModel, Field
 from google.cloud import storage
 from typing import Optional, Tuple
 
+# This MUST happen before any async code or loop initialization
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 # Load environment variables from .env file
 # load_dotenv()
 
@@ -43,10 +47,6 @@ ENV_MODE = os.getenv("ENV_MODE", "local")
 LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"d:\code\Inspecta\Data"))
 
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
-
-# This MUST happen before any async code or loop initialization
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # --- 1. Lifecycle Management ---
 @asynccontextmanager

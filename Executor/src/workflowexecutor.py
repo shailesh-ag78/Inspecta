@@ -150,15 +150,15 @@ class WorkflowExecutor:
         # Retry policy: Automatically handles API flickers or LLM timeouts
         retry=RetryPolicy(max_attempts=3, backoff_factor=2.0)
         builder.add_node(EXTRACT_AUDIO_NODE, self._extract_audio_node, retry_policy=retry)
-        #builder.add_node(TRANSCRIBE_NODE, self._transcribe_node, retry_policy=retry)
-        #builder.add_node(GENERATE_TASKS_NODE, self._generate_tasks_node, retry_policy=retry)
+        builder.add_node(TRANSCRIBE_NODE, self._transcribe_node, retry_policy=retry)
+        builder.add_node(GENERATE_TASKS_NODE, self._generate_tasks_node, retry_policy=retry)
 
 
         # Define Edges
         builder.add_edge(START, EXTRACT_AUDIO_NODE)
-        #builder.add_edge(EXTRACT_AUDIO_NODE, TRANSCRIBE_NODE)
-        #builder.add_edge(TRANSCRIBE_NODE, GENERATE_TASKS_NODE)
-        #builder.add_edge(GENERATE_TASKS_NODE, END)
+        builder.add_edge(EXTRACT_AUDIO_NODE, TRANSCRIBE_NODE)
+        builder.add_edge(TRANSCRIBE_NODE, GENERATE_TASKS_NODE)
+        builder.add_edge(GENERATE_TASKS_NODE, END)
 
         # Compile with checkpointer for pause/resume capability
         return builder.compile(checkpointer=self.saver)
@@ -274,7 +274,7 @@ class WorkflowExecutor:
                 data, 
                 incident_id=incident_id,
                 # This makes the incident_id appear in the LangSmith Trace Metadata tab
-                langsmith_extra={"metadata": {"incident_id": incident_id}}
+                #langsmith_extra={"metadata": {"incident_id": incident_id}}
             )
             audio_url = result.get("audio_url")
             
@@ -286,6 +286,8 @@ class WorkflowExecutor:
                 
             # 3. PERSISTENCE: Update the record with the audio path
             await self.repo.update_incident_audio(state['company_id'], incident_id, audio_url)
+            
+            state["audio_url"] = audio_url
             
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
@@ -334,19 +336,16 @@ class WorkflowExecutor:
             
             logger.info(f"🎙️ Transcribing audio for incident {incident_id}")
             
-            # AGENT CALL: Uncomment when transcribe agent is ready
-            # result = await self.transcribe_agent.post(data, incident_id=incident_id)
-            # transcript = result.get("transcript", "")
-            
-            # For now: Placeholder (remove when agent is ready)
-            transcript = "[Transcription Service Placeholder] Real transcript will appear here"
-            logger.warning(f"⚠️  Using placeholder transcript for {incident_id}. " 
-                          "Connect TranscriptionAgent when ready.")
-            
-            # PERSISTENCE: Save transcript to database
-            # if hasattr(self.repo, 'update_incident_transcript'):
-            #     self.repo.update_incident_transcript(state['company_id'], incident_id, transcript)
-            
+            result = await self.transcribe_agent.post(data, incident_id=incident_id)
+            transcript = result.get("transcript", "")
+            if not transcript:
+                raise ValueError(
+                    f"External agent at {self.transcribe_agent.url} failed to return transcript. "
+                    f"Response: {result}"
+                )
+                
+            state["transcript"] = transcript
+                       
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
                 node_name=node_name,
@@ -390,35 +389,29 @@ class WorkflowExecutor:
                     "company_id": state["company_id"],
                     "inspection_id": state["inspection_id"],
                     "incident_id": incident_id,
-                    "video_url": state.get("video_url", "")
                 }
             }
             
             logger.info(f"📋 Generating tasks for incident {incident_id}")
             
-            # AGENT CALL: Uncomment when task generator agent is ready
-            # result = await self.task_generator_agent.post(data, incident_id=incident_id)
-            # tasks = result.get("tasks", [])
-            
-            # For now: Placeholder (remove when agent is ready)
-            tasks = [
-                {
-                    "task_title": "Placeholder Task",
-                    "task_description": "Connect FieldReporterAgent to generate real tasks",
-                    "severity_id": 2,
-                    "task_type_id": 3
-                }
-            ]
-            logger.warning(f"⚠️  Using placeholder tasks for {incident_id}. "
-                          "Connect FieldReporterAgent when ready.")
-            
+            result = await self.task_generator_agent.post(data, incident_id=incident_id)
+            tasks = result.get("tasks", [])
+            if not isinstance(tasks, list):
+                raise ValueError(
+                    f"External agent at {self.task_generator_agent.url} returned invalid tasks format. "
+                    f"Expected a list but got: {tasks}"
+                )
+            else:
+                logger.info(f"Received {len(tasks)} tasks from agent.")
+                
             # PERSISTENCE: Bulk insert final tasks
-            await self.repo.bulk_add_incident_tasks(
-                company_id=state['company_id'],
-                incident_id=incident_id,
-                inspection_id=state['inspection_id'],
-                tasks=tasks
-            )
+            # await self.repo.bulk_add_incident_tasks(
+            #     company_id=state['company_id'],
+            #     incident_id=incident_id,
+            #     inspection_id=state['inspection_id'],
+            #     tasks=tasks
+            # )
+            state["generated_tasks"] = tasks
             
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(

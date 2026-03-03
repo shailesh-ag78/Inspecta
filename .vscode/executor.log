@@ -1,5 +1,0 @@
-2026-03-01 14:53:05,156 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
-2026-03-01 14:53:05,509 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
-2026-03-01 14:53:05,509 - langsmith_config - INFO - \u2705 LangSmith enabled. Project: inspecta-executor
-2026-03-01 14:53:05,509 - langsmith_config - INFO -    Endpoint: https://api.smith.langchain.com
-2026-03-01 14:53:05,509 - main - INFO - \u2705 LangSmith configured

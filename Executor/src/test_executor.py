@@ -1,4 +1,6 @@
+import asyncio
 import os
+import sys
 import pytest
 from fastapi.testclient import TestClient
 from main import app
@@ -35,7 +37,7 @@ def test_full_workflow_integration():
         # print(f"✅ Created Inspection: {inspection_id}")
         
         # Temporarily hardcoding an existing inspection ID for testing, since creating a new one may have side effects or require cleanup
-        inspection_id = "83c1a952-34e7-469a-95da-4017da8dc217"
+        inspection_id = "27822a7e-d0de-42b1-9316-ee82e359939a"
 
         print("\n--- [STEP 2] Get Real Upload URL ---")
         request_headers = headers.copy()
@@ -94,6 +96,10 @@ def test_full_workflow_integration():
 
 if __name__ == "__main__":
     # Note: Using pytest to run this is recommended, but you can call it directly
+    # Force SelectorEventLoop for Windows compatibility
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        
     try:
         test_full_workflow_integration()
     except Exception as e:
