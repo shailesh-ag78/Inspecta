@@ -94,6 +94,7 @@ class IncidentState(TypedDict):
     video_url: str
     audio_url: str
     transcript: str
+    transcript_segments_json_url: str
     # 'operator.add' allows nodes to append to this list without overwriting
     generated_tasks: Annotated[List[dict], operator.add]
 
@@ -223,6 +224,7 @@ class WorkflowExecutor:
             "video_url": file_url,
             "audio_url": "",          # Will be populated by extract_audio node
             "transcript": "",         # Initialize as empty string
+            "transcript_segments_json_url": "", # Initialize as empty string
             "generated_tasks": []     # Initialize the list for operator.add
         })
         
@@ -319,6 +321,7 @@ class WorkflowExecutor:
         incident_id = state["incident_id"]
         node_name = TRANSCRIBE_NODE
         start_time = time.time()
+        transcript = ""
         
         try:
             if not state.get("audio_url"):
@@ -345,6 +348,7 @@ class WorkflowExecutor:
                 )
                 
             state["transcript"] = transcript
+            state["transcript_segments_json_url"] = result.get("segments_json_url", "")
                        
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
@@ -355,7 +359,7 @@ class WorkflowExecutor:
                 duration_ms=duration_ms
             )
             
-            logger.info(f"✅ Transcription complete ({len(transcript)} chars)")
+            logger.info(f"✅ Transcription complete ({len(transcript)} chars), segments URL: {state['transcript_segments_json_url']}")
             return {"transcript": transcript}
             
         except Exception as e:
@@ -364,7 +368,7 @@ class WorkflowExecutor:
                 node_name=node_name,
                 incident_id=incident_id,
                 input_data={"audio_url": state.get("audio_url", "")},
-                output_data={},
+                output_data={"transcript_length": len(transcript)},
                 duration_ms=duration_ms,
                 error=e
             )
@@ -385,6 +389,7 @@ class WorkflowExecutor:
             # Prepare data for task generator agent
             data = {
                 "transcript": transcript,
+                "transcript_segments_json_url": state.get("transcript_segments_json_url", ""),
                 "metadata": {
                     "company_id": state["company_id"],
                     "inspection_id": state["inspection_id"],

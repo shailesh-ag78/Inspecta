@@ -1,2 +1,24 @@
+# --- Environment / Secrets ---
+.env
+*.env
+secret.json
+venv/
+.venv/
+__pycache__/
+
+# --- Inspecta Data Storage ---
+# We ignore the entire Data folder so videos and audio are never pushed
 Data/
-Executor/.env
+CompanyStorage1/
+uploads/
+processed/
+
+# --- Audio Agent Specifics ---
+# Ignore raw audio extractions
+*.mp3
+*.wav
+*.mp4
+
+# --- System Files ---
+.DS_Store
+Thumbs.db

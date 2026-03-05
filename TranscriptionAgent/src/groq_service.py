@@ -2,22 +2,120 @@ import os
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
+from urllib import response
+from pathlib import Path
+import dotenv
+from flask import json
 from pydub import AudioSegment
 from groq import Groq
 
 # Constants
-MODEL = "whisper-large-v3"
+MODEL = "whisper-large-v3-turbo"
 MAX_FILE_SIZE_MB = 25
 OVERLAP_SEC = 5
 
+# Load environment variables from .env file
+env_path = Path(__file__).parent / ".env"
+dotenv.load_dotenv(dotenv_path=env_path)
+
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
 class GroqService:
     def __init__(self):
-        self.api_key = api_key or os.environ.get("GROQ_API_KEY")
+        self.api_key = GROQ_API_KEY # Use the constant value defined above
         if not self.api_key:
-             # Fallback for local testing if env not set, though not recommended for prod
-             print("Warning: GROQ_API_KEY not set.")
-        self.client = Groq(api_key=self.api_key)
+            raise ValueError("GROQ_API_KEY is missing from the environment/ .env file")
+        self.client = Groq(api_key=GROQ_API_KEY)
 
+    def process_incident_audio(self, audio_url_path: str, prompt: str) -> Dict[str, Any]:
+        """Main method to process an incident audio file. Handles chunking, processing, and merging."""
+        print(f"Processing audio from URL: {audio_url_path}")
+        
+        
+        try:
+            # Open the file from the local path
+            with open(audio_url_path, "rb") as audio_file:
+                # Call Groq Transcription (Whisper Large V3 Turbo) : 
+                # The 'prompt' parameter guides the model's vocabulary and context
+                transcription = self.client.audio.transcriptions.create(
+                    file=(os.path.basename(audio_url_path), audio_file.read()),
+                    model=MODEL,
+                    prompt=prompt,
+                    response_format="verbose_json" # verbose_json gives you timestamps if needed
+                )
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Error: The file at {audio_url_path} was not found.")
+        except Exception as e:
+            raise RuntimeError(f"An unexpected error occurred: {str(e)}")
+        
+        data = transcription.model_dump()  # Convert to dict to avoid "Object not iterable" errors
+        structured_segments = [
+            {
+            "start": round(seg['start'], 3),
+            "end": round(seg['end'], 3),
+            "text": seg['text'].strip()
+            }
+            for seg in data.get('segments', [])
+        ]
+        
+        transcript_dict = {
+            "text": data.get("text", ""),
+            "segments": structured_segments
+        }
+        
+        return transcript_dict
+   
+# Sample dictionary output of the process_incident_audio method
+#     {
+#   "text": "Hello, this is an inspection at Site A. We found a crack in the pipe.",
+#   "segments": [
+#     {
+#       "start": 0.000,
+#       "end": 3.450,
+#       "text": "Hello, this is an inspection at Site A."
+#     },
+#     {
+#       "start": 3.450,
+#       "end": 7.200,
+#       "text": "We found a crack in the pipe."
+#     }
+#   ]
+# }
+    
+# Sample json output of Groq API
+#         {
+# "task": "transcribe",
+# "language": "english",
+# "duration": 7.50,
+# "text": "Hello everyone. This is a safety inspection report for Site A. We have identified a small leak in the pressure valve.",
+# "segments": [
+#     {
+#     "id": 0,
+#     "seek": 0,
+#     "start": 0.0,
+#     "end": 2.5,
+#     "text": " Hello everyone. This is a safety inspection report for Site A.",
+#     "tokens": [50364, 2425, 2300, 13, 639, 307, 257, 4510, 10561, 2213, 329, 3957, 311, 13, 50489],
+#     "temperature": 0.0,
+#     "avg_logprob": -0.15,
+#     "compression_ratio": 1.2,
+#     "no_speech_prob": 0.01
+#     },
+#     {
+#     "id": 1,
+#     "seek": 250,
+#     "start": 2.5,
+#     "end": 7.5,
+#     "text": " We have identified a small leak in the pressure valve.",
+#     "tokens": [50489, 492, 362, 7432, 257, 1402, 10301, 294, 264, 3277, 18567, 13, 50739],
+#     "temperature": 0.0,
+#     "avg_logprob": -0.12,
+#     "compression_ratio": 1.1,
+#     "no_speech_prob": 0.02
+#     }
+# ]
+# }
+        
     def get_audio_chunks(self, file_path: str, max_size_mb: int = 25, overlap_sec: int = 5) -> List[Dict[str, Any]]:
         """
         Splits audio into chunks based on file size limits.
@@ -160,5 +258,3 @@ class GroqService:
         
         # 3. Merge chunks
         return self.merge_incident_results(results, OVERLAP_SEC)
-
-    

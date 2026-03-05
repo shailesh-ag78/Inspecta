@@ -7,6 +7,9 @@ Write-Host "🚀 Starting Audio Extractor Agent on Port 8001..." -ForegroundColo
 cd D:\code\Inspecta\AudioExtractorAgent
 & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8001 --loop asyncio
 
+Write-Host "🚀 Starting Transcribe Agent on Port 8002..." -ForegroundColor Cyan
+cd D:\code\Inspecta\TranscriptionAgent
+& '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8002 --loop asyncio
 
 # --- 3. Start Executor ---
 Write-Host "🚀 Starting Executor on Port 8000..." -ForegroundColor Green
