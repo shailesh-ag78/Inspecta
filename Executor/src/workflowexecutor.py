@@ -328,10 +328,14 @@ class WorkflowExecutor:
                 raise ValueError("No audio_url found in state. Audio extraction may have failed.")
             
             # Prepare data for transcription agent
+            # TODo : Remove hardcoding
             data = {
                 "audio_url": state["audio_url"],
                 "metadata": {
-                    "company_id": state["company_id"],
+                    "company_name": state["company_id"],  # TODO: Get company_name and not company_id
+                    "industry": "Agriculture",  # Placeholder, ideally should come from DB
+                    "site": "Unknown Site",  # Placeholder, ideally should come from DB
+                    "input_prompt": "This is a farm video. Inspcting a farm.",  # Placeholder, can be enhanced with more context
                     "inspection_id": state["inspection_id"],
                     "incident_id": incident_id
                 }
