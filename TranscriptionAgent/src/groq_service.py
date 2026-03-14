@@ -1,4 +1,5 @@
 import os
+from sqlite3 import Date
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from typing import List, Dict, Any
@@ -8,6 +9,7 @@ import dotenv
 from flask import json
 from pydub import AudioSegment
 from groq import Groq
+from datetime import datetime
 
 # Constants
 MODEL = "whisper-large-v3-turbo"
@@ -15,7 +17,7 @@ MAX_FILE_SIZE_MB = 25
 OVERLAP_SEC = 5
 
 # Load environment variables from .env file
-env_path = Path(__file__).parent / ".env"
+env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -24,13 +26,14 @@ class GroqService:
     def __init__(self):
         self.api_key = GROQ_API_KEY # Use the constant value defined above
         if not self.api_key:
-            raise ValueError("GROQ_API_KEY is missing from the environment/ .env file")
+            msg = f"GROQ_API_KEY is missing from the environment/ .env file. Please set it before running the service. Looked for .env at: {env_path}"
+            raise ValueError(msg)
         self.client = Groq(api_key=GROQ_API_KEY)
 
     def process_incident_audio(self, audio_url_path: str, prompt: str) -> Dict[str, Any]:
         """Main method to process an incident audio file. Handles chunking, processing, and merging."""
-        print(f"Processing audio from URL: {audio_url_path}")
-        
+        print(f"{datetime.now()} Processing audio from URL: {audio_url_path}")
+        print(f"{datetime.now()} Using prompt: {prompt}")
         
         try:
             # Open the file from the local path
@@ -41,6 +44,7 @@ class GroqService:
                     file=(os.path.basename(audio_url_path), audio_file.read()),
                     model=MODEL,
                     prompt=prompt,
+                    temperature=0,  # Set to 0 for deterministic output; adjust if you want more creativity
                     response_format="verbose_json" # verbose_json gives you timestamps if needed
                 )
         except FileNotFoundError:

@@ -112,9 +112,8 @@ async def transcribe_endpoint(request: TranscribeRequest):
     #input_prompt = "This is a farm video. Inspcting farming scenarios."
     input_metadata = {
         "company_name": metadata.get("company_name", "Unknown Company") if metadata else "",
-        "industry": metadata.get("industry", "Agriculture") if metadata else "",
-        "site": metadata.get("site", "Unknown Site") if metadata else "",
-        "input_prompt": metadata.get("input_prompt", "Farm Video") if metadata else "",
+        "industry": metadata.get("industry", "Unknown Industry") if metadata else "",
+        "input_prompt": metadata.get("input_prompt", "") if metadata else "",
     }
     try:
         logger.info(f"Extracting transcript from {audio_url_path} to {transcibe_file_path}")
@@ -153,13 +152,20 @@ def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -
             f"You are a transcription assistant for Company : {metadata['company_name']}, "
             f"A company specializing in the filed of {metadata['industry']}. "
             f"Maintain industry-specific terminology and formal tone."
-            f"Audio can be in English or Hindi or Marathi. Audio may contain technical terms related to {metadata['industry']} inspections."
+            f"Audio can be in English or Hindi or Marathi. Audio may contain technical terms related to {metadata['industry']} inspections. Please transcribe exactly as spoken."
             f"There could be some background noise as well. Accurately transcribe all spoken words, including technical terms, site-specific jargon, and any Hindi or Marathi phrases without translation. "
+        )
+        
+        industry_terms = "pipeline, crack, plastering, site safety, shuttering, RCC" # Add your actual terms
+        system_prompt = (
+            f"Inspection report for {metadata['company_name']} in {metadata['industry']}. "
+            f"Terminology: {industry_terms}. "
+            f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
         )
 
         # User Prompt: Generated from Incident Metadata
         user_prompt = (
-            f"Adding Audio of an inspection happened at Site {metadata['site']}. Transcribe the audio." + metadata['input_prompt']
+            f"इसमें English, Hindi और Marathi का उपयोग किया गया है. The output should be strictly in English language. " + metadata['input_prompt']
         )
         prompt=f"{system_prompt}\n\n{user_prompt}"
         

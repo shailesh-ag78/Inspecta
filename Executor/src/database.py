@@ -218,6 +218,29 @@ class IncidentRepository:
                     )
                     return await cur.fetchone() is not None
 
+    async def get_company_info(self, company_id: int) -> Optional[Dict[str, Any]]:
+        """Fetches company name + industry for a given company id.
+
+        This uses the current session's company_id in order to honor RLS.
+        Returns a dict like: {"company_name": "Acme Corp", "industry": "Solar"}
+        If the company does not exist (or is restricted by RLS), returns None.
+        """
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    SELECT
+                        c.name AS company_name,
+                        i.name AS industry
+                    FROM companies c
+                    LEFT JOIN industries_lookup i ON c.industry_id = i.id
+                    WHERE c.id = %s
+                    """,
+                    (company_id,)
+                )
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
     async def get_incident_progress(self, company_id: int, incident_id: str):
         """Fetches basic status from the incident table."""
         async with self.session(company_id) as conn:

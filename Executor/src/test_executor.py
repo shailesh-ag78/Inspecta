@@ -10,7 +10,8 @@ from main import app
 # Ensure these match your actual local setup
 #DB_DSN = os.getenv("DATABASE_URL", "dbname=inspecta_local user=postgres password=passwd host=localhost port=5432")
 #DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_local")
-TEST_VIDEO_PATH = r"D:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
+#TEST_VIDEO_PATH = r"D:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
+TEST_VIDEO_PATH = r"D:\code\Inspecta\Data\test_data\SampleVideoFile1.mp4"
 COMPANY_ID = "1"
 STORAGE_ID = "CompanyStorage1"
 
@@ -29,15 +30,15 @@ def test_full_workflow_integration():
         }
 
         # print("\n--- [STEP 1] Create Real Inspection ---")
-        # inspection_payload = {"site_id": 1, "inspector_id": 1}
-        # resp_insp = client.post("/inspections", json=inspection_payload, headers=headers)
+        inspection_payload = {"site_id": 1, "inspector_id": 1}
+        resp_insp = client.post("/inspections", json=inspection_payload, headers=headers)
         
         # assert resp_insp.status_code == 200, f"Failed to create inspection: {resp_insp.text}"
-        # inspection_id = resp_insp.json()["inspection_id"]
-        # print(f"✅ Created Inspection: {inspection_id}")
+        inspection_id = resp_insp.json()["inspection_id"]
+        print(f"✅ Created Inspection: {inspection_id}")
         
         # Temporarily hardcoding an existing inspection ID for testing, since creating a new one may have side effects or require cleanup
-        inspection_id = "27822a7e-d0de-42b1-9316-ee82e359939a"
+        #inspection_id = "27822a7e-d0de-42b1-9316-ee82e359939a"
 
         print("\n--- [STEP 2] Get Real Upload URL ---")
         request_headers = headers.copy()

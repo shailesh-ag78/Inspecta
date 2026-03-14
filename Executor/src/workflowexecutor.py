@@ -328,16 +328,24 @@ class WorkflowExecutor:
                 raise ValueError("No audio_url found in state. Audio extraction may have failed.")
             
             # Prepare data for transcription agent
-            # TODo : Remove hardcoding
+            # Fetch company metadata (name + industry) from the DB so the agent can use it in prompts.
+            company_name = f"Unknown Company"  # Fallback if DB lookup fails
+            industry = "Unknown Industry"  # Fallback if DB lookup fails
+            try:
+                company_info = await self.repo.get_company_info(state["company_id"])
+                if company_info:
+                    company_name = company_info.get("company_name", company_name)
+                    industry = company_info.get("industry", industry)
+            except Exception:
+                # Best-effort: leave fallbacks in place even if the DB call fails
+                pass
+
             data = {
                 "audio_url": state["audio_url"],
                 "metadata": {
-                    "company_name": state["company_id"],  # TODO: Get company_name and not company_id
-                    "industry": "Agriculture",  # Placeholder, ideally should come from DB
-                    "site": "Unknown Site",  # Placeholder, ideally should come from DB
-                    "input_prompt": "This is a farm video. Inspcting a farm.",  # Placeholder, can be enhanced with more context
-                    "inspection_id": state["inspection_id"],
-                    "incident_id": incident_id
+                    "company_name": company_name,
+                    "industry": industry,
+                    "input_prompt": 'Typical Industry terms are "Pipe, water, tree, fruit, shade"',  # Placeholder, can be enhanced with more context
                 }
             }
             
