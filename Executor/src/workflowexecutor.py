@@ -331,21 +331,26 @@ class WorkflowExecutor:
             # Fetch company metadata (name + industry) from the DB so the agent can use it in prompts.
             company_name = f"Unknown Company"  # Fallback if DB lookup fails
             industry = "Unknown Industry"  # Fallback if DB lookup fails
+            industry_keywords = []
             try:
                 company_info = await self.repo.get_company_info(state["company_id"])
                 if company_info:
                     company_name = company_info.get("company_name", company_name)
                     industry = company_info.get("industry", industry)
+                    industry_keywords = company_info.get("industry_keywords") or []
             except Exception:
                 # Best-effort: leave fallbacks in place even if the DB call fails
                 pass
 
+            industry_keywords_str = ", ".join([f'\"{k}\"' for k in (industry_keywords or [])])
+            input_prompt = f"Typical Industry terms are {industry_keywords_str}"
+                
             data = {
                 "audio_url": state["audio_url"],
                 "metadata": {
                     "company_name": company_name,
                     "industry": industry,
-                    "input_prompt": 'Typical Industry terms are "Pipe, water, tree, fruit, shade"',  # Placeholder, can be enhanced with more context
+                    "input_prompt": input_prompt,
                 }
             }
             

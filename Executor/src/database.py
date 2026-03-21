@@ -222,7 +222,7 @@ class IncidentRepository:
         """Fetches company name + industry for a given company id.
 
         This uses the current session's company_id in order to honor RLS.
-        Returns a dict like: {"company_name": "Acme Corp", "industry": "Solar"}
+        Returns a dict like: {"company_name": "Acme Corp", "industry": "Solar", "industry_keywords": ["panel", "inverter"]}
         If the company does not exist (or is restricted by RLS), returns None.
         """
         async with self.session(company_id) as conn:
@@ -231,7 +231,8 @@ class IncidentRepository:
                     """
                     SELECT
                         c.name AS company_name,
-                        i.name AS industry
+                        i.name AS industry,
+                        i.industry_keywords
                     FROM companies c
                     LEFT JOIN industries_lookup i ON c.industry_id = i.id
                     WHERE c.id = %s

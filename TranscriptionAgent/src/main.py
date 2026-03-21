@@ -152,19 +152,20 @@ def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -
             f"You are a transcription assistant for Company : {metadata['company_name']}, "
             f"A company specializing in the filed of {metadata['industry']}. "
             f"Maintain industry-specific terminology and formal tone."
-            f"Audio can be in English or Hindi or Marathi. Audio may contain technical terms related to {metadata['industry']} inspections. Please transcribe exactly as spoken."
+            f"Audio will be mostly in English but it can have some Hindi or Marathi words. Audio may contain technical terms related to {metadata['industry']} inspections. Please transcribe exactly as spoken."
             f"There could be some background noise as well. Accurately transcribe all spoken words, including technical terms, site-specific jargon, and any Hindi or Marathi phrases without translation. "
         )
         
-        industry_terms = "pipeline, crack, plastering, site safety, shuttering, RCC" # Add your actual terms
-        system_prompt = (
-            f"Inspection report for {metadata['company_name']} in {metadata['industry']}. "
-            f"Terminology: {industry_terms}. "
-            f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
-        )
+        # industry_terms = "pipeline, crack, plastering, site safety, shuttering, RCC" # Add your actual terms
+        # system_prompt = (
+        #     f"Inspection report for {metadata['company_name']} in {metadata['industry']}. "
+        #     f"Terminology: {industry_terms}. "
+        #     f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
+        # )
 
         # User Prompt: Generated from Incident Metadata
         user_prompt = (
+            f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
             f"इसमें English, Hindi और Marathi का उपयोग किया गया है. The output should be strictly in English language. " + metadata['input_prompt']
         )
         prompt=f"{system_prompt}\n\n{user_prompt}"

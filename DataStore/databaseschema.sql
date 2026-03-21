@@ -2,7 +2,8 @@
 
 CREATE TABLE industries_lookup (
     id SERIAL PRIMARY KEY,
-    name TEXT NOT NULL UNIQUE -- e.g., 'Solar', 'Oil & Gas'
+    name TEXT NOT NULL UNIQUE, -- e.g., 'Solar', 'Oil & Gas'
+    industry_keywords JSONB NOT NULL DEFAULT '[]'::jsonb -- Helpful terms for this industry (e.g., ['solar', 'pv', 'inverter'])
 );
 
 CREATE TABLE task_statuses_lookup (

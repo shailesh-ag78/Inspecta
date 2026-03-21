@@ -1,5 +1,5 @@
 # --- 1. Start Database ---
-Read-Host -Prompt "🚀 Start Datbase Docker Image through Docker Desktop UI. Press enter when doone ... " | Out-Null
+Read-Host -Prompt "🚀 Start Datbase Deocker Image through Docker Desktop UI. Press enter when doone ... " | Out-Null
 
 # --- 2. Start Audio Agent ---
 Write-Host "🚀 Starting Audio Extractor Agent on Port 8001..." -ForegroundColor Cyan
