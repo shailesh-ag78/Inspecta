@@ -15,7 +15,7 @@ from .groq_service import GroqService
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='.\\audio_extarctor.log',
+    filename='.\\transcription_agent.log',
 )
 logger = logging.getLogger(__name__)
 
@@ -149,11 +149,10 @@ def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -
         # --- PROMPT LOGIC ---
         # System Prompt: Generated from Company Context
         system_prompt = (
-            f"You are a transcription assistant for Company : {metadata['company_name']}, "
-            f"A company specializing in the filed of {metadata['industry']}. "
-            f"Maintain industry-specific terminology and formal tone."
+            f"Act like a transcription assistant for Company : {metadata['company_name']}, it is specialized in {metadata['industry']}. "
             f"Audio will be mostly in English but it can have some Hindi or Marathi words. Audio may contain technical terms related to {metadata['industry']} inspections. Please transcribe exactly as spoken."
-            f"There could be some background noise as well. Accurately transcribe all spoken words, including technical terms, site-specific jargon, and any Hindi or Marathi phrases without translation. "
+            f"There could be some background noise as well. Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon, and any Hindi or Marathi phrases without translation."
+            f"The output should be strictly in English language."
         )
         
         # industry_terms = "pipeline, crack, plastering, site safety, shuttering, RCC" # Add your actual terms
@@ -164,11 +163,18 @@ def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -
         # )
 
         # User Prompt: Generated from Incident Metadata
+        # user_prompt = (
+        #     f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
+        #     f"इसमें English, Hindi और Marathi का उपयोग किया गया है. " + metadata['input_prompt']
+        # )
         user_prompt = (
-            f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
-            f"इसमें English, Hindi और Marathi का उपयोग किया गया है. The output should be strictly in English language. " + metadata['input_prompt']
-        )
-        prompt=f"{system_prompt}\n\n{user_prompt}"
+             f"{metadata['input_prompt']}"
+         )
+        original_prompt = f"{system_prompt}\n{user_prompt}"
+        ALLOWED_PROMPT_LENGTH = 790  # Adjust based on model limits and expected system prompt size
+        logger.info(f"Original Prompt and Length: {original_prompt} : {len(original_prompt)} chars. Using {ALLOWED_PROMPT_LENGTH} characters only")
+        max_user_len = ALLOWED_PROMPT_LENGTH - len(system_prompt) - 1 # 1 for newline separation
+        prompt = f"{system_prompt}\n{user_prompt[:max_user_len]}"
         
         transcript_dict = groq_service.process_incident_audio(audio_url_path, prompt)
         transcript_text = transcript_dict['text'] if isinstance(transcript_dict, dict) else ""

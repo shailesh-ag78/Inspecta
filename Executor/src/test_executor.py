@@ -17,6 +17,8 @@ TEST_VIDEO_PATH = r"D:\code\Inspecta\Data\test_data\Astitva Interior Videos"
 
 COMPANY_ID = "4"
 STORAGE_ID = "CompanyStorage4"
+INSPECTOR_ID = "2"
+SITE_ID = "3"
 
 def test_full_workflow_integration():
     """
@@ -68,9 +70,9 @@ def test_full_workflow_integration():
 
             print("\n--- [STEP 3] Trigger Real Incident Upload & LangGraph ---")
             incident_payload = {
-                "inspector_id": 1,
+                "inspector_id": INSPECTOR_ID,
                 "file_url": real_upload_path,
-                "site_id": 1
+                "site_id": SITE_ID
             }
             resp_inc = client.post(
                 f"/inspections/{inspection_id}/upload-incident", 

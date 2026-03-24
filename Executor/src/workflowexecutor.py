@@ -343,7 +343,7 @@ class WorkflowExecutor:
                 pass
 
             industry_keywords_str = ", ".join([f'\"{k}\"' for k in (industry_keywords or [])])
-            input_prompt = f"Typical Industry terms are {industry_keywords_str}"
+            input_prompt = f"Industry terms: {industry_keywords_str}"
                 
             data = {
                 "audio_url": state["audio_url"],
