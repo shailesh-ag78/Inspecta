@@ -1,3 +1,4 @@
+from asyncio import tasks
 import os
 import subprocess
 from fastapi import FastAPI, HTTPException
@@ -8,11 +9,13 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 from google.cloud import storage
 import logging
+import json
+from .openai_service import OpenAIService
 
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='.\\audio_extarctor.log',
+    filename='.\\task_generator.log',
 )
 logger = logging.getLogger(__name__)
 
@@ -50,8 +53,10 @@ async def lifespan(app: FastAPI):
     logger.info("🧹 Cleaning up resources...")
     
 app = FastAPI(lifespan=lifespan)
+
+openai_service = OpenAIService()
 class GenerateTasksRequest(BaseModel):
-    transcript: str
+    transcript_segments_json_url : str
     metadata: Optional[Dict[str, Any]] = None # company_name, industry_type, timestamp, etc.
 
 @app.post("/generate_tasks")
@@ -59,24 +64,120 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
     """
     Generates actionable tasks from the incident transcript store on storage lcoation
     """
-    transcript = request.transcript
+    transcript_segments_json_url = request.transcript_segments_json_url
     metadata = request.metadata
+    tasks = []
+    
     # 1. Validation
-    if not transcript:
+    if not transcript_segments_json_url:
         raise HTTPException(status_code=400, detail="transcript is required")
     
-    logger.info(f"Generating tasks for transcript: {transcript[:100]}...")
-    op_tasks = []
+    logger.info(f"Generating tasks for transcript: {transcript_segments_json_url}...")
     
-    # 4. Store Tasks in DB
-    if not op_tasks:
-        return {"status": "success", "message": "No tasks generated.", "task_count": 0}
+    if(ENV_MODE == "local"):
+        if not os.path.exists(transcript_segments_json_url):
+            raise HTTPException(status_code=400, detail=f"Transcript segments file not found at: {transcript_segments_json_url}")
+    
+        p = Path(transcript_segments_json_url)
+        tasks_file_path = str(p.with_name(f"{p.stem}_tasks.json"))
+        tasks_url = tasks_file_path
+        transcript_url_path = transcript_segments_json_url
+    else :
+        # Check if file is available on GCS
+        # File name example : "gs://inspecta-file-bucket/<company_storage>/uploads/a1b2-c3d4.mp4"
+        if not gcs_client:
+                raise HTTPException(status_code=500, detail="GCS client not initialized")
 
+        #full_gcp_path = f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/UPLOADS_FOLDER/{filename}"    
+        blob_name = transcript_segments_json_url.replace(f"gs://{INSPCTA_FILE_BUCKET}/", "")
+        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+        blob = bucket.get_blob(blob_name)   # blob = {company_storage_id}/UPLOADS_FOLDER/{filename}"
+        if not blob:
+            raise HTTPException(status_code=400, detail=f"Transcript segments file not found at: {transcript_segments_json_url}")
+
+        filename = blob_name.rsplit("/", 1)[-1]
+        name_without_ext = filename.rsplit(".", 1)[0]  # Handle multiple dots correctly (e.g., "video.v1_audio.mp3")
+        tasks_filename = f"{name_without_ext}_tasks.json"
+        tasks_file_path = os.path.join(LOCAL_TEMP_FOLDER, tasks_filename)
+        tasks_url = blob_name.rsplit("/", 1)[0] + "/" + tasks_filename
+
+        # Downloading Transcript file locally
+        temp_transcript_file_name = "temp_" + Path(blob_name).name
+        transcript_url_path = os.path.join(LOCAL_TEMP_FOLDER, temp_transcript_file_name)
+        logger.info(f"Downloading {transcript_segments_json_url} to {transcript_url_path}...")
+        blob.download_to_filename(transcript_url_path)
+
+    # 3. Generating Tasks using the transcript
+    input_metadata = {
+        "company_name": metadata.get("company_name", "Unknown Company") if metadata else "",
+        "industry": metadata.get("industry", "Unknown Industry") if metadata else "",
+        "input_prompt": metadata.get("input_prompt", "") if metadata else "",
+    }
+    try:
+        logger.info(f"Generating tasks from {transcript_url_path} to {tasks_file_path}")
+        tasks = tasks_generation(transcript_url_path, tasks_file_path, input_metadata)
+    except Exception as e:
+        logger.error(f"Extraction Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Tasks extraction failed: {str(e)}")
+
+    # 4. Return Result
+    if(ENV_MODE != "local"):
+        # Upload Transcript file in GCS storage folder and set transcibe_url
+        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+        new_transcibe_blob = bucket.blob(tasks_url)
+        new_transcibe_blob.upload_from_filename(tasks_file_path)
+        # Delete temporary files
+        os.remove(transcript_url_path)
+        os.remove(tasks_file_path)
+        
     return {
         "status": "success",
-        "transcript": transcript,
-        "tasks": op_tasks
+        "tasks_count": len(tasks),
+        "tasks_json_url": tasks_url,
+        "metadata": { # Additional information to be returned if any
+            "ENV_MODE" : ENV_MODE
+        }
     }
+    
+def tasks_generation(transcript_url_path, tasks_file_path, metadata: dict) -> list:
+    """ Generate tasks using the transcript and save them to disk """
+
+    transcript_content = ""
+    # Load the JSON properly to ensure it's valid
+    with open(transcript_url_path, 'r') as f:
+        data = json.load(f)
+
+    # Convert it back to a clean, formatted string for the prompt
+    transcript_content = json.dumps(data, indent=2)
+    
+    try:
+        user_prompt = (
+            f"Company : {metadata['company_name']}, it is specialized in {metadata['industry']}. "
+            f"{metadata['input_prompt']}. "
+            f"\n\nHere is the transcript in json format:\n\n{transcript_content}"
+        )
+        
+        # original_prompt = f"{system_prompt}\n{user_prompt}"
+        # ALLOWED_PROMPT_LENGTH = 790  # Adjust based on model limits and expected system prompt size
+        # logger.info(f"Original Prompt and Length: {original_prompt} : {len(original_prompt)} chars. Using {ALLOWED_PROMPT_LENGTH} characters only")
+        # max_user_len = ALLOWED_PROMPT_LENGTH - len(system_prompt) - 1 # 1 for newline separation
+        # prompt = f"{system_prompt}\n{user_prompt[:max_user_len]}"
+        
+        tasks_list = openai_service.generate_tasks_from_transcript(transcript_url_path, user_prompt=user_prompt)
+        if not tasks_list:
+            logger.warning(f"Task generation resulted in empty list for {transcript_url_path}")            
+        logger.info(f"Task generation complete (Length: {len(tasks_list)} chars)...")
+        
+        # Save Segment details in the file
+        # Save the structured list
+        with open(tasks_file_path, "w") as f:
+            json.dump(tasks_list, f, indent  =4)       
+        
+        return tasks_list
+    except Exception as e:
+        logger.error(f"OpenAI Service Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Tasks generation failed: {str(e)}")
+    
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8003)

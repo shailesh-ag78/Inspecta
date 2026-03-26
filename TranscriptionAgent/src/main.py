@@ -109,7 +109,6 @@ async def transcribe_endpoint(request: TranscribeRequest):
         blob.download_to_filename(audio_url_path)
         
     # 3. Extract Transcript
-    #input_prompt = "This is a farm video. Inspcting farming scenarios."
     input_metadata = {
         "company_name": metadata.get("company_name", "Unknown Company") if metadata else "",
         "industry": metadata.get("industry", "Unknown Industry") if metadata else "",
@@ -122,7 +121,7 @@ async def transcribe_endpoint(request: TranscribeRequest):
         logger.error(f"Extraction Error: {e}")
         raise HTTPException(status_code=500, detail=f"Transcript extraction failed: {str(e)}")
 
-    # # 4. Return Result
+    # 4. Return Result
     if(ENV_MODE != "local"):
         # Upload Transcript file in GCS storage folder and set transcibe_url
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
@@ -134,7 +133,7 @@ async def transcribe_endpoint(request: TranscribeRequest):
         
     return {
         "status": "success",
-        "transcript": transcript_text,
+        "transcript": transcript_text[:1000],
         "segments_json_url": transcibe_url,
         "metadata": { # Additional information to be returned if any
             "ENV_MODE" : ENV_MODE
@@ -151,8 +150,18 @@ def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -
         system_prompt = (
             f"Act like a transcription assistant for Company : {metadata['company_name']}, it is specialized in {metadata['industry']}. "
             f"Audio will be mostly in English but it can have some Hindi or Marathi words. Audio may contain technical terms related to {metadata['industry']} inspections. Please transcribe exactly as spoken."
-            f"There could be some background noise as well. Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon, and any Hindi or Marathi phrases without translation."
+            f"Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon, and any Hindi or Marathi phrases without translation."
             f"The output should be strictly in English language."
+            f"There could be some background noise as well."
+        )
+        system_prompt = (
+            f"Company : {metadata['company_name']}, it is specialized in {metadata['industry']}."
+            f"Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon."
+            f"Instructions:"
+            f"Please transcribe exactly as spoken. Do not try to be very creative."
+            f"Audio will be mostly in English but it can have some Hindi or Marathi words. In such case, trasncribe the sentence in English without changing the meaning."
+            f"The output should be strictly in English language."
+            f"There could be some background noise as well."
         )
         
         # industry_terms = "pipeline, crack, plastering, site safety, shuttering, RCC" # Add your actual terms

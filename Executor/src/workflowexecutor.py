@@ -364,7 +364,7 @@ class WorkflowExecutor:
                     f"Response: {result}"
                 )
                 
-            state["transcript"] = transcript
+            state["transcript"] = transcript   # gets only 1000 characters
             state["transcript_segments_json_url"] = result.get("segments_json_url", "")
                        
             duration_ms = (time.time() - start_time) * 1000
@@ -376,7 +376,7 @@ class WorkflowExecutor:
                 duration_ms=duration_ms
             )
             
-            logger.info(f"✅ Transcription complete ({len(transcript)} chars), segments URL: {state['transcript_segments_json_url']}")
+            logger.info(f"✅ Transcription complete ({len(transcript)} chars, max = 1000), segments URL: {state['transcript_segments_json_url']}")
             return {"transcript": transcript}
             
         except Exception as e:
@@ -397,20 +397,37 @@ class WorkflowExecutor:
         incident_id = state["incident_id"]
         node_name = GENERATE_TASKS_NODE
         start_time = time.time()
+        tasks = []
         
         try:
             transcript = state.get("transcript", "")
             if not transcript:
                 logger.warning(f"⚠️  Empty transcript for {incident_id}. Task generation may be limited.")
-            
-            # Prepare data for task generator agent
+                
+            # Prepare data for report generation agent
+            # Fetch company metadata (name + industry) from the DB so the agent can use it in prompts.
+            company_name = f"Unknown Company"  # Fallback if DB lookup fails
+            industry = "Unknown Industry"  # Fallback if DB lookup fails
+            industry_keywords = []
+            try:
+                company_info = await self.repo.get_company_info(state["company_id"])
+                if company_info:
+                    company_name = company_info.get("company_name", company_name)
+                    industry = company_info.get("industry", industry)
+                    industry_keywords = company_info.get("industry_keywords") or []
+            except Exception:
+                # Best-effort: leave fallbacks in place even if the DB call fails
+                pass
+
+            industry_keywords_str = ", ".join([f'\"{k}\"' for k in (industry_keywords or [])])
+            input_prompt = f"Industry terms: {industry_keywords_str}"
+                
             data = {
-                "transcript": transcript,
                 "transcript_segments_json_url": state.get("transcript_segments_json_url", ""),
                 "metadata": {
-                    "company_id": state["company_id"],
-                    "inspection_id": state["inspection_id"],
-                    "incident_id": incident_id,
+                    "company_name": company_name,
+                    "industry": industry,
+                    "input_prompt": input_prompt,
                 }
             }
             
@@ -427,12 +444,12 @@ class WorkflowExecutor:
                 logger.info(f"Received {len(tasks)} tasks from agent.")
                 
             # PERSISTENCE: Bulk insert final tasks
-            # await self.repo.bulk_add_incident_tasks(
-            #     company_id=state['company_id'],
-            #     incident_id=incident_id,
-            #     inspection_id=state['inspection_id'],
-            #     tasks=tasks
-            # )
+            await self.repo.bulk_add_incident_tasks(
+                company_id=state['company_id'],
+                incident_id=incident_id,
+                inspection_id=state['inspection_id'],
+                tasks=tasks
+            )
             state["generated_tasks"] = tasks
             
             duration_ms = (time.time() - start_time) * 1000
@@ -453,7 +470,7 @@ class WorkflowExecutor:
                 node_name=node_name,
                 incident_id=incident_id,
                 input_data={"transcript_length": len(state.get("transcript", ""))},
-                output_data={},
+                output_data={"task_count": len(tasks)},
                 duration_ms=duration_ms,
                 error=e
             )
