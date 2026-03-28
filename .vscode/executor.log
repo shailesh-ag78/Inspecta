@@ -1,0 +1,154 @@
+2026-03-28 16:42:48,012 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-03-28 16:42:48,394 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:42:48,395 - langsmith_config - INFO - \u2705 LangSmith enabled. Project: inspecta-executor
+2026-03-28 16:42:48,395 - langsmith_config - INFO -    Endpoint: https://api.smith.langchain.com
+2026-03-28 16:42:48,395 - main - INFO - \u2705 LangSmith configured
+2026-03-28 16:42:48,647 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:42:48,664 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:42:48,667 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:42:48,671 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:42:48,761 - workflowexecutor - INFO - \u2705 WorkflowExecutor initialized with LangSmith tracing
+2026-03-28 16:42:48,762 - main - INFO - \u2705 WorkflowExecutor initialized
+2026-03-28 16:42:48,943 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-03-28 16:42:48,954 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-03-28 16:42:49,172 - workflowexecutor - INFO - \U0001f4dd Incident 11526c27-e3ae-4030-8a8b-275e7ddb32c9 uploaded and queued for processing
+2026-03-28 16:42:49,362 - httpx - INFO - HTTP Request: POST http://testserver/inspections/a66c940b-b46f-4a32-9de7-775bc0a34672/upload-incident "HTTP/1.1 200 OK"
+2026-03-28 16:43:01,216 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident 11526c27-e3ae-4030-8a8b-275e7ddb32c9
+2026-03-28 16:43:02,844 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-03-28 16:43:02,846 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': '11526c27-e3ae-4030-8a8b-275e7ddb32c9', 'status': 'success', 'duration_ms': 1630.4795742034912, 'timestamp': '2026-03-28T11:13:02.846992', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-03-28 16:43:02,911 - langsmith_config - INFO - Node Execution: {'node': 'extract_audio', 'incident_id': '11526c27-e3ae-4030-8a8b-275e7ddb32c9', 'status': 'success', 'duration_ms': 1694.8573589324951, 'timestamp': '2026-03-28T11:13:02.911370+00:00', 'input_keys': ['video_url'], 'output_keys': ['audio_url']}
+2026-03-28 16:43:02,912 - workflowexecutor - INFO - \u2705 Audio extracted: d:\code\Inspecta\Data\CompanyStorage4\uploads\1c1cb018-d065-4a74-8642-e314234fc492_audio.mp3
+2026-03-28 16:43:02,962 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident 11526c27-e3ae-4030-8a8b-275e7ddb32c9
+2026-03-28 16:43:03,450 - httpx - INFO - HTTP Request: GET http://testserver/incidents/11526c27-e3ae-4030-8a8b-275e7ddb32c9/status "HTTP/1.1 200 OK"
+2026-03-28 16:43:12,151 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-03-28 16:43:12,153 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': '11526c27-e3ae-4030-8a8b-275e7ddb32c9', 'status': 'success', 'duration_ms': 9191.077470779419, 'timestamp': '2026-03-28T11:13:12.153599', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-03-28 16:43:12,154 - langsmith_config - INFO - Node Execution: {'node': 'transcribe', 'incident_id': '11526c27-e3ae-4030-8a8b-275e7ddb32c9', 'status': 'success', 'duration_ms': 9238.219499588013, 'timestamp': '2026-03-28T11:13:12.154587+00:00', 'input_keys': ['audio_url'], 'output_keys': ['transcript_length']}
+2026-03-28 16:43:12,154 - workflowexecutor - INFO - \u2705 Transcription complete (224 chars, max = 1000), segments URL: d:\code\Inspecta\Data\CompanyStorage4\uploads\1c1cb018-d065-4a74-8642-e314234fc492_audio_transcribe.json
+2026-03-28 16:43:12,301 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 11526c27-e3ae-4030-8a8b-275e7ddb32c9
+2026-03-28 16:43:12,833 - httpx - INFO - HTTP Request: GET http://testserver/incidents/11526c27-e3ae-4030-8a8b-275e7ddb32c9/status "HTTP/1.1 200 OK"
+2026-03-28 16:43:17,854 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-03-28 16:48:19,526 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-03-28 16:48:19,919 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:48:19,919 - langsmith_config - INFO - \u2705 LangSmith enabled. Project: inspecta-executor
+2026-03-28 16:48:19,921 - langsmith_config - INFO -    Endpoint: https://api.smith.langchain.com
+2026-03-28 16:48:19,921 - main - INFO - \u2705 LangSmith configured
+2026-03-28 16:48:20,051 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:48:20,062 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:48:20,064 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:48:20,066 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:48:20,109 - workflowexecutor - INFO - \u2705 WorkflowExecutor initialized with LangSmith tracing
+2026-03-28 16:48:20,109 - main - INFO - \u2705 WorkflowExecutor initialized
+2026-03-28 16:48:20,209 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-03-28 16:48:20,214 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-03-28 16:48:20,385 - workflowexecutor - INFO - \U0001f4dd Incident 0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b uploaded and queued for processing
+2026-03-28 16:48:20,497 - httpx - INFO - HTTP Request: POST http://testserver/inspections/07e34013-f3e5-42c7-ae2a-136059d78291/upload-incident "HTTP/1.1 200 OK"
+2026-03-28 16:48:23,578 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident 0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b
+2026-03-28 16:48:24,760 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-03-28 16:48:24,761 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': '0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b', 'status': 'success', 'duration_ms': 1183.2828521728516, 'timestamp': '2026-03-28T11:18:24.761807', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-03-28 16:48:24,818 - langsmith_config - INFO - Node Execution: {'node': 'extract_audio', 'incident_id': '0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b', 'status': 'success', 'duration_ms': 1239.7501468658447, 'timestamp': '2026-03-28T11:18:24.818275+00:00', 'input_keys': ['video_url'], 'output_keys': ['audio_url']}
+2026-03-28 16:48:24,818 - workflowexecutor - INFO - \u2705 Audio extracted: d:\code\Inspecta\Data\CompanyStorage4\uploads\9fbd3812-83b2-47d0-923c-f35c2b8831ba_audio.mp3
+2026-03-28 16:48:24,943 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident 0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b
+2026-03-28 16:48:25,566 - httpx - INFO - HTTP Request: GET http://testserver/incidents/0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b/status "HTTP/1.1 200 OK"
+2026-03-28 16:48:30,076 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-03-28 16:48:30,077 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': '0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b', 'status': 'success', 'duration_ms': 5134.8302364349365, 'timestamp': '2026-03-28T11:18:30.077958', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-03-28 16:48:30,078 - langsmith_config - INFO - Node Execution: {'node': 'transcribe', 'incident_id': '0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b', 'status': 'success', 'duration_ms': 5254.812240600586, 'timestamp': '2026-03-28T11:18:30.078529+00:00', 'input_keys': ['audio_url'], 'output_keys': ['transcript_length']}
+2026-03-28 16:48:30,078 - workflowexecutor - INFO - \u2705 Transcription complete (220 chars, max = 1000), segments URL: d:\code\Inspecta\Data\CompanyStorage4\uploads\9fbd3812-83b2-47d0-923c-f35c2b8831ba_audio_transcribe.json
+2026-03-28 16:48:30,176 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b
+2026-03-28 16:48:30,722 - httpx - INFO - HTTP Request: GET http://testserver/incidents/0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b/status "HTTP/1.1 200 OK"
+2026-03-28 16:48:34,914 - httpx - INFO - HTTP Request: GET http://testserver/incidents/0a8c4f1c-e988-4e26-a7b6-7ea30273cc3b/status "HTTP/1.1 200 OK"
+2026-03-28 16:48:42,125 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-03-28 16:58:29,067 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-03-28 16:58:29,185 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:58:29,185 - langsmith_config - INFO - \u2705 LangSmith enabled. Project: inspecta-executor
+2026-03-28 16:58:29,186 - langsmith_config - INFO -    Endpoint: https://api.smith.langchain.com
+2026-03-28 16:58:29,186 - main - INFO - \u2705 LangSmith configured
+2026-03-28 16:58:29,270 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:58:29,275 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:58:29,276 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:58:29,276 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 16:58:29,301 - workflowexecutor - INFO - \u2705 WorkflowExecutor initialized with LangSmith tracing
+2026-03-28 16:58:29,301 - main - INFO - \u2705 WorkflowExecutor initialized
+2026-03-28 16:58:29,405 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-03-28 16:58:29,410 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-03-28 16:58:29,572 - workflowexecutor - INFO - \U0001f4dd Incident 53f14c38-7784-4fdb-9712-aab2217ecc22 uploaded and queued for processing
+2026-03-28 16:58:29,724 - httpx - INFO - HTTP Request: POST http://testserver/inspections/9b4df9b3-60e4-49e0-aae3-68e4df71284d/upload-incident "HTTP/1.1 200 OK"
+2026-03-28 16:58:44,390 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident 53f14c38-7784-4fdb-9712-aab2217ecc22
+2026-03-28 16:58:45,613 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-03-28 16:58:45,615 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': '53f14c38-7784-4fdb-9712-aab2217ecc22', 'status': 'success', 'duration_ms': 1224.5721817016602, 'timestamp': '2026-03-28T11:28:45.615361', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-03-28 16:58:45,675 - langsmith_config - INFO - Node Execution: {'node': 'extract_audio', 'incident_id': '53f14c38-7784-4fdb-9712-aab2217ecc22', 'status': 'success', 'duration_ms': 1284.271001815796, 'timestamp': '2026-03-28T11:28:45.675060+00:00', 'input_keys': ['video_url'], 'output_keys': ['audio_url']}
+2026-03-28 16:58:45,675 - workflowexecutor - INFO - \u2705 Audio extracted: d:\code\Inspecta\Data\CompanyStorage4\uploads\124a8960-a39b-4101-b18c-6f56658d4fae_audio.mp3
+2026-03-28 16:58:45,736 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident 53f14c38-7784-4fdb-9712-aab2217ecc22
+2026-03-28 16:58:46,381 - httpx - INFO - HTTP Request: GET http://testserver/incidents/53f14c38-7784-4fdb-9712-aab2217ecc22/status "HTTP/1.1 200 OK"
+2026-03-28 16:58:50,315 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-03-28 16:58:50,317 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': '53f14c38-7784-4fdb-9712-aab2217ecc22', 'status': 'success', 'duration_ms': 4580.195188522339, 'timestamp': '2026-03-28T11:28:50.316695', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-03-28 16:58:50,317 - langsmith_config - INFO - Node Execution: {'node': 'transcribe', 'incident_id': '53f14c38-7784-4fdb-9712-aab2217ecc22', 'status': 'success', 'duration_ms': 4639.948606491089, 'timestamp': '2026-03-28T11:28:50.317696+00:00', 'input_keys': ['audio_url'], 'output_keys': ['transcript_length']}
+2026-03-28 16:58:50,317 - workflowexecutor - INFO - \u2705 Transcription complete (225 chars, max = 1000), segments URL: d:\code\Inspecta\Data\CompanyStorage4\uploads\124a8960-a39b-4101-b18c-6f56658d4fae_audio_transcribe.json
+2026-03-28 16:58:50,404 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 53f14c38-7784-4fdb-9712-aab2217ecc22
+2026-03-28 16:58:51,338 - httpx - INFO - HTTP Request: GET http://testserver/incidents/53f14c38-7784-4fdb-9712-aab2217ecc22/status "HTTP/1.1 200 OK"
+2026-03-28 16:58:55,592 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-03-28 17:06:35,898 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-03-28 17:06:36,004 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 17:06:36,004 - langsmith_config - INFO - \u2705 LangSmith enabled. Project: inspecta-executor
+2026-03-28 17:06:36,004 - langsmith_config - INFO -    Endpoint: https://api.smith.langchain.com
+2026-03-28 17:06:36,004 - main - INFO - \u2705 LangSmith configured
+2026-03-28 17:06:36,057 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 17:06:36,061 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 17:06:36,061 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 17:06:36,063 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 17:06:36,082 - workflowexecutor - INFO - \u2705 WorkflowExecutor initialized with LangSmith tracing
+2026-03-28 17:06:36,082 - main - INFO - \u2705 WorkflowExecutor initialized
+2026-03-28 17:06:36,149 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-03-28 17:06:36,152 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-03-28 17:06:36,265 - workflowexecutor - INFO - \U0001f4dd Incident 7d13ae6b-5f5c-4209-8e61-410835b29568 uploaded and queued for processing
+2026-03-28 17:06:36,369 - httpx - INFO - HTTP Request: POST http://testserver/inspections/5eb74f66-e548-4f92-9ade-43836eb0d56c/upload-incident "HTTP/1.1 200 OK"
+2026-03-28 17:06:38,430 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident 7d13ae6b-5f5c-4209-8e61-410835b29568
+2026-03-28 17:06:39,853 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-03-28 17:06:39,855 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': '7d13ae6b-5f5c-4209-8e61-410835b29568', 'status': 'success', 'duration_ms': 1423.830270767212, 'timestamp': '2026-03-28T11:36:39.855331', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-03-28 17:06:39,896 - langsmith_config - INFO - Node Execution: {'node': 'extract_audio', 'incident_id': '7d13ae6b-5f5c-4209-8e61-410835b29568', 'status': 'success', 'duration_ms': 1465.573787689209, 'timestamp': '2026-03-28T11:36:39.896075+00:00', 'input_keys': ['video_url'], 'output_keys': ['audio_url']}
+2026-03-28 17:06:39,897 - workflowexecutor - INFO - \u2705 Audio extracted: d:\code\Inspecta\Data\CompanyStorage4\uploads\0884ee18-81e4-4376-9da0-d7cf93d1a4ff_audio.mp3
+2026-03-28 17:06:39,946 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident 7d13ae6b-5f5c-4209-8e61-410835b29568
+2026-03-28 17:06:40,416 - httpx - INFO - HTTP Request: GET http://testserver/incidents/7d13ae6b-5f5c-4209-8e61-410835b29568/status "HTTP/1.1 200 OK"
+2026-03-28 17:06:44,928 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-03-28 17:06:44,929 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': '7d13ae6b-5f5c-4209-8e61-410835b29568', 'status': 'success', 'duration_ms': 4982.650279998779, 'timestamp': '2026-03-28T11:36:44.929569', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-03-28 17:06:44,930 - langsmith_config - INFO - Node Execution: {'node': 'transcribe', 'incident_id': '7d13ae6b-5f5c-4209-8e61-410835b29568', 'status': 'success', 'duration_ms': 5028.592586517334, 'timestamp': '2026-03-28T11:36:44.930570+00:00', 'input_keys': ['audio_url'], 'output_keys': ['transcript_length']}
+2026-03-28 17:06:44,930 - workflowexecutor - INFO - \u2705 Transcription complete (227 chars, max = 1000), segments URL: d:\code\Inspecta\Data\CompanyStorage4\uploads\0884ee18-81e4-4376-9da0-d7cf93d1a4ff_audio_transcribe.json
+2026-03-28 17:06:44,992 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 7d13ae6b-5f5c-4209-8e61-410835b29568
+2026-03-28 17:06:45,407 - httpx - INFO - HTTP Request: GET http://testserver/incidents/7d13ae6b-5f5c-4209-8e61-410835b29568/status "HTTP/1.1 200 OK"
+2026-03-28 17:06:48,494 - httpx - INFO - HTTP Request: GET http://testserver/incidents/7d13ae6b-5f5c-4209-8e61-410835b29568/status "HTTP/1.1 200 OK"
+2026-03-28 17:07:01,664 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-03-28 18:30:35,902 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-03-28 18:30:36,242 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 18:30:36,243 - langsmith_config - INFO - \u2705 LangSmith enabled. Project: inspecta-executor
+2026-03-28 18:30:36,243 - langsmith_config - INFO -    Endpoint: https://api.smith.langchain.com
+2026-03-28 18:30:36,243 - main - INFO - \u2705 LangSmith configured
+2026-03-28 18:30:36,438 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 18:30:36,451 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 18:30:36,454 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 18:30:36,456 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-03-28 18:30:36,502 - workflowexecutor - INFO - \u2705 WorkflowExecutor initialized with LangSmith tracing
+2026-03-28 18:30:36,503 - main - INFO - \u2705 WorkflowExecutor initialized
+2026-03-28 18:30:36,695 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-03-28 18:30:36,708 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-03-28 18:30:36,933 - workflowexecutor - INFO - \U0001f4dd Incident 013d6d66-bfe8-4458-98ac-b69b4721a7fb uploaded and queued for processing
+2026-03-28 18:30:37,109 - httpx - INFO - HTTP Request: POST http://testserver/inspections/ebb98f95-7456-426e-8057-16455b9c73e1/upload-incident "HTTP/1.1 200 OK"
+2026-03-28 18:30:41,028 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident 013d6d66-bfe8-4458-98ac-b69b4721a7fb
+2026-03-28 18:30:42,280 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-03-28 18:30:42,282 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': '013d6d66-bfe8-4458-98ac-b69b4721a7fb', 'status': 'success', 'duration_ms': 1252.4051666259766, 'timestamp': '2026-03-28T13:00:42.282116', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-03-28 18:30:42,355 - langsmith_config - INFO - Node Execution: {'node': 'extract_audio', 'incident_id': '013d6d66-bfe8-4458-98ac-b69b4721a7fb', 'status': 'success', 'duration_ms': 1326.5821933746338, 'timestamp': '2026-03-28T13:00:42.355292+00:00', 'input_keys': ['video_url'], 'output_keys': ['audio_url']}
+2026-03-28 18:30:42,355 - workflowexecutor - INFO - \u2705 Audio extracted: d:\code\Inspecta\Data\CompanyStorage4\uploads\d84be70a-2f42-4a07-a40f-6b201d38d75c_audio.mp3
+2026-03-28 18:30:42,423 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident 013d6d66-bfe8-4458-98ac-b69b4721a7fb
+2026-03-28 18:30:43,029 - httpx - INFO - HTTP Request: GET http://testserver/incidents/013d6d66-bfe8-4458-98ac-b69b4721a7fb/status "HTTP/1.1 200 OK"
+2026-03-28 18:30:46,385 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-03-28 18:30:46,386 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': '013d6d66-bfe8-4458-98ac-b69b4721a7fb', 'status': 'success', 'duration_ms': 3962.4569416046143, 'timestamp': '2026-03-28T13:00:46.386249', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-03-28 18:30:46,387 - langsmith_config - INFO - Node Execution: {'node': 'transcribe', 'incident_id': '013d6d66-bfe8-4458-98ac-b69b4721a7fb', 'status': 'success', 'duration_ms': 4023.4408378601074, 'timestamp': '2026-03-28T13:00:46.387249+00:00', 'input_keys': ['audio_url'], 'output_keys': ['transcript_length']}
+2026-03-28 18:30:46,387 - workflowexecutor - INFO - \u2705 Transcription complete (220 chars, max = 1000), segments URL: d:\code\Inspecta\Data\CompanyStorage4\uploads\d84be70a-2f42-4a07-a40f-6b201d38d75c_audio_transcribe.json
+2026-03-28 18:30:46,462 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 013d6d66-bfe8-4458-98ac-b69b4721a7fb
+2026-03-28 18:30:47,023 - httpx - INFO - HTTP Request: GET http://testserver/incidents/013d6d66-bfe8-4458-98ac-b69b4721a7fb/status "HTTP/1.1 200 OK"
+2026-03-28 18:30:52,347 - httpx - INFO - HTTP Request: GET http://testserver/incidents/013d6d66-bfe8-4458-98ac-b69b4721a7fb/status "HTTP/1.1 200 OK"
+2026-03-28 18:30:56,201 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 200 OK"
+2026-03-28 18:30:56,201 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': '013d6d66-bfe8-4458-98ac-b69b4721a7fb', 'status': 'success', 'duration_ms': 9739.001512527466, 'timestamp': '2026-03-28T13:00:56.201462', 'response_keys': ['status', 'tasks_count', 'tasks_json_url', 'metadata']}
+2026-03-28 18:30:56,202 - workflowexecutor - INFO - Received 0 tasks from agent.
+2026-03-28 18:30:56,307 - langsmith_config - INFO - Node Execution: {'node': 'generate_tasks', 'incident_id': '013d6d66-bfe8-4458-98ac-b69b4721a7fb', 'status': 'success', 'duration_ms': 9915.743589401245, 'timestamp': '2026-03-28T13:00:56.307993+00:00', 'input_keys': ['transcript_length'], 'output_keys': ['task_count']}
+2026-03-28 18:30:56,307 - workflowexecutor - INFO - \u2705 Generated 0 task(s) for incident 013d6d66-bfe8-4458-98ac-b69b4721a7fb
+2026-03-28 18:30:56,410 - workflowexecutor - INFO - \u2705 Workflow completed successfully for incident 013d6d66-bfe8-4458-98ac-b69b4721a7fb
+2026-03-28 18:30:58,097 - httpx - INFO - HTTP Request: GET http://testserver/incidents/013d6d66-bfe8-4458-98ac-b69b4721a7fb/status "HTTP/1.1 200 OK"

@@ -289,8 +289,6 @@ class WorkflowExecutor:
             # 3. PERSISTENCE: Update the record with the audio path
             await self.repo.update_incident_audio(state['company_id'], incident_id, audio_url)
             
-            state["audio_url"] = audio_url
-            
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
                 node_name=node_name,
@@ -364,8 +362,7 @@ class WorkflowExecutor:
                     f"Response: {result}"
                 )
                 
-            state["transcript"] = transcript   # gets only 1000 characters
-            state["transcript_segments_json_url"] = result.get("segments_json_url", "")
+            transcript_segments_json_url = result.get("segments_json_url", "")
                        
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
@@ -376,8 +373,11 @@ class WorkflowExecutor:
                 duration_ms=duration_ms
             )
             
-            logger.info(f"✅ Transcription complete ({len(transcript)} chars, max = 1000), segments URL: {state['transcript_segments_json_url']}")
-            return {"transcript": transcript}
+            logger.info(f"✅ Transcription complete ({len(transcript)} chars, max = 1000), segments URL: {transcript_segments_json_url}")
+            return {
+                "transcript": transcript,
+                "transcript_segments_json_url": transcript_segments_json_url
+            }
             
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
@@ -423,25 +423,23 @@ class WorkflowExecutor:
             input_prompt = f"Industry terms: {industry_keywords_str}"
                 
             data = {
-                "transcript_segments_json_url": state.get("transcript_segments_json_url", ""),
+                "transcript_segments_json_url": state.get("transcript_segments_json_url"),
                 "metadata": {
                     "company_name": company_name,
                     "industry": industry,
-                    "input_prompt": input_prompt,
+                    "input_prompt": input_prompt
                 }
             }
             
             logger.info(f"📋 Generating tasks for incident {incident_id}")
             
             result = await self.task_generator_agent.post(data, incident_id=incident_id)
-            tasks = result.get("tasks", [])
-            if not isinstance(tasks, list):
+            if(not result):
                 raise ValueError(
-                    f"External agent at {self.task_generator_agent.url} returned invalid tasks format. "
-                    f"Expected a list but got: {tasks}"
+                    f"External agent at {self.task_generator_agent.url} returned empty response. "
                 )
-            else:
-                logger.info(f"Received {len(tasks)} tasks from agent.")
+            tasks = result.get("tasks", [])
+            logger.info(f"Received {len(tasks)} tasks from agent.")
                 
             # PERSISTENCE: Bulk insert final tasks
             await self.repo.bulk_add_incident_tasks(
@@ -450,7 +448,6 @@ class WorkflowExecutor:
                 inspection_id=state['inspection_id'],
                 tasks=tasks
             )
-            state["generated_tasks"] = tasks
             
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(

@@ -1,0 +1,64 @@
+2026-03-28 16:57:18,620 - src.main - INFO - \U0001f680 Starting Executor with D:\code\Inspecta\FieldReporterAgent\.env ENV_MODE=local   gpt-4o (temp=0.2)
+2026-03-28 16:57:19,304 - src.main - INFO - \U0001f527 Initializing resources...
+2026-03-28 16:58:51,125 - src.main - INFO - Generating tasks for transcript: d:\code\Inspecta\Data\CompanyStorage4\uploads\124a8960-a39b-4101-b18c-6f56658d4fae_audio_transcribe.json...
+2026-03-28 16:58:51,125 - src.main - INFO - Generating tasks from d:\code\Inspecta\Data\CompanyStorage4\uploads\124a8960-a39b-4101-b18c-6f56658d4fae_audio_transcribe.json to d:\code\Inspecta\Data\CompanyStorage4\uploads\124a8960-a39b-4101-b18c-6f56658d4fae_audio_transcribe_tasks.json
+2026-03-28 16:58:51,125 - src.openai_service - INFO - Generating tasks from transcript with prompt length 3899 chars (System Prompt: 3157 chars, User Prompt: 742 chars)
+2026-03-28 16:58:55,171 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-28 16:58:55,182 - src.openai_service - INFO - OpenAI response received for task generation. : ChatCompletion(id='chatcmpl-DOM8RHfXZAl1qeNQfbs103UhfXeZ3', choices=[Choice(finish_reason='stop', index=0, logprobs=None, message=ChatCompletionMessage(content='{\n    "Summary": "On 21st March, during the inspection at site Astitwa on the third floor, issues were identified with the granite fitting near the sink and a missing drawer for the dustbin.",\n    "TaskList": {\n        "Task": [\n            {\n                "task_title": "Correct granite fitting near sink",\n                "task_description": "Ensure the granite piece near the sink on the third floor is fitted correctly.",\n                "severity_id": "2",\n                "task_type": "2"\n            },\n            {\n                "task_title": "Install missing drawer for dustbin",\n                "task_description": "Install the missing drawer for the dustbin on the third floor.",\n                "severity_id": "2",\n                "task_type": "1"\n            }\n        ]\n    }\n}', refusal=None, role='assistant', annotations=[], audio=None, function_call=None, tool_calls=None))], created=1774697331, model='gpt-4o-2024-08-06', object='chat.completion', service_tier='default', system_fingerprint='fp_c8b70290c4', usage=CompletionUsage(completion_tokens=165, prompt_tokens=798, total_tokens=963, completion_tokens_details=CompletionTokensDetails(accepted_prediction_tokens=0, audio_tokens=0, reasoning_tokens=0, rejected_prediction_tokens=0), prompt_tokens_details=PromptTokensDetails(audio_tokens=0, cached_tokens=0)))
+2026-03-28 16:58:55,182 - src.openai_service - INFO - Cleaned OpenAI response content for task generation: {
+    "Summary": "On 21st March, during the inspection at site Astitwa on the third floor, issues were identified with the granite fitting near the sink and a missing drawer for the dustbin.",
+    "TaskList": {
+        "Task": [
+            {
+                "task_title": "Correct granite fitting near sink",
+                "task_description": "Ensure the granite piece near the sink on the third floor is fitted correctly.",
+                "severity_id": "2",
+                "task_type": "2"
+            },
+            {
+                "task_title": "Install missing drawer for dustbin",
+                "task_description": "Install the missing drawer for the dustbin on the third floor.",
+                "severity_id": "2",
+                "task_type": "1"
+            }
+        ]
+    }
+}
+2026-03-28 16:58:55,182 - src.openai_service - INFO - Cleaned OpenAI response content in form of tasks: {'Summary': 'On 21st March, during the inspection at site Astitwa on the third floor, issues were identified with the granite fitting near the sink and a missing drawer for the dustbin.', 'TaskList': {'Task': [{'task_title': 'Correct granite fitting near sink', 'task_description': 'Ensure the granite piece near the sink on the third floor is fitted correctly.', 'severity_id': '2', 'task_type': '2'}, {'task_title': 'Install missing drawer for dustbin', 'task_description': 'Install the missing drawer for the dustbin on the third floor.', 'severity_id': '2', 'task_type': '1'}]}}
+2026-03-28 16:58:55,182 - src.main - ERROR - OpenAI Service Error: Failed to generate tasks: 'str' object has no attribute 'get'
+2026-03-28 16:58:55,182 - src.main - ERROR - Extraction Error: 500: Tasks generation failed: Failed to generate tasks: 'str' object has no attribute 'get'
+2026-03-28 17:05:59,182 - src.main - INFO - \U0001f9f9 Cleaning up resources...
+2026-03-28 17:06:04,913 - src.main - INFO - \U0001f680 Starting Executor with D:\code\Inspecta\FieldReporterAgent\.env ENV_MODE=local   gpt-4o (temp=0.2)
+2026-03-28 17:06:05,385 - src.main - INFO - \U0001f527 Initializing resources...
+2026-03-28 17:06:46,507 - src.main - INFO - Generating tasks for transcript: d:\code\Inspecta\Data\CompanyStorage4\uploads\0884ee18-81e4-4376-9da0-d7cf93d1a4ff_audio_transcribe.json...
+2026-03-28 17:06:46,507 - src.main - INFO - Generating tasks from d:\code\Inspecta\Data\CompanyStorage4\uploads\0884ee18-81e4-4376-9da0-d7cf93d1a4ff_audio_transcribe.json to d:\code\Inspecta\Data\CompanyStorage4\uploads\0884ee18-81e4-4376-9da0-d7cf93d1a4ff_audio_transcribe_tasks.json
+2026-03-28 17:06:46,508 - src.openai_service - INFO - Generating tasks from transcript with prompt length 3934 chars (System Prompt: 3157 chars, User Prompt: 777 chars)
+2026-03-28 17:06:49,681 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+2026-03-28 17:06:49,688 - src.openai_service - INFO - OpenAI response received for task generation. : ChatCompletion(id='chatcmpl-DOMG6ta8MqFuq8YCeYM460tcNRDmb', choices=[Choice(finish_reason='stop', index=0, logprobs=None, message=ChatCompletionMessage(content='{\n    "Summary": "On 21st March, an inspection was conducted at site Astitwa, specifically on the third floor. The primary observation was that the granite piece near the sink was not fitted correctly.",\n    "TaskList": {\n        "Task": [\n            {\n                "task_title": "Correct granite fitting near sink",\n                "task_description": "Ensure the granite piece near the sink on the third floor is fitted correctly to prevent any potential damage or safety hazards.",\n                "severity_id": "1",\n                "task_type": "2"\n            }\n        ],\n        "Clarification Needed": [\n            {\n                "task_title": "Unclear segment",\n                "task_description": "The segment \'Commissioner ultra�� strand.Command m~~~\' is unclear and requires clarification.",\n                "severity_id": "3",\n                "task_type": "3"\n            }\n        ]\n    }\n}', refusal=None, role='assistant', annotations=[], audio=None, function_call=None, tool_calls=None))], created=1774697806, model='gpt-4o-2024-08-06', object='chat.completion', service_tier='default', system_fingerprint='fp_c8b70290c4', usage=CompletionUsage(completion_tokens=189, prompt_tokens=814, total_tokens=1003, completion_tokens_details=CompletionTokensDetails(accepted_prediction_tokens=0, audio_tokens=0, reasoning_tokens=0, rejected_prediction_tokens=0), prompt_tokens_details=PromptTokensDetails(audio_tokens=0, cached_tokens=0)))
+2026-03-28 17:06:49,688 - src.openai_service - INFO - Cleaned OpenAI response content for task generation: {
+    "Summary": "On 21st March, an inspection was conducted at site Astitwa, specifically on the third floor. The primary observation was that the granite piece near the sink was not fitted correctly.",
+    "TaskList": {
+        "Task": [
+            {
+                "task_title": "Correct granite fitting near sink",
+                "task_description": "Ensure the granite piece near the sink on the third floor is fitted correctly to prevent any potential damage or safety hazards.",
+                "severity_id": "1",
+                "task_type": "2"
+            }
+        ],
+        "Clarification Needed": [
+            {
+                "task_title": "Unclear segment",
+                "task_description": "The segment 'Commissioner ultra�� strand.Command m~~~' is unclear and requires clarification.",
+                "severity_id": "3",
+                "task_type": "3"
+            }
+        ]
+    }
+}
+2026-03-28 17:06:49,689 - src.openai_service - INFO - type(tasks): <class 'dict'>
+2026-03-28 17:06:49,689 - src.openai_service - INFO - Cleaned OpenAI response content in form of tasks: {'Summary': 'On 21st March, an inspection was conducted at site Astitwa, specifically on the third floor. The primary observation was that the granite piece near the sink was not fitted correctly.', 'TaskList': {'Task': [{'task_title': 'Correct granite fitting near sink', 'task_description': 'Ensure the granite piece near the sink on the third floor is fitted correctly to prevent any potential damage or safety hazards.', 'severity_id': '1', 'task_type': '2'}], 'Clarification Needed': [{'task_title': 'Unclear segment', 'task_description': "The segment 'Commissioner ultra�� strand.Command m~~~' is unclear and requires clarification.", 'severity_id': '3', 'task_type': '3'}]}}
+2026-03-28 17:06:49,689 - src.openai_service - INFO - Processing task: Summary
+2026-03-28 17:06:49,689 - src.main - ERROR - OpenAI Service Error: Failed to generate tasks: 'str' object has no attribute 'get'
+2026-03-28 17:06:49,689 - src.main - ERROR - Extraction Error: 500: Tasks generation failed: Failed to generate tasks: 'str' object has no attribute 'get'
+2026-03-28 18:30:12,128 - src.main - INFO - \U0001f9f9 Cleaning up resources...

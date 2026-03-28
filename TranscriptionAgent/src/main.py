@@ -1,6 +1,5 @@
 import json
 import os
-import subprocess
 from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import asynccontextmanager
 from pydantic import BaseModel
@@ -140,6 +139,7 @@ async def transcribe_endpoint(request: TranscribeRequest):
         }
     }
     
+   
 def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -> str:
     """ Transcript the Audio file using Groq Service and save the transcript to disk """
 

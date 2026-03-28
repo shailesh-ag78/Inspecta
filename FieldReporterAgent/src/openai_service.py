@@ -4,6 +4,14 @@ import json
 import dotenv
 from typing import List, Dict, Any
 from openai import OpenAI
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    filename='.\\task_generator.log',
+)
+logger = logging.getLogger(__name__)
 
 # Constants
 
@@ -11,8 +19,12 @@ from openai import OpenAI
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
-MODEL = os.getenv("OPENAI_MODEL", "gpt-5-nano")
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+MODEL= "gpt-4o"
+MODEL_TEMPERATURE= 0.2
 
 def safe_int(val, default):
     try:
@@ -20,16 +32,19 @@ def safe_int(val, default):
     except (ValueError, TypeError):
         return default
 class OpenAIService:
-    def __init__(self, api_key: str = None):
-        self.api_key = api_key or os.environ.get("OPENAI_API_KEY")
-        if not self.api_key:
-             print("Warning: OPENAI_API_KEY not set.")
-        self.client = OpenAI(api_key=self.api_key)
+    def __init__(self, logger=None):
+        self.logger = logger
+        if not OPENAI_API_KEY:
+            if self.logger:
+                self.logger.warning("Warning: OPENAI_API_KEY not set.")
+            else:
+                print("Warning: OPENAI_API_KEY not set.")
+        self.client = OpenAI(api_key=OPENAI_API_KEY)
 
-    def generate_tasks_from_transcript(self, transcript: str, user_prompt: str) -> List[Dict[str, Any]]:
+    def generate_tasks_from_transcript(self, transcript: str, user_prompt: str) -> Dict[str, Any]:
         """
         Uses OpenAI to extract structured tasks from the inspection transcript.
-        Returns a list of dictionaries compatible with the database schema.
+        Returns a dictionary compatible with the database schema.
         """
         
         header_prompt = (
@@ -98,6 +113,7 @@ class OpenAIService:
         # num_tokens = len(encoding.encode(your_full_prompt))
         # print(f"Total tokens: {num_tokens}")
         
+        logger.info(f"Generating tasks from transcript with prompt length {len(system_prompt) + len(user_prompt)} chars (System Prompt: {len(system_prompt)} chars, User Prompt: {len(user_prompt)} chars)")
         try:
             response = self.client.chat.completions.create(
                 model=MODEL,
@@ -105,9 +121,11 @@ class OpenAIService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=0.2,
+                temperature=MODEL_TEMPERATURE,
                 response_format={ "type": "json_object" }
             )
+            
+            logger.info(f"OpenAI response received for task generation. : {response}")
             
             content = response.choices[0].message.content.strip()
             
@@ -121,22 +139,102 @@ class OpenAIService:
                 content = content.rsplit('```', 1)[0].strip()
             if content.endswith("```"):
                 content = content[:-3]
-                
-            tasks = json.loads(content)
             
-            # Validate/Sanitize default fields
-            cleaned_tasks = []
-            for t in tasks:
-                cleaned_tasks.append({
-                    "task_title": t.get("task_title", "Untitled Task"),
-                    "task_description": t.get("task_description", ""),
-                    "task_original_description": t.get("task_original_description", ""),
-                    "severity_id": safe_int(t.get("severity_id"), 2),
-                    "task_type": safe_int(t.get("task_type"), 3)
-                })
+            cleaned_tasks = safe_transform_tasks(content)
+            # tasks = json.loads(content)
+            # logger.info(f"type(tasks): {type(tasks)}")
+            
+            # logger.info(f"Cleaned OpenAI response content in form of tasks: {tasks}")    
+            
+            # # Validate/Sanitize default fields
+            # cleaned_tasks = []
+            # for t in tasks:
+            #     logger.info(f"Processing task: {t}")
+            #     cleaned_tasks.append({
+            #         "task_title": t.get("task_title", "Untitled Task"),
+            #         "task_description": t.get("task_description", ""),
+            #         "task_original_description": t.get("task_original_description", ""),
+            #         "severity_id": safe_int(t.get("severity_id"), 2),
+            #         "task_type": safe_int(t.get("task_type"), 3)
+            #     })
                 
             return cleaned_tasks
 
         except Exception as e:
             print(f"OpenAI Task Generation Error: {e}")
             raise RuntimeError(f"Failed to generate tasks: {str(e)}")
+
+
+import json
+import logging
+
+def safe_transform_tasks(raw_input) -> Dict[str, Any]:
+    """
+    Robustly transforms raw AI output into a standardized task dictionary.
+    Handles strings, empty inputs, and malformed dictionaries.
+    """
+    processed_data = {}
+
+    # 1. HANDLE NON-DICTIONARY INPUT (Strings/None)
+    if not raw_input:
+        logging.warning("Received empty input for task transformation.")
+        return {"summary": "Error: No data received", "tasks": []}
+
+    if isinstance(raw_input, str):
+        try:
+            # Try to parse if it's a JSON string
+            processed_data = json.loads(raw_input)
+        except json.JSONDecodeError:
+            logging.error(f"Raw input is a string but not valid JSON: {raw_input[:100]}...")
+            return {
+                "summary": "Error: AI returned non-JSON text.",
+                "tasks": [],
+                "metadata": {"raw_response": raw_input} # Keep raw text for debugging
+            }
+    elif isinstance(raw_input, dict):
+        processed_data = raw_input
+    else:
+        logging.error(f"Unsupported data type: {type(raw_input)}")
+        return {"summary": "Error: Unexpected data format", "tasks": []}
+
+    # 2. STANDARDIZED TRANSFORMATION (The "Safe" Way)
+    def get_int(val, default):
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return default
+
+    # Extract Summary
+    summary = processed_data.get("Summary") or processed_data.get("summary") or "No summary extracted."
+    
+    # Extract Task Lists (Handle nested TaskList or flat structure)
+    task_container = processed_data.get("TaskList", processed_data)
+    
+    raw_tasks = task_container.get("Task", []) if isinstance(task_container, dict) else []
+    raw_clarifications = task_container.get("Clarification Needed", []) if isinstance(task_container, dict) else []
+
+    # Ensure we are iterating over a list even if AI returned a single dict
+    if isinstance(raw_tasks, dict): raw_tasks = [raw_tasks]
+    if isinstance(raw_clarifications, dict): raw_clarifications = [raw_clarifications]
+
+    cleaned_tasks = {
+        "summary": summary,
+        "tasks": [
+            {
+                "task_title": t.get("task_title", "Untitled Task"),
+                "task_description": t.get("task_description", ""),
+                "severity_id": get_int(t.get("severity_id"), 2),
+                "task_type": get_int(t.get("task_type"), 3)
+            } for t in raw_tasks if isinstance(t, dict)
+        ],
+        "clarification_needed": [
+            {
+                "task_title": c.get("task_title", "Clarification"),
+                "task_description": c.get("task_description", ""),
+                "severity_id": get_int(c.get("severity_id"), 3),
+                "task_type": get_int(c.get("task_type"), 3)
+            } for c in raw_clarifications if isinstance(c, dict)
+        ]
+    }
+
+    return cleaned_tasks

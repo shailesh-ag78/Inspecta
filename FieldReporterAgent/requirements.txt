@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+pydantic
+google-cloud-storage
+python-dotenv
+pydub
+flask
+openai

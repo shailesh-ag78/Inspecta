@@ -1,9 +1,10 @@
 from asyncio import tasks
 import os
-import subprocess
+import dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.concurrency import asynccontextmanager
 from pydantic import BaseModel
+
 import uvicorn
 from typing import Optional, Dict, Any
 from pathlib import Path
@@ -23,8 +24,13 @@ INSPCTA_FILE_BUCKET = "inspecta-file-bucket"
 UPLOADS_FOLDER = "uploads"
 
 # Set this in your environment or .env file: ENV_MODE=local
+env_path = Path(__file__).parent.parent / ".env"
+dotenv.load_dotenv(dotenv_path=env_path)
+
 ENV_MODE = os.getenv("ENV_MODE", "local")
-logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
+MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
+logger.info(f"🚀 Starting Executor with {env_path} ENV_MODE={ENV_MODE}   {MODEL} (temp={MODEL_TEMPERATURE})")
 
 # Define your local root (where files actually live on your PC)
 LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"d:\code\Inspecta\Data"))
@@ -54,7 +60,7 @@ async def lifespan(app: FastAPI):
     
 app = FastAPI(lifespan=lifespan)
 
-openai_service = OpenAIService()
+openai_service = OpenAIService(logger = logger)
 class GenerateTasksRequest(BaseModel):
     transcript_segments_json_url : str
     metadata: Optional[Dict[str, Any]] = None # company_name, industry_type, timestamp, etc.
@@ -139,7 +145,7 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
         }
     }
     
-def tasks_generation(transcript_url_path, tasks_file_path, metadata: dict) -> list:
+def tasks_generation(transcript_url_path, tasks_file_path, metadata: dict) -> dict:
     """ Generate tasks using the transcript and save them to disk """
 
     transcript_content = ""
@@ -163,17 +169,17 @@ def tasks_generation(transcript_url_path, tasks_file_path, metadata: dict) -> li
         # max_user_len = ALLOWED_PROMPT_LENGTH - len(system_prompt) - 1 # 1 for newline separation
         # prompt = f"{system_prompt}\n{user_prompt[:max_user_len]}"
         
-        tasks_list = openai_service.generate_tasks_from_transcript(transcript_url_path, user_prompt=user_prompt)
-        if not tasks_list:
-            logger.warning(f"Task generation resulted in empty list for {transcript_url_path}")            
-        logger.info(f"Task generation complete (Length: {len(tasks_list)} chars)...")
+        op_tasks = openai_service.generate_tasks_from_transcript(transcript_url_path, user_prompt=user_prompt)
+        if not op_tasks:
+            logger.warning(f"Task generation resulted in empty dictionary for {transcript_url_path}")            
         
-        # Save Segment details in the file
-        # Save the structured list
+        logger.info(f"Tasks generated: {op_tasks}")
+        
+        # Save the structured output to a JSON file for later retrieval
         with open(tasks_file_path, "w") as f:
-            json.dump(tasks_list, f, indent  =4)       
+            json.dump(op_tasks, f, indent=4, ensure_ascii=False)
         
-        return tasks_list
+        return op_tasks
     except Exception as e:
         logger.error(f"OpenAI Service Error: {e}")
         raise HTTPException(status_code=500, detail=f"Tasks generation failed: {str(e)}")
