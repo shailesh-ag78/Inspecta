@@ -23,8 +23,8 @@ MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-MODEL= "gpt-4o"
-MODEL_TEMPERATURE= 0.2
+MODEL= "gpt-4o" # "gpt-5-nano"
+MODEL_TEMPERATURE= 0.2  #1  
 
 def safe_int(val, default):
     try:
@@ -53,7 +53,7 @@ class OpenAIService:
             f"The audio transcript may contain observations, issues, and comments made by the inspector while walking around the site."
             f"The audio transcript is referred as 'Inspector Comments'."
             f"The inputted transcript is a JSON text that contains segments of the audio transcription with their corresponding timestamps (start second count and end second count)."
-            f"Each segment is referred here as a 'transcript segment' and has inspector comments."    
+            f"Each segment is referred here as a 'transcript segment' and has inspector comments. Each segment has Start time and End time in Seconds"    
         )
         
         ask = (
@@ -70,6 +70,7 @@ class OpenAIService:
                     ○ Inspector comments may have some sentences or words in Hindi or Marathi. Generate output in English only.
                     ○ Tone: Professional, objective, and urgent regarding safety.
                     ○ Technical Accuracy: Maintain any specific measurements, floor numbers, or trade-specific terminology (e.g., HVAC, MEP, Grade).
+                    ○ The task dscription shall be accurate and summarizd. Do not add stuff on your own. Do not become too creative here.
                     ○ Handling Ambiguity: If a comment is unclear, list it under a 'Clarification Needed' section rather than guessing the task." 
                     ○ Safety First: Prioritize any observations related to OSHA/safety violations at the top of the task list.
                     ○ De-noising: Ignore filler words, personal anecdotes, or irrelevant chatter in the raw text.
@@ -88,6 +89,8 @@ class OpenAIService:
                                 "task_description": "exact description of the action to be taken for the task",
                                 "severity_id": "1=Severe, 2=Regular, 3=Low",
                                 "task_type": "1=Install, 2=Repair, 3=Verify, 4=Clear", (infer from context, default to Verify (3) if unsure.)                                
+                                "segment_start_time": "start time of the transcript segment in seconds",
+                                "segment_end_time": "end time of the transcript segment in seconds"
                             }}
                         ]
                     }}
@@ -125,6 +128,18 @@ class OpenAIService:
                 response_format={ "type": "json_object" }
             )
             
+            # Extract total, prompt, and completion tokens
+            usage = response.usage
+            prompt_tokens = usage.prompt_tokens if usage else 0        # The words you sent (Input)
+            completion_tokens = usage.completion_tokens if usage else 0  # The words AI generated (Output)
+            
+            cached_tokens = 'N/A'
+            if usage and hasattr(usage, 'prompt_tokens_details') and usage.prompt_tokens_details:
+                cached_tokens = getattr(usage.prompt_tokens_details, 'cached_tokens', 'N/A')
+            logger.info(f"OpenAI API Usage - Prompt Tokens: {prompt_tokens}," + 
+                        f" Completion Tokens: {completion_tokens}, " + 
+                        f"Cached Tokens: {cached_tokens}")
+
             logger.info(f"OpenAI response received for task generation. : {response}")
             
             content = response.choices[0].message.content.strip()
@@ -140,33 +155,13 @@ class OpenAIService:
             if content.endswith("```"):
                 content = content[:-3]
             
-            cleaned_tasks = safe_transform_tasks(content)
-            # tasks = json.loads(content)
-            # logger.info(f"type(tasks): {type(tasks)}")
-            
-            # logger.info(f"Cleaned OpenAI response content in form of tasks: {tasks}")    
-            
-            # # Validate/Sanitize default fields
-            # cleaned_tasks = []
-            # for t in tasks:
-            #     logger.info(f"Processing task: {t}")
-            #     cleaned_tasks.append({
-            #         "task_title": t.get("task_title", "Untitled Task"),
-            #         "task_description": t.get("task_description", ""),
-            #         "task_original_description": t.get("task_original_description", ""),
-            #         "severity_id": safe_int(t.get("severity_id"), 2),
-            #         "task_type": safe_int(t.get("task_type"), 3)
-            #     })
-                
+            cleaned_tasks = safe_transform_tasks(content)                
             return cleaned_tasks
 
         except Exception as e:
-            print(f"OpenAI Task Generation Error: {e}")
+            logger.error(f"OpenAI Task Generation Error: {e}")
             raise RuntimeError(f"Failed to generate tasks: {str(e)}")
 
-
-import json
-import logging
 
 def safe_transform_tasks(raw_input) -> Dict[str, Any]:
     """
@@ -224,7 +219,9 @@ def safe_transform_tasks(raw_input) -> Dict[str, Any]:
                 "task_title": t.get("task_title", "Untitled Task"),
                 "task_description": t.get("task_description", ""),
                 "severity_id": get_int(t.get("severity_id"), 2),
-                "task_type": get_int(t.get("task_type"), 3)
+                "task_type": get_int(t.get("task_type"), 3),
+                "start_time": get_int(t.get("segment_start_time"), 0),
+                "end_time": get_int(t.get("segment_end_time"), 0)
             } for t in raw_tasks if isinstance(t, dict)
         ],
         "clarification_needed": [

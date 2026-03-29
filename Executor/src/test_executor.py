@@ -89,10 +89,10 @@ def test_full_workflow_integration():
             print(f"\n--- Poll Status for {incident_id} (Wait for Processing) ---")
             # Since LangGraph runs in a background task, we poll the status
             import time
-            max_attempts = 10
+            max_attempts = 15
             finished = False
             for i in range(max_attempts):
-                time.sleep(2) # Give nodes time to process
+                time.sleep(3) # Give nodes time to process
                 resp_status = client.get(f"/incidents/{incident_id}/status", headers=headers)
                 status_data = resp_status.json()
                 
