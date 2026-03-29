@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [{
+        "name": "Debug: Executor",
+        "type": "python",
+        "request": "launch",
+        "module": "uvicorn",
+        "args": [
+            "Executor.src.main:app", // Point to the app relative to the root
+            "--host", "0.0.0.0", 
+            "--port", "8000",
+            "--reload"
+        ],
+        "jinja": true,
+        "cwd": "${workspaceFolder}", // Stay in the project root (D:\code\Inspecta)
+        "env": {
+            "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/Executor"
+        }
+    }],
+    "compounds": [
+        {
+            "name": "Debug All Services",
+            "configurations": ["Debug: Executor", "Debug: Audio Agent", "Debug: Integration Test"]
+        }
+    ],
+    "termsinal.integrated.env.windows": {
+        "PYTHONPATH": "d:\\code\\Inspecta\\Executor"
+    }
+}

@@ -12,7 +12,7 @@ import shutil
 #DB_DSN = os.getenv("DATABASE_URL", "dbname=inspecta_local user=postgres password=passwd host=localhost port=5432")
 #DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_local")
 #TEST_VIDEO_PATH = r"D:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
-TEST_VIDEO_PATH = r"D:\code\Inspecta\Data\test_data\Astitva Interior Videos"
+TEST_VIDEO_PATH = r"D:\code\Inspecta\Data\test_data\test_videos"
 
 COMPANY_ID = "4"
 STORAGE_ID = "CompanyStorage4"

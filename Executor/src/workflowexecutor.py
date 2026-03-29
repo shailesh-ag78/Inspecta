@@ -1,18 +1,25 @@
 import asyncio
+from http.client import HTTPException
+from importlib import metadata
+import json
 import logging
+from pathlib import Path
 import time
 from typing import Any, Literal, TypedDict, Annotated, List, Optional
 from typing import cast
 import operator
 import httpx
+import os
+import sys
+sys.path.append(os.getcwd())
 
 # Import the Repository
-from database import IncidentRepository
+from database import IncidentRepository, TaskStatus, TaskSeverity, TaskType
 
 # LangChain / LangGraph imports
 from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.postgres import PostgresSaver
-from langchain_core.runnables import RunnableConfig
+#from langgraph.checkpoint.postgres import PostgresSaver
+#from langchain_core.runnables import RunnableConfig
 from langgraph.types import RetryPolicy
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver # Use .aio
 
@@ -438,8 +445,14 @@ class WorkflowExecutor:
                 raise ValueError(
                     f"External agent at {self.task_generator_agent.url} returned empty response. "
                 )
-            tasks = result.get("tasks", [])
-            logger.info(f"Received {len(tasks)} tasks from agent.")
+            task_count = int(result.get("tasks_count", "0"))
+            logger.info(f"Received {task_count} tasks from agent.")
+            
+            metadata = result.get("metadata", {})
+            env_mode = metadata.get("ENV_MODE", "LOCAL")
+            tasks_json_url = result.get("tasks_json_url", "")
+            summary, tasks = get_tasklist_from_url(tasks_json_url, video_url=state.get("video_url", ""), env_mode=env_mode)
+            logger.info(f"Extracted summary: {summary}, from tasks JSON URL: {tasks_json_url}")
                 
             # PERSISTENCE: Bulk insert final tasks
             await self.repo.bulk_add_incident_tasks(
@@ -555,3 +568,56 @@ class WorkflowExecutor:
                 site_id=site_id
             )
             return inspection_id
+        
+def get_tasklist_from_url(tasks_json_url: str, video_url : str, env_mode: str = "LOCAL") -> tuple[str, List[dict]]:
+    """
+    Utility function to fetch the generated tasks JSON from a URL.
+    This can be a local file path or a GCS URL depending on the environment.
+    """
+    summary = "No summary available."
+    tasks = []
+    
+    if(env_mode != "local"):
+        logger.info(f"Fetching tasks JSON from {tasks_json_url} in {env_mode} environment...")
+        #if tasks_json_url.startswith("gs://"):
+            # TO DO: Fetch from GCS
+            # if not gcs_client:
+            #     raise RuntimeError("GCS client not initialized")
+            
+            # bucket_name, blob_name = parse_gcs_url(url)
+            # bucket = gcs_client.bucket(bucket_name)
+            # blob = bucket.get_blob(blob_name)
+            # if not blob:
+            #     raise FileNotFoundError(f"File not found in GCS at {url}")
+            
+            # content = blob.download_as_text()
+            # return json.loads(content)
+    else:
+        # if not os.path.exists(tasks_json_url):
+        #     raise HTTPException(status_code=400, detail=f"Tasks file not found at: {tasks_json_url}")
+    
+        with open(tasks_json_url, "r") as f:
+            data = json.load(f)
+        
+        # 2. Extract the Summary
+        summary = data.get("summary", "No summary available.")
+        
+        # 3. Extract the Task List array
+        tasks = [
+            {
+                "task_title": t.get('task_title'),
+                "task_description": t.get('task_description'),
+                "task_original_description": "",
+                "video_url": t.get('video_url', video_url), 
+                "video_start_ms": t.get('start_time', 0),
+                "video_end_ms": t.get('end_time', 0),
+                "task_artifacts": [],
+                "status_id": t.get('status_id', TaskStatus.PENDING),
+                "severity_id": t.get('severity_id', TaskSeverity.REGULAR),
+                "task_type_id": t.get('task_type', TaskType.VERIFY)
+            } for t in data.get("tasks", [])
+        ]
+        
+        #4 ToDo : Handle Clarification Needed element
+        
+    return summary, tasks

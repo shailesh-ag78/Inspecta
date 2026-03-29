@@ -4,11 +4,10 @@ import logging
 import datetime
 import sys
 import uuid
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request, BackgroundTasks
-from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException, Request
 from dotenv import load_dotenv
+import uvicorn
 
-from database import IncidentRepository
 from workflowexecutor import WorkflowExecutor
 from langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
@@ -18,6 +17,8 @@ from typing import Optional, Tuple
 # This MUST happen before any async code or loop initialization
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+from contextlib import asynccontextmanager
 
 # Load environment variables from .env file
 # load_dotenv()
@@ -318,3 +319,6 @@ async def get_upload_url(request: Request):
             "blob_name": blob_name,
             "storage_type": "gcs"
         }
+        
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8003)

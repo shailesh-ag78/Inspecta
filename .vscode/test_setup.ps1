@@ -22,6 +22,7 @@ Write-Host "🚀 Starting Executor on Port 8000..." -ForegroundColor Green
 #Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd D:\code\Inspecta\Executor\src; uvicorn main:app --host 0.0.0.0 --port 8000"
 cd D:\code\Inspecta\Executor
 & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --loop asyncio
+#& '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --loop asyncio --reload
 
 # --- 5. Run the Test ---
 Write-Host "⏳ Waiting for services to initialize..." -ForegroundColor Gray

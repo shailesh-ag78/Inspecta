@@ -58,7 +58,7 @@ class OpenAIService:
         
         ask = (
             f"Ask: Analyze all provided 'Inspector Comments' and generate two specific sections:"
-            f"A. Concise Observation Summary: A 2-3 sentence professional overview of the current site status based on the comments. Focus on the 'what' and the 'where.'"
+            f"A. Concise Observation Summary: A 2-3 sentence professional overview of the current site status based on the comments."
             f"B. Actionable Task List for each 'transcript segment': "
             f"   A bulleted list of specific, high-priority tasks that need to be completed or corrected. "
         )
@@ -90,7 +90,7 @@ class OpenAIService:
                                 "severity_id": "1=Severe, 2=Regular, 3=Low",
                                 "task_type": "1=Install, 2=Repair, 3=Verify, 4=Clear", (infer from context, default to Verify (3) if unsure.)                                
                                 "segment_start_time": "start time of the transcript segment in seconds",
-                                "segment_end_time": "end time of the transcript segment in seconds"
+                                "segment_end_time": "end time of the transcript segment in seconds. It shall be same or more than segment_start_time."
                             }}
                         ]
                     }}

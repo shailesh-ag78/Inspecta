@@ -14,3 +14,4 @@ google-cloud-storage
 firebase-admin
 python-dotenv>=1.0.0  # Environment variable management
 pytest
+dotenv
