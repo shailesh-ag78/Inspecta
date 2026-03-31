@@ -20,6 +20,9 @@
         },
         {
             "path": ".vscode"
+        },
+        {
+            "path": "UI"
         }
     ],
     "settings": {
