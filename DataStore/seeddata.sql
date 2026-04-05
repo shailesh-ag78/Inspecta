@@ -52,10 +52,10 @@ INSERT INTO companies (name, industry_id) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO sites (company_id, industry_id, site_name, address) VALUES 
-(4, 4, 'Site 1', 'Magic Interiors Site 1 Address, Pune') 
+(2, 4, 'Site 1', 'Magic Interiors Site 1 Address, Pune') 
 ON CONFLICT (id) DO NOTHING;
 
 -- 7. Seed Inspector
 INSERT INTO inspectors (company_id, full_name, email) VALUES 
-(4, 'Inspector A', 'inspectorA@magicinteriors.com') 
+(2, 'Inspector A', 'inspectorA@magicinteriors.com') 
 ON CONFLICT (id) DO NOTHING;

@@ -8,8 +8,8 @@ from fastapi import FastAPI, HTTPException, Request
 from dotenv import load_dotenv
 import uvicorn
 
-from workflowexecutor import WorkflowExecutor
-from langsmith_config import get_langsmith_config
+from .workflowexecutor import WorkflowExecutor
+from .langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
 from google.cloud import storage
 from typing import Optional, Tuple
