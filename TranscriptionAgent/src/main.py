@@ -26,7 +26,7 @@ ENV_MODE = os.getenv("ENV_MODE", "local")
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)
-LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"d:\code\Inspecta\Data"))
+LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"g:\code\Inspecta\Data"))
 LOCAL_TEMP_FOLDER = os.path.join(LOCAL_STORAGE_ROOT, "temp")
 if not os.path.exists(LOCAL_TEMP_FOLDER):
     os.makedirs(LOCAL_TEMP_FOLDER)

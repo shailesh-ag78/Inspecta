@@ -6,3 +6,4 @@ groq
 python-dotenv
 pydub
 flask
+audioop-lts
