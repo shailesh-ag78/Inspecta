@@ -14,7 +14,7 @@ import sys
 sys.path.append(os.getcwd())
 
 # Import the Repository
-from .database import IncidentRepository, TaskStatus, TaskSeverity, TaskType
+from database import IncidentRepository, TaskStatus, TaskSeverity, TaskType
 
 # LangChain / LangGraph imports
 from langgraph.graph import StateGraph, START, END
@@ -24,7 +24,7 @@ from langgraph.types import RetryPolicy
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver # Use .aio
 
 # LangSmith imports
-from .langsmith_config import get_langsmith_config, WorkflowTracer
+from langsmith_config import get_langsmith_config, WorkflowTracer
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class WorkflowExecutor:
         The Factory Method: This is the ONLY place that knows 
         about Postgres Checkpointers.
         """
-        db_dsn = "postgresql://postgres:passwd@localhost:5432/inspecta_local"
+        db_dsn = "postgresql://postgres:passwd@localhost:5432/inspecta_db"
         # 1. Internalize Repository Creation
         repo = IncidentRepository(db_dsn)
         

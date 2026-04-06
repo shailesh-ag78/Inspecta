@@ -8,8 +8,8 @@ from fastapi import FastAPI, HTTPException, Request
 from dotenv import load_dotenv
 import uvicorn
 
-from .workflowexecutor import WorkflowExecutor
-from .langsmith_config import get_langsmith_config
+from workflowexecutor import WorkflowExecutor
+from langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
 from google.cloud import storage
 from typing import Optional, Tuple
@@ -45,7 +45,7 @@ ALLOWED_TYPES = {
 # Set this in your environment or .env file: ENV_MODE=local
 ENV_MODE = os.getenv("ENV_MODE", "local")
 # Define your local root (where files actually live on your PC)
-LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"d:\code\Inspecta\Data"))
+LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"G:\code\Inspecta\Data"))
 
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
