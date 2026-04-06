@@ -140,6 +140,41 @@ export const themes: Record<string, Theme> = {
     },
   },
 
+  oceanVibrant: {
+    name: "Ocean Vibrant",
+    id: "oceanVibrant",
+    header: {
+      bg: "bg-gradient-to-r from-bank-primary via-bank-primary to-bank-secondary",
+      text: "text-white",
+    },
+    primary: {
+      from: "from-bank-primary",
+      to: "to-bank-secondary",
+    },
+    secondary: {
+      from: "from-bank-accent",
+      to: "to-bank-secondary",
+    },
+    logo: {
+      from: "from-bank-accent",
+      to: "to-bank-secondary",
+    },
+    cardBorder: "border-bank-accent/40",
+    background: {
+      gradient: "from-bank-background via-bank-background to-bank-background",
+      section: "from-bank-background via-bank-background to-bank-background",
+    },
+    status: {
+      urgent: "bg-gradient-to-r from-red-500 to-rose-600",
+      medium: "from-amber-500 to-orange-500",
+      success: "from-cyan-500 to-blue-500",
+    },
+    filters: {
+      border: "border-bank-accent",
+      focus: "border-bank-accent ring-bank-accent/20",
+    },
+  },
+
   indigoSlate: {
     name: "Indigo Slate",
     id: "indigoSlate",

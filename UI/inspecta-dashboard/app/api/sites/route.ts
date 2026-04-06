@@ -10,14 +10,12 @@ export async function GET(request: NextRequest) {
         s.address,
         c.name as company_name,
         i.name as industry_name,
-        s.created_at,
         COUNT(insp.id) as inspection_count
       FROM sites s
       LEFT JOIN companies c ON s.company_id = c.id
       LEFT JOIN industries_lookup i ON s.industry_id = i.id
       LEFT JOIN inspections insp ON s.id = insp.site_id
       GROUP BY s.id, c.name, i.name
-      ORDER BY s.created_at DESC
       LIMIT 100`
     );
 
@@ -28,7 +26,6 @@ export async function GET(request: NextRequest) {
       company_name: site.company_name,
       industry_name: site.industry_name,
       floor: site.address ? `${site.address}` : 'Unknown',
-      lastModified: new Date(site.created_at).toISOString(),
       inspection_count: parseInt(site.inspection_count),
     }));
 

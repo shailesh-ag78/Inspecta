@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Clock, ChevronLeft, ChevronRight, Play, User, AlertCircle, Loader } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 
 interface Site {
@@ -55,7 +55,7 @@ export default function ReviewerDashboard() {
     task_type: 'all',
     task_status: 'all'
   });
-  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(false);
+  const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
   const [isVideoCollapsed, setIsVideoCollapsed] = useState(false);
   const [selectedSite, setSelectedSite] = useState<string>('');
   const [selectedIncident, setSelectedIncident] = useState<string>('');
@@ -194,11 +194,11 @@ export default function ReviewerDashboard() {
 
   const getTaskStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return 'fa-circle-dot';
-      case 'in_progress': return 'fa-rotate';
-      case 'review': return 'fa-magnifying-glass';
-      case 'completed': return 'fa-circle-check';
-      case 'failed': return 'fa-circle-xmark';
+      case 'pending': return 'fa-clock';
+      case 'in_progress': return 'fa-spinner';
+      case 'review': return 'fa-eye';
+      case 'completed': return 'fa-check-circle';
+      case 'failed': return 'fa-times-circle';
       default: return 'fa-question';
     }
   };
@@ -231,129 +231,100 @@ export default function ReviewerDashboard() {
     return true;
   });
 
-  const currentSite = sites.find(s => s.id === selectedSite);
-
   return (
     <div className={`h-screen flex flex-col bg-gradient-to-br ${theme.background.gradient}`}>
       {/* Header */}
-      <header className={`${theme.header.bg} ${theme.header.text} h-16 flex items-center justify-between px-6 shrink-0 border-b border-blue-500/30 shadow-lg`}>
-        <div className="flex items-center gap-4">
-          <span 
-            className="font-black text-xl tracking-tighter text-transparent bg-clip-text"
-            style={{
-              backgroundImage: `linear-gradient(to right, ${
-                theme.id === 'premiumBlue' ? 'rgb(96, 165, 250), rgb(196, 181, 253)' :
-                theme.id === 'aquaGradient' ? 'rgb(34, 211, 238), rgb(45, 212, 191)' :
-                theme.id === 'aquaLightGradient' ? 'rgb(96, 165, 250), rgb(34, 211, 238)' :
-                'rgb(165, 180, 252), rgb(196, 181, 253)'
-              })`,
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
-            } as any}
-          >
-            INSPECTA
-          </span>
-          <div 
-            className="h-6 w-px"
-            style={{
-              backgroundImage: `linear-gradient(to bottom, ${
-                theme.id === 'premiumBlue' ? 'rgb(96, 165, 250), rgb(196, 181, 253)' :
-                theme.id === 'aquaGradient' ? 'rgb(34, 211, 238), rgb(45, 212, 191)' :
-                theme.id === 'aquaLightGradient' ? 'rgb(96, 165, 250), rgb(34, 211, 238)' :
-                'rgb(165, 180, 252), rgb(196, 181, 253)'
-              })`
-            }}
-          ></div>
-          
-          {/* Site Selection */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Site:</span>
-            {sitesLoading ? (
-              <Loader className="w-4 h-4 animate-spin text-blue-400" />
-            ) : (
-              <select
-                value={selectedSite}
-                onChange={(e) => handleSiteChange(e.target.value)}
-                className="bg-slate-800/50 border border-slate-600 rounded px-3 py-1 text-sm text-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-              >
-                {sites.length === 0 && <option>No sites available</option>}
-                {sites.map(site => (
-                  <option key={site.id} value={site.id}>
-                    {site.name} - {site.floor}
-                  </option>
-                ))}
-              </select>
-            )}
+      <header className={`${theme.header.bg} ${theme.header.text} shrink-0 border-b border-slate-300/20 shadow-lg`}>
+        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center text-white shadow-sm">
+              <span className="font-black text-lg">I</span>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.24em] text-white/80">INSPECTA</div>
+              <div className="text-2xl font-bold">Home Dashboard</div>
+            </div>
           </div>
 
-          {/* Incident Selection */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Incident:</span>
-            {incidentsLoading ? (
-              <Loader className="w-4 h-4 animate-spin text-blue-400" />
-            ) : (
-              <select
-                value={selectedIncident}
-                onChange={(e) => setSelectedIncident(e.target.value)}
-                className="bg-slate-800/50 border border-slate-600 rounded px-3 py-1 text-sm text-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400"
-              >
-                {incidents.length === 0 && <option>No incidents available</option>}
-                {incidents.map(incident => (
-                  <option key={incident.id} value={incident.id}>
-                    {incident.title}
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Profile & Settings */}
-          <div className="relative">
-            <button
-              onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2"
-              title="Profile Settings"
-            >
-              <User className="w-5 h-5 text-blue-300" />
-            </button>
-            
-            {showSettingsMenu && (
-              <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50">
-                {/* Settings Header */}
-                <div className="px-4 py-3 border-b border-slate-700">
-                  <div className="font-medium text-white">Profile</div>
-                  <div className="text-xs text-slate-400 mt-1">Settings</div>
-                </div>
-                
-                {/* Theme Selection */}
-                <div className="p-2">
-                  <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
-                  {Object.values(themes).map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        setTheme(t);
-                        setShowSettingsMenu(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all mb-1 ${
-                        theme.id === t.id
-                          ? 'bg-blue-600 text-white'
-                          : 'hover:bg-slate-800 text-slate-200'
-                      }`}
-                    >
-                      <div className="font-medium">{t.name}</div>
-                      <div className="text-xs opacity-75 mt-1">
-                        <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
-                      </div>
-                    </button>
+          <div className="flex items-center gap-3">
+            <div className={`relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-2 text-sm text-white shadow-sm`}>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">Site</span>
+              {sitesLoading ? (
+                <Loader className="w-4 h-4 animate-spin text-white/70 ml-2" />
+              ) : (
+                <select
+                  value={selectedSite}
+                  onChange={(e) => handleSiteChange(e.target.value)}
+                  className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
+                >
+                  {sites.length === 0 && <option>No sites available</option>}
+                  {sites.map(site => (
+                    <option key={site.id} value={site.id}>{site.name} - {site.floor}</option>
                   ))}
-                </div>
-              </div>
-            )}
-          </div>
+                </select>
+              )}
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+            </div>
+            <div className={`relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-2 text-sm text-white shadow-sm`}>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">Incident</span>
+              {incidentsLoading ? (
+                <Loader className="w-4 h-4 animate-spin text-white/70 ml-2" />
+              ) : (
+                <select
+                  value={selectedIncident}
+                  onChange={(e) => setSelectedIncident(e.target.value)}
+                  className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
+                >
+                  {incidents.length === 0 && <option>No incidents available</option>}
+                  {incidents.map(incident => (
+                    <option key={incident.id} value={incident.id}>{incident.title}</option>
+                  ))}
+                </select>
+              )}
+              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+            </div>
 
-          <span className="text-xs bg-gradient-to-r from-blue-500 to-cyan-500 px-2 py-1 rounded text-white font-bold shadow-lg">Ver 2.0</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                title="Profile Settings"
+              >
+                <User className="w-5 h-5" />
+              </button>
+              {showSettingsMenu && (
+                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-50">
+                  <div className="px-4 py-3 border-b border-slate-700">
+                    <div className="font-medium text-white">Profile</div>
+                    <div className="text-xs text-slate-400 mt-1">Settings</div>
+                    <div className="text-[10px] text-slate-500 mt-2">Ver 6.0</div>
+                  </div>
+                  <div className="p-2">
+                    <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
+                    {Object.values(themes).map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setTheme(t);
+                          setShowSettingsMenu(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 ${
+                          theme.id === t.id
+                            ? 'bg-white/10 text-white'
+                            : 'hover:bg-slate-800 text-slate-200'
+                        }`}
+                      >
+                        <div className="font-medium">{t.name}</div>
+                        <div className="text-xs opacity-75 mt-1">
+                          <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </header>
 
@@ -372,43 +343,32 @@ export default function ReviewerDashboard() {
       {/* Main Content */}
       <main className="flex flex-1 overflow-hidden">
         {/* Left Pane - Task Feed */}
-        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto p-6 bg-slate-100 border border-slate-200/70 transition-all duration-300`}>
-          <div className="mb-4 flex justify-between items-end">
-            <h2 className="text-base font-semibold text-slate-800 leading-tight">
-              {tasksLoading ? (
-                <span className="flex items-center gap-2">
-                  <Loader className="w-5 h-5 animate-spin" /> Loading Tasks...
-                </span>
-              ) : (
-                `Pending Verification (${filteredTasks.length} Tasks)`
-              )}
-            </h2>
-            <div className="flex gap-2">
-              <button className={`text-xs bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white px-3 py-1.5 rounded-lg shadow-md hover:shadow-lg font-bold transition-all duration-200`}>
-                Approve All
-              </button>
-            </div>
-          </div>
+        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto p-6 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300`}>
+          <div className="mb-4"></div>
 
           {/* Filters */}
           <div className="mb-6 bg-slate-100/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/70">
             <div className="flex items-center justify-between p-4 border-b border-slate-200/70">
               <h3 className="text-base font-semibold text-slate-900 flex items-center gap-3">
-                <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-base p-2 rounded-lg`}></i>
+                <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
                 Task Filters
               </h3>
-              <button
-                onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
-                className={`text-white transition-all p-2 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
-              >
-                <ChevronLeft className={`w-5 h-5 transform transition-transform ${isFiltersCollapsed ? 'rotate-90' : '-rotate-90'}`} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button className={`text-xs bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white px-3 py-1.5 rounded-lg shadow-md hover:shadow-lg font-bold transition-all duration-200`}>
+                  Apply All
+                </button>
+                <button
+                  onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
+                  className={`text-white transition-all p-2 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
+                >
+                  <ChevronDown className={`w-5 h-5 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
+                </button>
+              </div>
             </div>
             {!isFiltersCollapsed && (
               <div className="p-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 mb-2">Severity</label>
                     <select
                       value={filters.severity}
                       onChange={(e) => setFilters({...filters, severity: e.target.value})}
@@ -421,7 +381,6 @@ export default function ReviewerDashboard() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 mb-2">Task Type</label>
                     <select
                       value={filters.task_type}
                       onChange={(e) => setFilters({...filters, task_type: e.target.value})}
@@ -435,7 +394,6 @@ export default function ReviewerDashboard() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-600 mb-2">Status</label>
                     <select
                       value={filters.task_status}
                       onChange={(e) => setFilters({...filters, task_status: e.target.value})}
@@ -474,53 +432,55 @@ export default function ReviewerDashboard() {
                     }`}
                   >
                     {/* Task Header - Always Visible */}
-                    <div className="flex justify-between items-start p-5 pb-3">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-lg flex items-center justify-center shadow-lg ${
-                          task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600 text-white' : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                        }`}>
-                          <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-xl`}></i>
+                    <div className="space-y-2 p-2.5">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+                            task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600 text-white' : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
+                          }`}>
+                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-sm bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-slate-900 text-sm truncate">{task.task_title}</h3>
+                            <div className="flex items-center gap-3 text-sm text-slate-500">
+                              {task.status_label && (
+                                <div className="flex items-center gap-2 text-xs capitalize text-slate-500">
+                                  <span>{task.status_label}</span>
+                                  <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} ${getTaskStatusColor(task.task_status)} text-[11px]`} />
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <h3 className="font-bold text-slate-900 text-lg leading-tight">{task.task_title}</h3>
-                          <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Area: {task.area}</p>
+                        <div className="flex items-center gap-2">
+                          <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${
+                            task.severity_id === 1 ? 'bg-red-600' : 'bg-yellow-500'
+                          }`}>
+                            {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
+                          </span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTaskExpansion(index);
+                            }}
+                            className="text-slate-500 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
+                          >
+                            <ChevronLeft className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center ${getTaskStatusColor(task.task_status)}`}>
-                          <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} text-lg`}></i>
-                        </div>
-                        <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${
-                          task.severity_id === 1 ? 'bg-red-600' : 'bg-yellow-500'
-                        }`}>
-                          {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleTaskExpansion(index);
-                          }}
-                          className="text-slate-500 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
-                        >
-                          <ChevronLeft className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
-                        </button>
-                      </div>
+
                     </div>
 
                     {/* Expandable Content */}
                     {isExpanded && (
                       <>
-                        <div className="px-5 pb-3">
-                          <p className="text-slate-600 text-sm mb-4 leading-relaxed">{task.task_description}</p>
-                          {task.status_label && (
-                            <div className="text-xs text-slate-500 mb-2">
-                              <strong>Status:</strong> {task.status_label}
-                            </div>
-                          )}
+                        <div className="px-2.5 pb-1.5">
+                          <p className="text-slate-600 text-sm mb-3 leading-relaxed">{task.task_description}</p>
                         </div>
-                        <div className="flex items-center justify-between border-t border-blue-200/50 pt-4 pb-5 px-5">
+                        <div className="flex items-center justify-between border-t border-blue-200/50 pt-2.5 pb-2.5 px-2.5">
                           <div className="text-xs font-bold text-blue-600 flex items-center gap-1">
-                            <Play className="w-3 h-3" /> Evidence at {formatTime(task.start_time)}
+                            <Play className="w-3 h-3" /> Evident at {formatTime(task.start_time)}
                           </div>
                           <div className="flex gap-2">
                             <button
@@ -528,7 +488,7 @@ export default function ReviewerDashboard() {
                                 e.stopPropagation();
                                 handleTaskClick(task);
                               }}
-                              className={`px-4 py-1.5 bg-gradient-to-r ${theme.secondary.from} ${theme.secondary.to} text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg transition-all duration-200`}
+                              className={`px-4 py-1.5 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg transition-all duration-200`}
                             >
                               PLAY
                             </button>
