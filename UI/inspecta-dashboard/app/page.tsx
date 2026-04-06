@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Clock, ChevronLeft, ChevronRight, Play, User, AlertCircle, Loader } from 'lucide-react';
+import { themes, defaultTheme, type Theme } from '@/lib/themes';
 
 interface Site {
   id: string;
@@ -47,6 +48,8 @@ export default function ReviewerDashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
+  const [theme, setTheme] = useState<Theme>(defaultTheme);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [filters, setFilters] = useState({
     severity: 'all',
     task_type: 'all',
@@ -231,12 +234,36 @@ export default function ReviewerDashboard() {
   const currentSite = sites.find(s => s.id === selectedSite);
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20">
+    <div className={`h-screen flex flex-col bg-gradient-to-br ${theme.background.gradient}`}>
       {/* Header */}
-      <header className="bg-gradient-to-r from-slate-900 via-blue-900 to-purple-900 text-white h-16 flex items-center justify-between px-6 shrink-0 border-b border-blue-500/30 shadow-lg">
+      <header className={`${theme.header.bg} ${theme.header.text} h-16 flex items-center justify-between px-6 shrink-0 border-b border-blue-500/30 shadow-lg`}>
         <div className="flex items-center gap-4">
-          <span className="font-black text-xl tracking-tighter text-transparent bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text">INSPECTA</span>
-          <div className="h-6 w-px bg-gradient-to-b from-blue-400 to-purple-400"></div>
+          <span 
+            className="font-black text-xl tracking-tighter text-transparent bg-clip-text"
+            style={{
+              backgroundImage: `linear-gradient(to right, ${
+                theme.id === 'premiumBlue' ? 'rgb(96, 165, 250), rgb(196, 181, 253)' :
+                theme.id === 'aquaGradient' ? 'rgb(34, 211, 238), rgb(45, 212, 191)' :
+                theme.id === 'aquaLightGradient' ? 'rgb(96, 165, 250), rgb(34, 211, 238)' :
+                'rgb(165, 180, 252), rgb(196, 181, 253)'
+              })`,
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent'
+            } as any}
+          >
+            INSPECTA
+          </span>
+          <div 
+            className="h-6 w-px"
+            style={{
+              backgroundImage: `linear-gradient(to bottom, ${
+                theme.id === 'premiumBlue' ? 'rgb(96, 165, 250), rgb(196, 181, 253)' :
+                theme.id === 'aquaGradient' ? 'rgb(34, 211, 238), rgb(45, 212, 191)' :
+                theme.id === 'aquaLightGradient' ? 'rgb(96, 165, 250), rgb(34, 211, 238)' :
+                'rgb(165, 180, 252), rgb(196, 181, 253)'
+              })`
+            }}
+          ></div>
           
           {/* Site Selection */}
           <div className="flex items-center gap-2">
@@ -280,12 +307,53 @@ export default function ReviewerDashboard() {
             )}
           </div>
         </div>
-        <div className="flex items-center gap-6">
-          <span className="text-xs bg-gradient-to-r from-blue-500/20 to-purple-500/20 px-2 py-1 rounded border border-blue-400/30 text-blue-300 font-mono">
-            ID: {selectedIncident.substring(0, 8) || 'N/A'}
-          </span>
-          <span className="text-xs bg-gradient-to-r from-green-500 to-blue-500 px-2 py-1 rounded text-white font-bold shadow-lg">DB</span>
-          <User className="w-5 h-5 text-blue-300" />
+        <div className="flex items-center gap-4">
+          {/* Profile & Settings */}
+          <div className="relative">
+            <button
+              onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2"
+              title="Profile Settings"
+            >
+              <User className="w-5 h-5 text-blue-300" />
+            </button>
+            
+            {showSettingsMenu && (
+              <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50">
+                {/* Settings Header */}
+                <div className="px-4 py-3 border-b border-slate-700">
+                  <div className="font-medium text-white">Profile</div>
+                  <div className="text-xs text-slate-400 mt-1">Settings</div>
+                </div>
+                
+                {/* Theme Selection */}
+                <div className="p-2">
+                  <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
+                  {Object.values(themes).map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setTheme(t);
+                        setShowSettingsMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all mb-1 ${
+                        theme.id === t.id
+                          ? 'bg-blue-600 text-white'
+                          : 'hover:bg-slate-800 text-slate-200'
+                      }`}
+                    >
+                      <div className="font-medium">{t.name}</div>
+                      <div className="text-xs opacity-75 mt-1">
+                        <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          <span className="text-xs bg-gradient-to-r from-blue-500 to-cyan-500 px-2 py-1 rounded text-white font-bold shadow-lg">Ver 2.0</span>
         </div>
       </header>
 
@@ -304,9 +372,9 @@ export default function ReviewerDashboard() {
       {/* Main Content */}
       <main className="flex flex-1 overflow-hidden">
         {/* Left Pane - Task Feed */}
-        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto p-6 bg-gradient-to-br from-white via-blue-50/20 to-purple-50/10 transition-all duration-300`}>
-          <div className="mb-6 flex justify-between items-end">
-            <h2 className="text-xl font-bold text-slate-800">
+        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto p-6 bg-slate-100 border border-slate-200/70 transition-all duration-300`}>
+          <div className="mb-4 flex justify-between items-end">
+            <h2 className="text-base font-semibold text-slate-800 leading-tight">
               {tasksLoading ? (
                 <span className="flex items-center gap-2">
                   <Loader className="w-5 h-5 animate-spin" /> Loading Tasks...
@@ -316,22 +384,22 @@ export default function ReviewerDashboard() {
               )}
             </h2>
             <div className="flex gap-2">
-              <button className="text-xs bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1.5 rounded-lg shadow-md hover:shadow-lg hover:from-blue-600 hover:to-purple-700 font-bold transition-all duration-200">
+              <button className={`text-xs bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white px-3 py-1.5 rounded-lg shadow-md hover:shadow-lg font-bold transition-all duration-200`}>
                 Approve All
               </button>
             </div>
           </div>
 
           {/* Filters */}
-          <div className="mb-6 bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border border-blue-200/50">
-            <div className="flex items-center justify-between p-4 border-b border-blue-200/50">
-              <h3 className="text-xl font-medium text-slate-900 flex items-center gap-3">
-                <i className="fa-solid fa-filter text-blue-600 text-lg"></i>
+          <div className="mb-6 bg-slate-100/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/70">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200/70">
+              <h3 className="text-base font-semibold text-slate-900 flex items-center gap-3">
+                <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-base p-2 rounded-lg`}></i>
                 Task Filters
               </h3>
               <button
                 onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
-                className="text-slate-500 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200"
+                className={`text-white transition-all p-2 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
               >
                 <ChevronLeft className={`w-5 h-5 transform transition-transform ${isFiltersCollapsed ? 'rotate-90' : '-rotate-90'}`} />
               </button>
@@ -344,7 +412,7 @@ export default function ReviewerDashboard() {
                     <select
                       value={filters.severity}
                       onChange={(e) => setFilters({...filters, severity: e.target.value})}
-                      className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all">All Severities</option>
                       <option value="1">🔴 Severe</option>
@@ -357,7 +425,7 @@ export default function ReviewerDashboard() {
                     <select
                       value={filters.task_type}
                       onChange={(e) => setFilters({...filters, task_type: e.target.value})}
-                      className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all">All Types</option>
                       <option value="install">🔧 Install</option>
@@ -371,7 +439,7 @@ export default function ReviewerDashboard() {
                     <select
                       value={filters.task_status}
                       onChange={(e) => setFilters({...filters, task_status: e.target.value})}
-                      className="w-full text-sm border border-blue-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
+                      className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all">All Statuses</option>
                       <option value="pending">● Pending</option>
@@ -401,8 +469,8 @@ export default function ReviewerDashboard() {
                     key={task.id}
                     className={`bg-white/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${
                       activeTask?.id === task.id
-                        ? 'border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20'
-                        : 'border-blue-200/50 hover:border-blue-300'
+                        ? `border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20`
+                        : `${theme.cardBorder} hover:border-blue-300`
                     }`}
                   >
                     {/* Task Header - Always Visible */}
@@ -422,8 +490,8 @@ export default function ReviewerDashboard() {
                         <div className={`w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center ${getTaskStatusColor(task.task_status)}`}>
                           <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} text-lg`}></i>
                         </div>
-                        <span className={`text-[10px] font-black px-2 py-1 rounded ${
-                          task.severity_id === 1 ? 'bg-red-600 text-white' : 'bg-yellow-500 text-white'
+                        <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${
+                          task.severity_id === 1 ? 'bg-red-600' : 'bg-yellow-500'
                         }`}>
                           {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
                         </span>
@@ -460,7 +528,7 @@ export default function ReviewerDashboard() {
                                 e.stopPropagation();
                                 handleTaskClick(task);
                               }}
-                              className="px-4 py-1.5 bg-gradient-to-r from-blue-500 to-purple-600 text-white text-xs font-bold rounded-lg hover:from-blue-600 hover:to-purple-700 shadow-md hover:shadow-lg transition-all duration-200"
+                              className={`px-4 py-1.5 bg-gradient-to-r ${theme.secondary.from} ${theme.secondary.to} text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg transition-all duration-200`}
                             >
                               PLAY
                             </button>
@@ -488,7 +556,7 @@ export default function ReviewerDashboard() {
           <aside className="w-2/5 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col shadow-inner relative border-l border-slate-700">
             <button
               onClick={() => setIsVideoCollapsed(true)}
-              className="absolute top-4 right-4 z-20 w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 border-2 border-white/20 hover:scale-105"
+              className={`absolute top-4 right-4 z-20 w-10 h-10 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white rounded-full flex items-center justify-center shadow-lg hover:shadow-xl transition-all duration-200 border-2 border-white/20 hover:scale-105`}
               title="Collapse Video Pane"
             >
               <ChevronLeft className="w-5 h-5" />
@@ -559,7 +627,7 @@ export default function ReviewerDashboard() {
         {isVideoCollapsed && (
           <button
             onClick={() => setIsVideoCollapsed(false)}
-            className="w-12 bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white flex items-center justify-center transition-all duration-200 border-l-2 border-white/20 shadow-lg hover:shadow-xl hover:scale-105"
+            className={`w-12 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} hover:brightness-110 text-white flex items-center justify-center transition-all duration-200 border-l-2 border-white/20 shadow-lg hover:shadow-xl hover:scale-105`}
             title="Expand Video Pane"
           >
             <ChevronLeft className="w-5 h-5 rotate-180" />
