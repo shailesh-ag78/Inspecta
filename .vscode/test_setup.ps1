@@ -5,22 +5,26 @@ Read-Host -Prompt "🚀 Start Datbase Deocker Image through Docker Desktop UI. P
 Write-Host "🚀 Starting Audio Extractor Agent on Port 8001..." -ForegroundColor Cyan
 #Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd G:\code\Inspecta\AudioExtractorAgent\src; '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8001 --loop asyncio"
 cd G:\code\Inspecta\AudioExtractorAgent
+.\.venv\Scripts\Activate.ps1
 & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8001 --loop asyncio
 
 # --- 2. Start Transcribe Agent ---
 Write-Host "🚀 Starting Transcribe Agent on Port 8002..." -ForegroundColor Cyan
 cd G:\code\Inspecta\TranscriptionAgent
+.\.venv\Scripts\Activate.ps1
 & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8002 --loop asyncio
 
 # --- 3. Start Field Reporter Agent ---
 Write-Host "🚀 Starting Field Reporter Agent on Port 8003..." -ForegroundColor Cyan
 cd G:\code\Inspecta\FieldReporterAgent
+.\.venv\Scripts\Activate.ps1
 & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8003 --loop asyncio
 
 # --- 4. Start Executor ---
 Write-Host "🚀 Starting Executor on Port 8000..." -ForegroundColor Green
 #Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd D:\code\Inspecta\Executor\src; uvicorn main:app --host 0.0.0.0 --port 8000"
 cd G:\code\Inspecta\Executor
+.\.venv\Scripts\Activate.ps1
 & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --loop asyncio
 #& '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8000 --loop asyncio --reload
 

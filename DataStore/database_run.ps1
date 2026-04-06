@@ -5,7 +5,7 @@ docker rm inspecta-db
 # Run with a volume (saves data to a folder called 'postgres_data' on your PC)
 $dockerArgs = @(
     "run", "--name", "inspecta-db",
-    "-e", "POSTGRES_DB=inspecta_local",
+    "-e", "POSTGRES_DB=inspecta_db",
     "-e", "POSTGRES_PASSWORD=passwd",
     "-v", "D:\code\Inspecta\Data\postgresdb:/var/lib/postgresql",
     "-p", "5432:5432",

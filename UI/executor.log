@@ -1,0 +1,28 @@
+2026-04-06 11:47:23,893 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-04-06 11:47:23,943 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 11:47:23,943 - langsmith_config - WARNING - \u26a0\ufe0f  LANGCHAIN_API_KEY not set. LangSmith tracing will not work.
+2026-04-06 11:47:23,943 - main - INFO - \u2705 LangSmith configured
+2026-04-06 11:47:25,020 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 11:47:25,020 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 11:47:25,020 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 11:47:25,021 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 11:47:25,031 - workflowexecutor - INFO - \u2705 WorkflowExecutor initialized with LangSmith tracing
+2026-04-06 11:47:25,031 - main - INFO - \u2705 WorkflowExecutor initialized
+2026-04-06 11:48:26,152 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 500 Internal Server Error"
+2026-04-06 11:48:27,940 - main - INFO - \U0001f6d1 Shutdown initiated. Cleaning up resources...
+2026-04-06 11:48:27,941 - workflowexecutor - INFO - LangGraph Checkpointer connection closed.
+2026-04-06 11:48:27,941 - main - INFO - \u2705 Checkpointer pool closed.
+2026-04-06 11:48:27,941 - main - INFO - \u23f3 Waiting for 2 background tasks to settle...
+2026-04-06 11:48:32,944 - main - INFO - \U0001f44b Shutdown complete.
+2026-04-06 12:21:20,464 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-04-06 12:21:20,510 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 12:21:20,510 - langsmith_config - WARNING - \u26a0\ufe0f  LANGCHAIN_API_KEY not set. LangSmith tracing will not work.
+2026-04-06 12:21:20,510 - main - INFO - \u2705 LangSmith configured
+2026-04-06 12:35:41,409 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-04-06 12:35:41,453 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 12:35:41,454 - langsmith_config - WARNING - \u26a0\ufe0f  LANGCHAIN_API_KEY not set. LangSmith tracing will not work.
+2026-04-06 12:35:41,454 - main - INFO - \u2705 LangSmith configured
+2026-04-06 12:54:12,351 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-04-06 12:54:20,016 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-04-06 12:54:20,016 - langsmith_config - WARNING - \u26a0\ufe0f  LANGCHAIN_API_KEY not set. LangSmith tracing will not work.
+2026-04-06 12:54:20,016 - main - INFO - \u2705 LangSmith configured
