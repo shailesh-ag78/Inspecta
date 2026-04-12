@@ -85,3 +85,39 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const taskId = body?.id;
+    const taskDescription = body?.task_description;
+    const taskTitle = body?.task_title;
+
+    if (!taskId) {
+      return NextResponse.json({ error: 'Task id is required' }, { status: 400 });
+    }
+    if (typeof taskDescription !== 'string') {
+      return NextResponse.json({ error: 'Task description must be a string' }, { status: 400 });
+    }
+    if (typeof taskTitle !== 'string') {
+      return NextResponse.json({ error: 'Task title must be a string' }, { status: 400 });
+    }
+
+    const updateResult = await query(
+      'UPDATE incident_tasks SET task_description = $1, task_title = $2 WHERE id = $3 RETURNING id, task_description, task_title',
+      [taskDescription.trim(), taskTitle.trim(), taskId]
+    );
+
+    if (updateResult.rowCount === 0) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(updateResult.rows[0], { status: 200 });
+  } catch (error) {
+    console.error('Error updating task:', error);
+    return NextResponse.json(
+      { error: 'Failed to update task', details: String(error) },
+      { status: 500 }
+    );
+  }
+}

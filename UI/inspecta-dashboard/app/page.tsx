@@ -41,6 +41,8 @@ interface Task {
   created_at: string;
 }
 
+const [isPlaying, setIsPlaying] = useState(false);
+
 export default function ReviewerDashboard() {
   // State management
   const [sites, setSites] = useState<Site[]>([]);
@@ -59,6 +61,12 @@ export default function ReviewerDashboard() {
   const [isVideoCollapsed, setIsVideoCollapsed] = useState(false);
   const [selectedSite, setSelectedSite] = useState<string>('');
   const [selectedIncident, setSelectedIncident] = useState<string>('');
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingDescription, setEditingDescription] = useState('');
+  const [taskSaveLoading, setTaskSaveLoading] = useState(false);
+  const [taskEditError, setTaskEditError] = useState<string | null>(null);
+  const [pendingPlayTask, setPendingPlayTask] = useState<{ id: string; start: number; end: number } | null>(null);
   
   // Loading and error states
   const [sitesLoading, setSitesLoading] = useState(true);
@@ -153,7 +161,7 @@ export default function ReviewerDashboard() {
         setTasks(data);
         
         // Expand all tasks initially
-        setExpandedTasks(new Set(data.map((_, idx) => idx)));
+        setExpandedTasks(new Set(data.map((_: any, idx: number) => idx)));
       } catch (error) {
         console.error('Error fetching tasks:', error);
         setTasksError(error instanceof Error ? error.message : 'Failed to fetch tasks');
@@ -169,11 +177,18 @@ export default function ReviewerDashboard() {
     setSelectedSite(siteId);
   };
 
-  const handleTaskClick = (task: Task) => {
+  const handleTaskClick = (task: Task, shouldPlay = false) => {
     setActiveTask(task);
-    if (videoRef.current) {
-      videoRef.current.currentTime = task.start_time;
+    if (shouldPlay) {
+      setPendingPlayTask({ id: task.id, start: task.start_time, end: task.end_time });
+    } else {
+      setPendingPlayTask(null);
     }
+  };
+
+  const handleActiveVideoPlay = () => {
+    if (!activeTask) return;
+    setPendingPlayTask({ id: activeTask.id, start: activeTask.start_time, end: activeTask.end_time });
   };
 
   const formatTime = (seconds: number) => {
@@ -224,6 +239,129 @@ export default function ReviewerDashboard() {
     setExpandedTasks(newExpanded);
   };
 
+  const startEditingTask = (task: Task) => {
+    setEditingTaskId(task.id);
+    setEditingTitle(task.task_title || '');
+    setEditingDescription(task.task_description || '');
+    setTaskEditError(null);
+  };
+
+  const cancelEditingTask = () => {
+    setEditingTaskId(null);
+    setEditingTitle('');
+    setEditingDescription('');
+    setTaskEditError(null);
+  };
+
+  const saveTaskEdits = async (task: Task) => {
+    const trimmedTitle = editingTitle.trim();
+    const trimmedDescription = editingDescription.trim();
+    if (
+      trimmedTitle === task.task_title.trim() &&
+      trimmedDescription === task.task_description.trim()
+    ) {
+      cancelEditingTask();
+      return;
+    }
+
+    try {
+      setTaskSaveLoading(true);
+      setTaskEditError(null);
+
+      const response = await fetch('/api/tasks', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: task.id,
+          task_title: trimmedTitle,
+          task_description: trimmedDescription,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || 'Failed to save task');
+      }
+
+      const updatedTask = await response.json();
+      setTasks((prevTasks) => prevTasks.map((item) => item.id === task.id ? {
+        ...item,
+        task_title: updatedTask.task_title || trimmedTitle,
+        task_description: updatedTask.task_description || trimmedDescription,
+      } : item));
+
+      if (activeTask?.id === task.id) {
+        setActiveTask({
+          ...task,
+          task_title: updatedTask.task_title || trimmedTitle,
+          task_description: updatedTask.task_description || trimmedDescription,
+        });
+      }
+
+      cancelEditingTask();
+    } catch (error) {
+      console.error('Error saving task:', error);
+      setTaskEditError(error instanceof Error ? error.message : 'Failed to save task');
+    } finally {
+      setTaskSaveLoading(false);
+    }
+  };
+
+  const openTaskForEditing = (task: Task, index: number) => {
+    const nextExpanded = new Set(expandedTasks);
+    nextExpanded.add(index);
+    setExpandedTasks(nextExpanded);
+    startEditingTask(task);
+  };
+
+  useEffect(() => {
+    if (!pendingPlayTask || !videoRef.current) {
+      return;
+    }
+
+    const video = videoRef.current;
+    if (video.readyState >= 1) {
+      video.currentTime = pendingPlayTask.start;
+      video.play().catch((error) => {
+        console.error('Video play failed:', error);
+      });
+      setPendingPlayTask(null);
+      return;
+    }
+  }, [pendingPlayTask]);
+
+  const handleVideoLoadedMetadata = () => {
+    if (!pendingPlayTask || !videoRef.current) return;
+    if (activeTask?.id !== pendingPlayTask.id) return;
+
+    videoRef.current.currentTime = pendingPlayTask.start;
+    videoRef.current.play().catch((error) => {
+      console.error('Video play failed:', error);
+    });
+    setPendingPlayTask(null);
+  };
+
+  const handleVideoTimeUpdate = () => {
+    if (!activeTask || !videoRef.current) return;
+    if (videoRef.current.currentTime >= activeTask.end_time) {
+      videoRef.current.pause();
+    }
+  };
+
+  const getVideoSrc = (videoUrl?: string) => {
+    if (!videoUrl) return '/sample-video.mp4';
+
+    // If it's already a URL (starts with http/https), use as is
+    if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
+      return videoUrl;
+    }
+
+    // Otherwise, assume it's a local file path and serve via API
+    return `/api/video?path=${encodeURIComponent(videoUrl)}`;
+  };
+
   const filteredTasks = tasks.filter(task => {
     if (filters.severity !== 'all' && task.severity_id !== parseInt(filters.severity)) return false;
     if (filters.task_type !== 'all' && task.task_type !== filters.task_type) return false;
@@ -257,9 +395,9 @@ export default function ReviewerDashboard() {
                   onChange={(e) => handleSiteChange(e.target.value)}
                   className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
                 >
-                  {sites.length === 0 && <option>No sites available</option>}
+                  {sites.length === 0 && <option className="text-slate-900 bg-white">No sites available</option>}
                   {sites.map(site => (
-                    <option key={site.id} value={site.id}>{site.name} - {site.floor}</option>
+                    <option key={site.id} value={site.id} className="text-slate-900 bg-white">{site.name} - {site.floor}</option>
                   ))}
                 </select>
               )}
@@ -275,9 +413,9 @@ export default function ReviewerDashboard() {
                   onChange={(e) => setSelectedIncident(e.target.value)}
                   className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
                 >
-                  {incidents.length === 0 && <option>No incidents available</option>}
+                  {incidents.length === 0 && <option className="text-slate-900 bg-white">No incidents available</option>}
                   {incidents.map(incident => (
-                    <option key={incident.id} value={incident.id}>{incident.title}</option>
+                    <option key={incident.id} value={incident.id} className="text-slate-900 bg-white">{incident.title}</option>
                   ))}
                 </select>
               )}
@@ -354,9 +492,6 @@ export default function ReviewerDashboard() {
                 Task Filters
               </h3>
               <div className="flex items-center gap-2">
-                <button className={`text-xs bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white px-3 py-1.5 rounded-lg shadow-md hover:shadow-lg font-bold transition-all duration-200`}>
-                  Apply All
-                </button>
                 <button
                   onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
                   className={`text-white transition-all p-2 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
@@ -425,7 +560,8 @@ export default function ReviewerDashboard() {
                 return (
                   <div
                     key={task.id}
-                    className={`bg-white/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${
+                    onClick={() => handleTaskClick(task)}
+                    className={`cursor-pointer bg-white/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${
                       activeTask?.id === task.id
                         ? `border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20`
                         : `${theme.cardBorder} hover:border-blue-300`
@@ -435,14 +571,44 @@ export default function ReviewerDashboard() {
                     <div className="space-y-2 p-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex items-start gap-3 min-w-0">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg ${
                             task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600 text-white' : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
                           }`}>
-                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-sm bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
+                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[10px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
                           </div>
                           <div className="min-w-0">
-                            <h3 className="font-semibold text-slate-900 text-sm truncate">{task.task_title}</h3>
-                            <div className="flex items-center gap-3 text-sm text-slate-500">
+                            <div className="flex items-center gap-2 flex-nowrap">
+                              {editingTaskId === task.id ? (
+                                <input
+                                  value={editingTitle}
+                                  onChange={(e) => setEditingTitle(e.target.value)}
+                                  className="flex-[1.15] min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                />
+                              ) : (
+                                <h3 className="flex-[1.15] min-w-0 pr-2 font-semibold text-slate-900 text-sm truncate">{task.task_title}</h3>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTaskClick(task, true);
+                                }}
+                                title="Play video"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                              >
+                                <i className="fa-solid fa-play text-[11px]" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTaskForEditing(task, index);
+                                }}
+                                title="Modify task"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                              >
+                                <i className="fa-solid fa-pen text-[11px]" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
                               {task.status_label && (
                                 <div className="flex items-center gap-2 text-xs capitalize text-slate-500">
                                   <span>{task.status_label}</span>
@@ -476,31 +642,42 @@ export default function ReviewerDashboard() {
                     {isExpanded && (
                       <>
                         <div className="px-2.5 pb-1.5">
-                          <p className="text-slate-600 text-sm mb-3 leading-relaxed">{task.task_description}</p>
-                        </div>
-                        <div className="flex items-center justify-between border-t border-blue-200/50 pt-2.5 pb-2.5 px-2.5">
-                          <div className="text-xs font-bold text-blue-600 flex items-center gap-1">
-                            <Play className="w-3 h-3" /> Evident at {formatTime(task.start_time)}
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleTaskClick(task);
-                              }}
-                              className={`px-4 py-1.5 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white text-xs font-bold rounded-lg shadow-md hover:shadow-lg transition-all duration-200`}
-                            >
-                              PLAY
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                              }}
-                              className="px-4 py-1.5 bg-gradient-to-r from-slate-100 to-slate-200 text-slate-600 text-xs font-bold rounded-lg border border-slate-300 hover:from-slate-200 hover:to-slate-300 shadow-sm hover:shadow-md transition-all duration-200"
-                            >
-                              EDIT
-                            </button>
-                          </div>
+                          {editingTaskId === task.id ? (
+                            <div className="space-y-3">
+                              <textarea
+                                value={editingDescription}
+                                onChange={(e) => setEditingDescription(e.target.value)}
+                                rows={4}
+                                className="w-full rounded-2xl border border-slate-300/80 bg-slate-50 p-3 text-sm text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                              />
+                              {taskEditError && (
+                                <p className="text-xs text-red-600">{taskEditError}</p>
+                              )}
+                              <div className="flex justify-end gap-2 pt-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    saveTaskEdits(task);
+                                  }}
+                                  disabled={taskSaveLoading}
+                                  className="px-3 py-1.5 min-w-[72px] bg-blue-600 text-white rounded-xl text-[11px] font-bold shadow-sm hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:bg-blue-300"
+                                >
+                                  {taskSaveLoading ? 'Saving...' : 'Save'}
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    cancelEditingTask();
+                                  }}
+                                  className="px-3 py-1.5 min-w-[72px] bg-slate-100 text-slate-700 rounded-xl text-[11px] font-bold border border-slate-300 hover:bg-slate-200 transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-slate-600 text-sm mb-3 leading-relaxed">{task.task_description}</p>
+                          )}
                         </div>
                       </>
                     )}
@@ -536,16 +713,30 @@ export default function ReviewerDashboard() {
                 <video
                   ref={videoRef}
                   controls
+                  onLoadedMetadata={handleVideoLoadedMetadata}
+                  onTimeUpdate={handleVideoTimeUpdate}
+                  onPlay={() => setIsPlaying(true)}    
+                  onPause={() => setIsPlaying(false)}  
                   className="w-full h-full object-cover"
-                  src={activeTask?.video_url || '/sample-video.mp4'}
+                  src={getVideoSrc(activeTask?.video_url)}
                 >
                   Your browser does not support the video tag.
                 </video>
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl shadow-xl">
-                    <Play className="w-6 h-6 ml-1" />
+                {/* ✅ Hide overlay once playing so controls are accessible */}
+                {!isPlaying && (
+                  <div className="absolute inset-0 flex items-center justify-center z-20">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleActiveVideoPlay();
+                      }}
+                      className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl shadow-xl hover:bg-blue-500 transition-all"
+                      title="Play video clip"
+                    >
+                      <Play className="w-6 h-6 ml-1" />
+                    </button>
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="mt-8">
