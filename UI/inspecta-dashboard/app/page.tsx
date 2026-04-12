@@ -41,8 +41,6 @@ interface Task {
   created_at: string;
 }
 
-const [isPlaying, setIsPlaying] = useState(false);
-
 export default function ReviewerDashboard() {
   // State management
   const [sites, setSites] = useState<Site[]>([]);
@@ -67,7 +65,9 @@ export default function ReviewerDashboard() {
   const [taskSaveLoading, setTaskSaveLoading] = useState(false);
   const [taskEditError, setTaskEditError] = useState<string | null>(null);
   const [pendingPlayTask, setPendingPlayTask] = useState<{ id: string; start: number; end: number } | null>(null);
-  
+  // FIX 1: Track playing state to conditionally show/hide the overlay button
+  const [isPlaying, setIsPlaying] = useState(false);
+
   // Loading and error states
   const [sitesLoading, setSitesLoading] = useState(true);
   const [sitesError, setSitesError] = useState<string | null>(null);
@@ -75,7 +75,9 @@ export default function ReviewerDashboard() {
   const [incidentsError, setIncidentsError] = useState<string | null>(null);
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState<string | null>(null);
-  
+
+  const [hasAutoPaused, setHasAutoPaused] = useState(false);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Fetch sites on component mount
@@ -85,14 +87,14 @@ export default function ReviewerDashboard() {
         setSitesLoading(true);
         setSitesError(null);
         const response = await fetch('/api/sites');
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch sites: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         setSites(data);
-        
+
         // Auto-select first site
         if (data.length > 0) {
           setSelectedSite(data[0].id);
@@ -117,14 +119,14 @@ export default function ReviewerDashboard() {
         setIncidentsLoading(true);
         setIncidentsError(null);
         const response = await fetch(`/api/incidents?siteId=${selectedSite}`);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch incidents: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         setIncidents(data);
-        
+
         // Auto-select first incident
         if (data.length > 0) {
           setSelectedIncident(data[0].id);
@@ -152,14 +154,14 @@ export default function ReviewerDashboard() {
         setTasksLoading(true);
         setTasksError(null);
         const response = await fetch(`/api/tasks?incidentId=${selectedIncident}`);
-        
+
         if (!response.ok) {
           throw new Error(`Failed to fetch tasks: ${response.statusText}`);
         }
-        
+
         const data = await response.json();
         setTasks(data);
-        
+
         // Expand all tasks initially
         setExpandedTasks(new Set(data.map((_: any, idx: number) => idx)));
       } catch (error) {
@@ -173,12 +175,17 @@ export default function ReviewerDashboard() {
     fetchTasks();
   }, [selectedIncident]);
 
+  useEffect(() => {
+    setHasAutoPaused(false);
+  }, [activeTask?.id]);
+
   const handleSiteChange = (siteId: string) => {
     setSelectedSite(siteId);
   };
 
   const handleTaskClick = (task: Task, shouldPlay = false) => {
     setActiveTask(task);
+    setHasAutoPaused(false);
     if (shouldPlay) {
       setPendingPlayTask({ id: task.id, start: task.start_time, end: task.end_time });
     } else {
@@ -187,8 +194,11 @@ export default function ReviewerDashboard() {
   };
 
   const handleActiveVideoPlay = () => {
-    if (!activeTask) return;
-    setPendingPlayTask({ id: activeTask.id, start: activeTask.start_time, end: activeTask.end_time });
+    if (!activeTask || !videoRef.current) return;
+    const video = videoRef.current;
+    // Seek to task start time then play — direct call, no state indirection
+    video.currentTime = activeTask.start_time;
+    video.play().catch((err) => console.error('Video play failed:', err));
   };
 
   const formatTime = (seconds: number) => {
@@ -316,22 +326,29 @@ export default function ReviewerDashboard() {
     startEditingTask(task);
   };
 
+  // FIX 2: When activeTask's video_url changes, reload the video element to
+  // clear any stale browser buffer from the previous src, and reset play state.
   useEffect(() => {
-    if (!pendingPlayTask || !videoRef.current) {
-      return;
+    if (videoRef.current) {
+      videoRef.current.load();
+      setIsPlaying(false);
     }
+  }, [activeTask?.video_url]);
 
+  // FIX 3: Only attempt immediate play if video is already buffered (readyState >= 2).
+  // Otherwise, handleVideoLoadedMetadata is the single source of truth for seeking.
+  useEffect(() => {
+    if (!pendingPlayTask || !videoRef.current) return;
     const video = videoRef.current;
-    if (video.readyState >= 1) {
+    if (video.readyState >= 2) {
       video.currentTime = pendingPlayTask.start;
-      video.play().catch((error) => {
-        console.error('Video play failed:', error);
-      });
+      video.play().catch((err) => console.error('Video play failed:', err));
       setPendingPlayTask(null);
-      return;
     }
+    // Otherwise wait for onLoadedMetadata to fire.
   }, [pendingPlayTask]);
 
+  // FIX 3 (cont): Single source of truth for seeking when a new src is loaded.
   const handleVideoLoadedMetadata = () => {
     if (!pendingPlayTask || !videoRef.current) return;
     if (activeTask?.id !== pendingPlayTask.id) return;
@@ -344,21 +361,22 @@ export default function ReviewerDashboard() {
   };
 
   const handleVideoTimeUpdate = () => {
-    if (!activeTask || !videoRef.current) return;
+    if (!activeTask || !videoRef.current || hasAutoPaused) return;
     if (videoRef.current.currentTime >= activeTask.end_time) {
       videoRef.current.pause();
+      setHasAutoPaused(true); // "Unlock" the video so subsequent plays work
+      console.log(`Auto-paused at evidence end: ${activeTask.end_time}s`);
     }
   };
 
-  const getVideoSrc = (videoUrl?: string) => {
-    if (!videoUrl) return '/sample-video.mp4';
+  // FIX 4: Return undefined instead of a broken fallback path.
+  const getVideoSrc = (videoUrl?: string): string | undefined => {
+    if (!videoUrl) return undefined;
 
-    // If it's already a URL (starts with http/https), use as is
     if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
       return videoUrl;
     }
 
-    // Otherwise, assume it's a local file path and serve via API
     return `/api/video?path=${encodeURIComponent(videoUrl)}`;
   };
 
@@ -635,7 +653,6 @@ export default function ReviewerDashboard() {
                           </button>
                         </div>
                       </div>
-
                     </div>
 
                     {/* Expandable Content */}
@@ -709,35 +726,44 @@ export default function ReviewerDashboard() {
                 </span>
               </div>
 
-              <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-slate-700 shadow-2xl group">
-                <video
-                  ref={videoRef}
-                  controls
-                  onLoadedMetadata={handleVideoLoadedMetadata}
-                  onTimeUpdate={handleVideoTimeUpdate}
-                  onPlay={() => setIsPlaying(true)}    
-                  onPause={() => setIsPlaying(false)}  
-                  className="w-full h-full object-cover"
-                  src={getVideoSrc(activeTask?.video_url)}
-                >
-                  Your browser does not support the video tag.
-                </video>
-                {/* ✅ Hide overlay once playing so controls are accessible */}
-                {!isPlaying && (
-                  <div className="absolute inset-0 flex items-center justify-center z-20">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleActiveVideoPlay();
-                      }}
-                      className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-2xl shadow-xl hover:bg-blue-500 transition-all"
-                      title="Play video clip"
-                    >
-                      <Play className="w-6 h-6 ml-1" />
-                    </button>
+              {/* Video container — no overlay div at all so native controls are always clickable */}
+              <div className="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-slate-700 shadow-2xl">
+                {getVideoSrc(activeTask?.video_url) ? (
+                  <video
+                    ref={videoRef}
+                    controls
+                    onLoadedMetadata={handleVideoLoadedMetadata}
+                    onTimeUpdate={handleVideoTimeUpdate}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                    onEnded={() => setIsPlaying(false)}
+                    // Full size, sits on top of everything, controls always reachable
+                    className="w-full h-full object-cover"
+                    src={getVideoSrc(activeTask?.video_url)}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-slate-500 text-sm">
+                    {activeTask ? 'No video evidence for this task.' : 'Select a task to view video.'}
                   </div>
                 )}
               </div>
+
+              {/* Play-from-timestamp button lives OUTSIDE the video box so it never
+                  overlaps the native controls. Only shown when paused and src exists. */}
+              {getVideoSrc(activeTask?.video_url) && !isPlaying && (
+                <div className="flex justify-center mt-3">
+                  <button
+                    onClick={handleActiveVideoPlay}
+                    className="flex items-center gap-2 px-5 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-full shadow-lg transition-all"
+                    title="Play from task start time"
+                  >
+                    <Play className="w-4 h-4 ml-0.5" />
+                    Play from {activeTask ? formatTime(activeTask.start_time) : '00:00'}
+                  </button>
+                </div>
+              )}
 
               <div className="mt-8">
                 <h4 className="text-blue-400 text-[10px] font-black uppercase tracking-widest mb-3">Task Details</h4>
