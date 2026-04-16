@@ -153,6 +153,7 @@ export default function ReviewerDashboard() {
       try {
         setTasksLoading(true);
         setTasksError(null);
+        console.log(`Fetching tasks for incident ${selectedIncident}...`);
         const response = await fetch(`/api/tasks?incidentId=${selectedIncident}`);
 
         if (!response.ok) {
@@ -160,6 +161,7 @@ export default function ReviewerDashboard() {
         }
 
         const data = await response.json();
+        console.log('Fetched tasks:', data);
         setTasks(data);
 
         // Expand all tasks initially
@@ -184,6 +186,7 @@ export default function ReviewerDashboard() {
   };
 
   const handleTaskClick = (task: Task, shouldPlay = false) => {
+    console.log(`Task clicked: ${task.id} : {task.task_title}`);
     setActiveTask(task);
     setHasAutoPaused(false);
     if (shouldPlay) {
@@ -201,9 +204,26 @@ export default function ReviewerDashboard() {
     video.play().catch((err) => console.error('Video play failed:', err));
   };
 
+  // CRITICAL FIX: Update video position and panel state when activeTask changes
+  useEffect(() => {
+    if (activeTask && videoRef.current) {
+      // Reset the auto-pause flag for the new task range
+      setHasAutoPaused(false);
+      
+      // Manually set the video time to the start of the new task
+      videoRef.current.currentTime = activeTask.start_time;
+      
+      // Clear any pending play tasks as we've handled the seek manually
+      setPendingPlayTask(null);
+    }
+  }, [activeTask?.id]); // This triggers on every task switch, even if the video URL is the same
+
+
   const formatTime = (seconds: number) => {
+    console.log(`Formatting time for ${seconds} seconds`);
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
+    console.log(`Formatting time: ${seconds}s as ${mins}m:${secs}s`);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
@@ -326,7 +346,7 @@ export default function ReviewerDashboard() {
     startEditingTask(task);
   };
 
-  // FIX 2: When activeTask's video_url changes, reload the video element to
+  // When activeTask's video_url changes, reload the video element to
   // clear any stale browser buffer from the previous src, and reset play state.
   useEffect(() => {
     if (videoRef.current) {
@@ -335,7 +355,6 @@ export default function ReviewerDashboard() {
     }
   }, [activeTask?.video_url]);
 
-  // FIX 3: Only attempt immediate play if video is already buffered (readyState >= 2).
   // Otherwise, handleVideoLoadedMetadata is the single source of truth for seeking.
   useEffect(() => {
     if (!pendingPlayTask || !videoRef.current) return;
@@ -348,7 +367,6 @@ export default function ReviewerDashboard() {
     // Otherwise wait for onLoadedMetadata to fire.
   }, [pendingPlayTask]);
 
-  // FIX 3 (cont): Single source of truth for seeking when a new src is loaded.
   const handleVideoLoadedMetadata = () => {
     if (!pendingPlayTask || !videoRef.current) return;
     if (activeTask?.id !== pendingPlayTask.id) return;
@@ -369,7 +387,7 @@ export default function ReviewerDashboard() {
     }
   };
 
-  // FIX 4: Return undefined instead of a broken fallback path.
+  // Return undefined instead of a broken fallback path.
   const getVideoSrc = (videoUrl?: string): string | undefined => {
     if (!videoUrl) return undefined;
 
@@ -393,12 +411,15 @@ export default function ReviewerDashboard() {
       <header className={`${theme.header.bg} ${theme.header.text} shrink-0 border-b border-slate-300/20 shadow-lg`}>
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center text-white shadow-sm">
+            {/* <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center text-white shadow-sm">
               <span className="font-black text-lg">I</span>
+            </div> */}
+            <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center shadow-sm">
+              <img src="/inspectalogo.png" alt="Logo" className="h-full w-full object-cover rounded-full" />
             </div>
             <div>
               <div className="text-[11px] uppercase tracking-[0.24em] text-white/80">INSPECTA</div>
-              <div className="text-2xl font-bold">Home Dashboard</div>
+              <div className="text-2xl font-bold">Task Dashboard</div>
             </div>
           </div>
 
@@ -600,10 +621,16 @@ export default function ReviewerDashboard() {
                                 <input
                                   value={editingTitle}
                                   onChange={(e) => setEditingTitle(e.target.value)}
-                                  className="flex-[1.15] min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                                  /*className="flex-[1.15] min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"*/
+                                  /* Changed flex-[1.15] to w-80 (320px) */
+                                  className="w-96 min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                                 />
                               ) : (
-                                <h3 className="flex-[1.15] min-w-0 pr-2 font-semibold text-slate-900 text-sm truncate">{task.task_title}</h3>
+                                /*<h3 className="flex-[1.15] min-w-0 pr-2 font-semibold text-slate-900 text-sm truncate">{task.task_title}</h3>*/
+                                /* Changed flex-[1.15] to w-80 to match the input width */
+                                <h3 className="w-96 min-w-0 pr-2 font-semibold text-slate-900 text-sm truncate">
+                                  {task.task_title}
+                                </h3>
                               )}
                               <button
                                 onClick={(e) => {

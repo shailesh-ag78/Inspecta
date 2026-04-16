@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import { Readable } from 'node:stream';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,8 +36,6 @@ export async function GET(request: NextRequest) {
     //   });
     // }
 
-    console.log('Attempting to serve video from path:', filePath);
-
     // Check if file exists
     if (!fs.existsSync(filePath)) {
       console.error('File not found:', filePath);
@@ -50,7 +49,6 @@ export async function GET(request: NextRequest) {
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
     const range = request.headers.get('range');
-    console.log('Received range request:', range);
     //const contentType = getMimeType(filePath); // ✅ Dynamic MIME type
 
     if (range) {
@@ -84,7 +82,6 @@ export async function GET(request: NextRequest) {
     } else {
       // Serve entire file
       const file = fs.createReadStream(filePath);
-      console.log('Serving entire video file:', filePath);
       const stream = new ReadableStream({
         start(controller) {
           file.on('data', (chunk) => controller.enqueue(chunk));

@@ -41,10 +41,19 @@ export async function GET(request: NextRequest) {
         ? 'completed' 
         : 'pending';
 
+      const formattedDate = new Date(incident.created_at).toLocaleString('en-GB', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      }).replace(',', ''); // Removes the default comma between date and time
+
       return {
         id: String(incident.id),
         inspection_id: String(incident.inspection_id),
-        title: `Inspection ${incident.inspection_id?.substring(0, 8) || 'Unknown'}`,
+        title: `(${incident.id?.substring(0, 4) + 'XXX' || 'Unknown'}) -- ${formattedDate}`,
         status: status,
         created: new Date(incident.created_at).toISOString(),
         task_count: parseInt(incident.task_count),

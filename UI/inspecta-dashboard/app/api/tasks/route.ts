@@ -67,8 +67,8 @@ export async function GET(request: NextRequest) {
         task_type: taskTypeMap[task.task_type_id] || 'verify',
         severity_label: task.severity_label || 'Regular',
         status_label: task.status_label || 'Pending',
-        start_time: Math.floor((task.video_start_ms || 0) / 1000), // Convert ms to seconds
-        end_time: Math.floor((task.video_end_ms || 0) / 1000),
+        start_time: Math.floor((task.video_start_ms || 0)),
+        end_time: Math.floor((task.video_end_ms || 0)),
         video_url: task.video_url,
         task_artifacts: task.task_artifacts || [],
         area: 'Task Area', // Placeholder - could be extracted from artifacts
