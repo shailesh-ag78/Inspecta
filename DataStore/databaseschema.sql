@@ -127,3 +127,37 @@ CREATE POLICY task_isolation_policy ON incident_tasks
 
 CREATE POLICY site_isolation_policy ON sites
     USING (company_id = NULLIF(current_setting('app.current_company_id', TRUE), '')::integer);
+
+-- ======================================================================
+-- ToDO: Add constraints of length for example ----------------
+-- ADD CONSTRAINT check_task_title_length 
+-- CHECK (length(task_title) >= 1 AND length(task_title) <= 150);
+
+--------------------------------------------------------------
+
+--- ToDo :Enable Triggers on important table to maintain DB level Audit log ----------
+-- CREATE TRIGGER tr_audit_tasks
+-- AFTER INSERT OR UPDATE OR DELETE ON incident_tasks
+-- FOR EACH ROW EXECUTE FUNCTION process_audit_log();
+
+-- CREATE OR REPLACE FUNCTION process_audit_log() RETURNS TRIGGER AS $$
+-- BEGIN
+--     INSERT INTO audit_logs (
+--         table_name, 
+--         record_id, 
+--         action, 
+--         changed_by, 
+--         old_data, 
+--         new_data
+--     )
+--     VALUES (
+--         TG_TABLE_NAME, 
+--         COALESCE(OLD.id, NEW.id), 
+--         TG_OP, 
+--         current_setting('app.current_user_id', true), -- Retrieve the user UID
+--         to_jsonb(OLD), 
+--         to_jsonb(NEW)
+--     );
+--     RETURN NEW;
+-- END;
+-- $$ LANGUAGE plpgsql;

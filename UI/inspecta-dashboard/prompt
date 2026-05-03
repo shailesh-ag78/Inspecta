@@ -1,0 +1,6 @@
+"I need to secure the Inspecta web application by integrating Firebase Authentication with our Next.js API and PostgreSQL RLS backend. Please perform the following:  Auth Provider: Create a lib/auth-context.tsx using Firebase onAuthStateChanged. It must provide the current user and a method to get the getIdToken().Secure the Dashboard: Update the ReviewerDashboard to be a protected route. If no user is authenticated, redirect to /login.  Authenticated API Calls: Modify the fetch calls in the dashboard to include the Firebase ID Token in the Authorization: Bearer <token> header.Backend Verification: In app/api/tasks/route.ts (and relevant PATCH routes), implement a session verification step using firebase-admin.  Ensure that PATCH or GET routes, you extract the company_id from the decoded Firebase token—not from a body parameter or a separate session variable.
+
+RLS Integration: Ensure the database query in the API first executes SET LOCAL app.current_company_id and SET LOCAL app.current_user_id within a transaction before performing any SELECT or UPDATE on the incident_tasks table.  Error Handling: If a token is invalid or the RLS policy denies access, return appropriate 401 or 403 status codes."
+
+
+If possible use Python session manager to automatically inject SET LOCAL variables so I don't have to write them manually in every PATCH function?
