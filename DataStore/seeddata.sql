@@ -59,3 +59,5 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO inspectors (company_id, full_name, email) VALUES 
 (2, 'Inspector A', 'inspectorA@magicinteriors.com') 
 ON CONFLICT (id) DO NOTHING;
+
+-- ======================================================='

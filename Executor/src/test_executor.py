@@ -12,11 +12,11 @@ import shutil
 #DB_DSN = os.getenv("DATABASE_URL", "dbname=inspecta_db user=postgres password=passwd host=localhost port=5432")
 #DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
 #TEST_VIDEO_PATH = r"G:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
-TEST_VIDEO_PATH = r"G:\code\Inspecta\Data\test_data\test_videos"
+TEST_VIDEO_PATH = r"G:\code\Inspecta\data\test_data\Farm Videos\Marathi Test 1"
 
-COMPANY_ID = "2"
-STORAGE_ID = "CompanyStorage2"
-INSPECTOR_ID = "2"
+COMPANY_ID = "3"
+STORAGE_ID = "CompanyStorage3"
+INSPECTOR_ID = "3"
 SITE_ID = "3"
 
 def test_full_workflow_integration():
@@ -33,8 +33,8 @@ def test_full_workflow_integration():
             #"Content-Type": "video/mp4"
         }
 
-        # print("\n--- [STEP 1] Create Real Inspection ---")
-        inspection_payload = {"site_id": 1, "inspector_id": 1}
+        # print("\n------------------ [STEP 1] Create Real Inspection ------------------")
+        inspection_payload = {"site_id": SITE_ID, "inspector_id": INSPECTOR_ID}
         
         p = Path(TEST_VIDEO_PATH)
 
@@ -52,7 +52,7 @@ def test_full_workflow_integration():
             # Temporarily hardcoding an existing inspection ID for testing, since creating a new one may have side effects or require cleanup
             #inspection_id = "27822a7e-d0de-42b1-9316-ee82e359939a"
         
-            print("\n--- [STEP 2] Get Real Upload URL ---")
+            print("\n------------------ [STEP 2] Get Real Upload URL ------------------")
             request_headers = headers.copy()
             request_headers["Content-Type"] = "video/mp4"  # Ensure content type is set for JSON responses
             resp_url = client.get("/get-upload-url", headers=request_headers)
@@ -67,7 +67,7 @@ def test_full_workflow_integration():
             print("✅ Simulated file upload to local storage.")
 
 
-            print("\n--- [STEP 3] Trigger Real Incident Upload & LangGraph ---")
+            print("\n------------------ [STEP 3] Trigger Real Incident Upload & LangGraph ------------------")
             incident_payload = {
                 "inspector_id": INSPECTOR_ID,
                 "file_url": real_upload_path,
@@ -86,7 +86,7 @@ def test_full_workflow_integration():
             
         print(f"Found {len(incident_ids)} incidents:")
         for incident_id in incident_ids:
-            print(f"\n--- Poll Status for {incident_id} (Wait for Processing) ---")
+            print(f"\n------------------ Poll Status for {incident_id} (Wait for Processing) ------------------")
             # Since LangGraph runs in a background task, we poll the status
             import time
             max_attempts = 15
@@ -115,5 +115,3 @@ if __name__ == "__main__":
         test_full_workflow_integration()
     except Exception as e:
         print(f"❌ Integration Test Failed: {e}")
-        
-        #can you give me a powershell script that starts all agents and executor in different terminals. Then I will just execute 

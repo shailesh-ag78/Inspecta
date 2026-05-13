@@ -410,20 +410,31 @@ export default function ReviewerDashboard() {
       {/* Header */}
       <header className={`${theme.header.bg} ${theme.header.text} shrink-0 border-b border-slate-300/20 shadow-lg`}>
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 justify-start">
             {/* <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center text-white shadow-sm">
               <span className="font-black text-lg">I</span>
             </div> */}
-            <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center shadow-sm">
-              <img src="/inspectalogo.png" alt="Logo" className="h-full w-full object-cover rounded-full" />
-            </div>
+            {/* <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center shadow-sm">
+              <img src="/inspectalogo2.png" alt="Logo" className="h-full w-full object-cover rounded-full" />
+            </div> */}
+            <img src="/InspectaLogo.png" alt="Logo" className="h-14 w-14 rounded-full object-cover drop-shadow-[0_0_12px_rgba(59,130,246,0.7)]" />
             <div>
-              <div className="text-[11px] uppercase tracking-[0.24em] text-white/80">INSPECTA</div>
+              {/* <div className="text-[12px] uppercase tracking-[0.10em] font-bold 
+                bg-gradient-to-r from-[#60A5FA] via-[#7C3AED] to-[#A78BFA] 
+                text-transparent bg-clip-text drop-shadow-md">
+                INSPECTA
+              </div> */}
+              <div className="text-[12px] uppercase tracking-[0.10em] font-bold 
+                bg-gradient-to-r from-[#3B82F6] via-[#FB923C] to-[#8B5CF6] 
+                text-transparent bg-clip-text drop-shadow-md">
+                INSPECTA
+              </div>
+
               <div className="text-2xl font-bold">Task Dashboard</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 justify-end">
             <div className={`relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-2 text-sm text-white shadow-sm`}>
               <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">Site</span>
               {sitesLoading ? (
