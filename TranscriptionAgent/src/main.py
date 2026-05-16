@@ -9,7 +9,7 @@ from pathlib import Path
 from google.cloud import storage
 import logging
 
-from .groq_service import GroqService
+from src.groq_service import GroqService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -139,52 +139,70 @@ async def transcribe_endpoint(request: TranscribeRequest):
         }
     }
     
-   
+def generate_whisper_prompt(metadata):
+    #Whisper prompt as a "style guide" rather than a set of orders.
+
+    # 1. Define the "Fixed" part of your prompt
+    # We use roughly 400-500 characters as a safe buffer for the header/footer
+    header = (
+        f"Technical Site Inspection for {metadata['company_name']}. "
+        f"Subject: {metadata['industry']} audit and assessment. "
+    )
+    
+    footer = (
+        "Observations: The inspector is recording real-time notes on site. "
+        "All Hindi and Marathi comments are translated into professional technical English. "
+        "Every observation, measurement, and actionable item is documented with precision. Transcription: "
+    )
+
+    # 2. Handle the Dynamic Keywords with Truncation
+    ALLOWED_PROMPT_LENGTH = 790  # Adjust based on model limits and expected system prompt size
+    available_space = ALLOWED_PROMPT_LENGTH - len(header) - len(footer) - 25 # 25 for the label
+    
+    # Truncate the input_prompt to fit the remaining space
+    safe_keywords = metadata.get('input_prompt', '')[:available_space]
+    
+    # 3. Combine using f-string
+    final_prompt = f"{header}Technical Vocabulary: {safe_keywords}. {footer}"
+    
+    return final_prompt
+
 def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -> str:
     """ Transcript the Audio file using Groq Service and save the transcript to disk """
 
-    try:
+    try:   
         # process_incident handles chunking and merging
         # --- PROMPT LOGIC ---
         # System Prompt: Generated from Company Context
-        system_prompt = (
-            f"Act like a transcription assistant for Company : {metadata['company_name']}, it is specialized in {metadata['industry']}. "
-            f"Audio will be mostly in English but it can have some Hindi or Marathi words. Audio may contain technical terms related to {metadata['industry']} inspections. Please transcribe exactly as spoken."
-            f"Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon, and any Hindi or Marathi phrases without translation."
-            f"The output should be strictly in English language."
-            f"There could be some background noise as well."
-        )
-        system_prompt = (
-            f"Company : {metadata['company_name']}, it is specialized in {metadata['industry']}."
-            f"Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon."
-            f"Instructions:"
-            f"Please transcribe exactly as spoken. Do not try to be very creative."
-            f"Audio will be mostly in English but it can have some Hindi or Marathi words. In such case, trasncribe the sentence in English without changing the meaning."
-            f"The output should be strictly in English language."
-            f"There could be some background noise as well."
-        )
-        
-        # industry_terms = "pipeline, crack, plastering, site safety, shuttering, RCC" # Add your actual terms
         # system_prompt = (
-        #     f"Inspection report for {metadata['company_name']} in {metadata['industry']}. "
-        #     f"Terminology: {industry_terms}. "
-        #     f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
+        #     f"Act like a transcription assistant for Company : {metadata['company_name']}, it is specialized in {metadata['industry']}. "
+        #     f"Audio will be mostly in English but it can have some Hindi or Marathi words. Audio may contain technical terms related to {metadata['industry']} inspections. Please transcribe exactly as spoken."
+        #     f"Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon, and any Hindi or Marathi phrases without translation."
+        #     f"The output should be strictly in English language."
+        #     f"There could be some background noise as well."
         # )
-
-        # User Prompt: Generated from Incident Metadata
+        # system_prompt = (
+        #     f"Company : {metadata['company_name']}, it is specialized in {metadata['industry']}."
+        #     f"Accurately transcribe all spoken words, including industry-specific terminology, site-specific jargon."
+        #     f"Instructions:"
+        #     f"Please transcribe exactly as spoken. Do not try to be very creative."
+        #     f"Audio will be mostly in English but it can have some Hindi or Marathi words. In such case, trasncribe the sentence in English without changing the meaning."
+        #     f"The output should be strictly in English language."
+        #     f"There could be some background noise as well."
+        # )
         # user_prompt = (
-        #     f"हा एक साइट इन्स्पेक्शन रिपोर्ट आहे. (This is a site inspection report). "
-        #     f"इसमें English, Hindi और Marathi का उपयोग किया गया है. " + metadata['input_prompt']
-        # )
-        user_prompt = (
-             f"{metadata['input_prompt']}"
-         )
-        original_prompt = f"{system_prompt}\n{user_prompt}"
-        ALLOWED_PROMPT_LENGTH = 790  # Adjust based on model limits and expected system prompt size
-        logger.info(f"Original Prompt and Length: {original_prompt} : {len(original_prompt)} chars. Using {ALLOWED_PROMPT_LENGTH} characters only")
-        max_user_len = ALLOWED_PROMPT_LENGTH - len(system_prompt) - 1 # 1 for newline separation
-        prompt = f"{system_prompt}\n{user_prompt[:max_user_len]}"
-        
+        #      f"{metadata['input_prompt']}"
+        #  )        
+
+        # original_prompt = f"{system_prompt}\n{user_prompt}"
+        #ALLOWED_PROMPT_LENGTH = 790  # Adjust based on model limits and expected system prompt size
+        # logger.info(f"Original Prompt and Length: {original_prompt} : {len(original_prompt)} chars. Using {ALLOWED_PROMPT_LENGTH} characters only")
+        # max_user_len = ALLOWED_PROMPT_LENGTH - len(system_prompt) - 1 # 1 for newline separation
+        # prompt = f"{system_prompt}\n{user_prompt[:max_user_len]}"
+
+        prompt = generate_whisper_prompt(metadata)
+        logger.info(f"Prompt Length: {len(prompt)} chars")
+
         transcript_dict = groq_service.process_incident_audio(audio_url_path, prompt)
         transcript_text = transcript_dict['text'] if isinstance(transcript_dict, dict) else ""
         if not transcript_text:

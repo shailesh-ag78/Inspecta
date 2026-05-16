@@ -53,7 +53,8 @@ class OpenAIService:
             f"The audio transcript may contain observations, issues, and comments made by the inspector while walking around the site."
             f"The audio transcript is referred as 'Inspector Comments'."
             f"The inputted transcript is a JSON text that contains segments of the audio transcription with their corresponding timestamps (start second count and end second count)."
-            f"Each segment is referred here as a 'transcript segment' and has inspector comments. Each segment has Start time and End time in Seconds"    
+            f"Each segment is referred here as a 'transcript segment' and has inspector comments. Each segment has Start time and End time in Seconds"   
+            f"Note: The audio transcript is generated using AI translation service. If a sentence is split across two segments, combine the context to ensure the task remains complete." 
         )
         
         ask = (

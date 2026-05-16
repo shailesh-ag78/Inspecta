@@ -28,5 +28,38 @@
     "settings": {
         "editor.fontSize": 14,
         "powershell.cwd": "Executor",
+        "python.terminal.executeInFileDir": false
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Python Debugger: Transcribe Test Module",
+                "type": "debugpy",
+                "request": "launch",
+                "module": "src.test_app",
+                "cwd": "${workspaceFolder:TranscriptionAgent}",
+                "console": "integratedTerminal",
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder:TranscriptionAgent}"
+                },
+                "justMyCode": true
+            }
+        ]
+        //         "configurations": [
+        //     {
+        //         "name": "Python Debugger: Transcribe Test Module",
+        //         "type": "debugpy",
+        //         "request": "launch",
+        //         "module": "test_app",
+        //         "cwd": "${workspaceFolder:TranscriptionAgent}/src",
+        //         "console": "integratedTerminal",
+        //         "env": {
+        //             "PYTHONPATH": "${workspaceFolder:TranscriptionAgent}/src"
+        //         },
+        //         "justMyCode": true
+        //     }
+        // ]
+
     },
 }

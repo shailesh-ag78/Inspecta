@@ -11,7 +11,8 @@ from groq import Groq
 from datetime import datetime
 
 # Constants
-MODEL = "whisper-large-v3-turbo"
+#MODEL = "whisper-large-v3-turbo"
+MODEL = "whisper-large-v3"
 MAX_FILE_SIZE_MB = 25
 OVERLAP_SEC = 5
 
@@ -39,13 +40,20 @@ class GroqService:
             with open(audio_url_path, "rb") as audio_file:
                 # Call Groq Transcription (Whisper Large V3 Turbo) : 
                 # The 'prompt' parameter guides the model's vocabulary and context
-                transcription = self.client.audio.transcriptions.create(
+                transcription = self.client.audio.translations.create(
                     file=(os.path.basename(audio_url_path), audio_file.read()),
                     model=MODEL,
                     prompt=prompt,
                     temperature=0,  # Set to 0 for deterministic output; adjust if you want more creativity
                     response_format="verbose_json" # verbose_json gives you timestamps if needed
                 )
+                # transcription = self.client.audio.transcriptions.create(
+                #     file=(os.path.basename(audio_url_path), audio_file.read()),
+                #     model=MODEL,
+                #     prompt=prompt,
+                #     temperature=0,  # Set to 0 for deterministic output; adjust if you want more creativity
+                #     response_format="verbose_json" # verbose_json gives you timestamps if needed
+                # )
         except FileNotFoundError:
             raise FileNotFoundError(f"Error: The file at {audio_url_path} was not found.")
         except Exception as e:
@@ -60,12 +68,14 @@ class GroqService:
             }
             for seg in data.get('segments', [])
         ]
-        
+
         transcript_dict = {
             "text": data.get("text", ""),
             "segments": structured_segments
         }
         
+        transcript_dict["segments"] = self.combine_adjacent_segments(transcript_dict["segments"])
+
         return transcript_dict
    
 # Sample dictionary output of the process_incident_audio method
@@ -240,7 +250,40 @@ class GroqService:
                 last_end_time = new_segments[-1]["end"]
                 
         merged["text"] = merged["text"].strip()
+        
+        # Combine adjacent segments where end of one equals start of next
+        merged["segments"] = self.combine_adjacent_segments(merged["segments"])
+        
         return merged
+
+    def combine_adjacent_segments(self, segments: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Combines segments where the end time of one segment equals the start time of the next.
+        This handles cases where a word or phrase was split across segment boundaries.
+        """
+        if not segments or len(segments) <= 1:
+            return segments
+        
+        combined = []
+        current_segment = segments[0].copy()
+        
+        for i in range(1, len(segments)):
+            next_segment = segments[i]
+            
+            # Check if current segment's end matches next segment's start
+            # Use small tolerance for floating point comparison
+            if abs(current_segment["end"] - next_segment["start"]) < 0.01:
+                # Combine segments
+                current_segment["end"] = next_segment["end"]
+                current_segment["text"] += " " + next_segment["text"]
+            else:
+                # No match, add current to combined and move to next
+                combined.append(current_segment)
+                current_segment = next_segment.copy()
+        
+        # Don't forget to add the last segment
+        combined.append(current_segment)
+        return combined
 
     def process_incident(self, file_path: str, task_type: str) -> Dict[str, Any]:
         """Handles logic for a single incident: chunking, parallel processing, and merging."""

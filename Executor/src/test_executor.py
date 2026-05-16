@@ -5,14 +5,13 @@ from fastapi.testclient import TestClient
 from main import app
 from pathlib import Path
 import shutil
-#from database import IncidentRepository
 
 # 1. Configuration Constants
 # Ensure these match your actual local setup
 #DB_DSN = os.getenv("DATABASE_URL", "dbname=inspecta_db user=postgres password=passwd host=localhost port=5432")
 #DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
 #TEST_VIDEO_PATH = r"G:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
-TEST_VIDEO_PATH = r"G:\code\Inspecta\data\test_data\Farm Videos\Marathi Test 1"
+TEST_VIDEO_PATH = r"G:\code\Inspecta\data\test_data\test_videos"
 
 COMPANY_ID = "3"
 STORAGE_ID = "CompanyStorage3"

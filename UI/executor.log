@@ -1,0 +1,361 @@
+2026-05-13 23:16:18,363 - main - INFO - \U0001f680 Starting Executor with ENV_MODE=local
+2026-05-13 23:16:18,443 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-05-13 23:16:18,443 - langsmith_config - WARNING - \u26a0\ufe0f  LANGCHAIN_API_KEY not set. LangSmith tracing will not work.
+2026-05-13 23:16:18,443 - main - INFO - \u2705 LangSmith configured
+2026-05-13 23:16:18,564 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-05-13 23:16:18,565 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-05-13 23:16:18,565 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-05-13 23:16:18,565 - langsmith_config - INFO - LangSmith Configuration: project=inspecta-executor, tracing=True
+2026-05-13 23:16:18,576 - workflowexecutor - INFO - \u2705 WorkflowExecutor initialized with LangSmith tracing
+2026-05-13 23:16:18,576 - main - INFO - \u2705 WorkflowExecutor initialized
+2026-05-13 23:16:40,470 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-05-13 23:16:49,921 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-05-13 23:17:26,714 - workflowexecutor - INFO - \U0001f4dd Incident 87d29c65-a96a-4e6b-84ff-865f51c0dba8 uploaded and queued for processing
+2026-05-13 23:17:26,720 - httpx - INFO - HTTP Request: POST http://testserver/inspections/c0f613d0-c8a8-4543-bfcb-738670b348cb/upload-incident "HTTP/1.1 200 OK"
+2026-05-13 23:17:29,452 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident 87d29c65-a96a-4e6b-84ff-865f51c0dba8
+2026-05-13 23:17:37,670 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-05-13 23:17:44,013 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-05-13 23:17:44,015 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': '87d29c65-a96a-4e6b-84ff-865f51c0dba8', 'status': 'success', 'duration_ms': 14562.707901000977, 'timestamp': '2026-05-13T17:47:44.015460', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-05-13 23:17:44,064 - workflowexecutor - INFO - \u2705 Audio extracted: G:\code\Inspecta\Data\CompanyStorage3\uploads\cbebef0f-439e-4217-9bed-bf428dd3e24a_audio.mp3
+2026-05-13 23:17:44,112 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident 87d29c65-a96a-4e6b-84ff-865f51c0dba8
+2026-05-13 23:17:48,747 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-05-13 23:17:48,749 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': '87d29c65-a96a-4e6b-84ff-865f51c0dba8', 'status': 'success', 'duration_ms': 4636.132478713989, 'timestamp': '2026-05-13T17:47:48.748969', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-05-13 23:17:48,749 - workflowexecutor - INFO - \u2705 Transcription complete (65 chars, max = 1000), segments URL: G:\code\Inspecta\Data\CompanyStorage3\uploads\cbebef0f-439e-4217-9bed-bf428dd3e24a_audio_transcribe.json
+2026-05-13 23:17:48,784 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 87d29c65-a96a-4e6b-84ff-865f51c0dba8
+2026-05-13 23:17:54,405 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-05-13 23:17:54,406 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': '87d29c65-a96a-4e6b-84ff-865f51c0dba8', 'status': 'error', 'duration_ms': 5621.525526046753, 'timestamp': '2026-05-13T17:47:54.406911', 'error': {'type': 'Exception', 'message': 'Agent generate_tasks returned 500: {"detail":"Tasks extraction failed: \'charmap\' codec can\'t decode byte 0x8d in position 116: character maps to <undefined>"}'}}
+2026-05-13 23:17:54,407 - workflowexecutor - ERROR - \u274c Task generation failed: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+2026-05-13 23:17:55,162 - langgraph.pregel._retry - INFO - Retrying task generate_tasks after 0.75 seconds (attempt 1) after HTTPStatusError Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_retry.py", line 242, in arun_with_retry
+    return await task.proc.ainvoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 705, in ainvoke
+    input = await asyncio.create_task(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        step.ainvoke(input, config, **kwargs), context=context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 473, in ainvoke
+    ret = await self.afunc(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+During task with name 'generate_tasks' and id 'b0cc2c38-229e-4a83-adda-7a5dae6da825'
+2026-05-13 23:17:55,207 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 87d29c65-a96a-4e6b-84ff-865f51c0dba8
+2026-05-13 23:17:55,358 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-05-13 23:17:56,675 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-05-13 23:17:56,676 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': '87d29c65-a96a-4e6b-84ff-865f51c0dba8', 'status': 'error', 'duration_ms': 1467.963695526123, 'timestamp': '2026-05-13T17:47:56.676204', 'error': {'type': 'Exception', 'message': 'Agent generate_tasks returned 500: {"detail":"Tasks extraction failed: \'charmap\' codec can\'t decode byte 0x8d in position 116: character maps to <undefined>"}'}}
+2026-05-13 23:17:56,676 - workflowexecutor - ERROR - \u274c Task generation failed: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+2026-05-13 23:18:00,246 - langgraph.pregel._retry - INFO - Retrying task generate_tasks after 1.92 seconds (attempt 2) after HTTPStatusError Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_retry.py", line 242, in arun_with_retry
+    return await task.proc.ainvoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 705, in ainvoke
+    input = await asyncio.create_task(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        step.ainvoke(input, config, **kwargs), context=context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 473, in ainvoke
+    ret = await self.afunc(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+During task with name 'generate_tasks' and id 'b0cc2c38-229e-4a83-adda-7a5dae6da825'
+2026-05-13 23:18:00,293 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident 87d29c65-a96a-4e6b-84ff-865f51c0dba8
+2026-05-13 23:18:04,018 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-05-13 23:18:04,019 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': '87d29c65-a96a-4e6b-84ff-865f51c0dba8', 'status': 'error', 'duration_ms': 3725.5594730377197, 'timestamp': '2026-05-13T17:48:04.019914', 'error': {'type': 'Exception', 'message': 'Agent generate_tasks returned 500: {"detail":"Tasks extraction failed: \'charmap\' codec can\'t decode byte 0x8d in position 116: character maps to <undefined>"}'}}
+2026-05-13 23:18:04,020 - workflowexecutor - ERROR - \u274c Task generation failed: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+2026-05-13 23:18:05,112 - workflowexecutor - ERROR - \u274c Background Workflow Error for 87d29c65-a96a-4e6b-84ff-865f51c0dba8: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 244, in handle_result
+    t.result()
+    ~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\main.py", line 3479, in ainvoke
+    async for chunk in self.astream(
+    ...<29 lines>...
+            chunks.append(chunk)
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\main.py", line 3128, in astream
+    async for _ in runner.atick(
+    ...<16 lines>...
+            yield o
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_runner.py", line 304, in atick
+    await arun_with_retry(
+    ...<15 lines>...
+    )
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_retry.py", line 242, in arun_with_retry
+    return await task.proc.ainvoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 705, in ainvoke
+    input = await asyncio.create_task(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        step.ainvoke(input, config, **kwargs), context=context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 473, in ainvoke
+    ret = await self.afunc(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+During task with name 'generate_tasks' and id 'b0cc2c38-229e-4a83-adda-7a5dae6da825'
+2026-05-13 23:18:15,859 - workflowexecutor - INFO - \U0001f4dd Incident b0798d4c-6e8e-44e9-81e1-1f8a288e477a uploaded and queued for processing
+2026-05-13 23:18:15,861 - httpx - INFO - HTTP Request: POST http://testserver/inspections/bc201b82-c412-4867-92f9-cb364500b0b4/upload-incident "HTTP/1.1 200 OK"
+2026-05-13 23:18:18,780 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident b0798d4c-6e8e-44e9-81e1-1f8a288e477a
+2026-05-13 23:18:27,772 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-05-13 23:18:27,773 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': 'b0798d4c-6e8e-44e9-81e1-1f8a288e477a', 'status': 'success', 'duration_ms': 8992.316484451294, 'timestamp': '2026-05-13T17:48:27.773142', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-05-13 23:18:29,245 - workflowexecutor - INFO - \u2705 Audio extracted: G:\code\Inspecta\Data\CompanyStorage3\uploads\cf7e4cd8-1005-401b-8cdb-3dfc58aeb47a_audio.mp3
+2026-05-13 23:18:29,286 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident b0798d4c-6e8e-44e9-81e1-1f8a288e477a
+2026-05-13 23:18:35,934 - httpx - INFO - HTTP Request: POST http://testserver/inspections "HTTP/1.1 200 OK"
+2026-05-13 23:18:40,898 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-05-13 23:18:40,899 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': 'b0798d4c-6e8e-44e9-81e1-1f8a288e477a', 'status': 'success', 'duration_ms': 11613.057136535645, 'timestamp': '2026-05-13T17:48:40.899708', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-05-13 23:18:40,900 - workflowexecutor - INFO - \u2705 Transcription complete (597 chars, max = 1000), segments URL: G:\code\Inspecta\Data\CompanyStorage3\uploads\cf7e4cd8-1005-401b-8cdb-3dfc58aeb47a_audio_transcribe.json
+2026-05-13 23:18:40,959 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident b0798d4c-6e8e-44e9-81e1-1f8a288e477a
+2026-05-13 23:18:44,625 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-05-13 23:18:44,626 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': 'b0798d4c-6e8e-44e9-81e1-1f8a288e477a', 'status': 'error', 'duration_ms': 3666.283369064331, 'timestamp': '2026-05-13T17:48:44.626627', 'error': {'type': 'Exception', 'message': 'Agent generate_tasks returned 500: {"detail":"Tasks extraction failed: \'charmap\' codec can\'t decode byte 0x90 in position 261: character maps to <undefined>"}'}}
+2026-05-13 23:18:44,626 - workflowexecutor - ERROR - \u274c Task generation failed: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+2026-05-13 23:18:45,629 - langgraph.pregel._retry - INFO - Retrying task generate_tasks after 1.00 seconds (attempt 1) after HTTPStatusError Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_retry.py", line 242, in arun_with_retry
+    return await task.proc.ainvoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 705, in ainvoke
+    input = await asyncio.create_task(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        step.ainvoke(input, config, **kwargs), context=context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 473, in ainvoke
+    ret = await self.afunc(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+During task with name 'generate_tasks' and id 'd5d1174b-0eb3-690d-5665-3c7906408c1e'
+2026-05-13 23:18:46,925 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident b0798d4c-6e8e-44e9-81e1-1f8a288e477a
+2026-05-13 23:18:49,508 - httpx - INFO - HTTP Request: GET http://testserver/get-upload-url "HTTP/1.1 200 OK"
+2026-05-13 23:18:50,439 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-05-13 23:18:50,440 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': 'b0798d4c-6e8e-44e9-81e1-1f8a288e477a', 'status': 'error', 'duration_ms': 3514.19997215271, 'timestamp': '2026-05-13T17:48:50.440668', 'error': {'type': 'Exception', 'message': 'Agent generate_tasks returned 500: {"detail":"Tasks extraction failed: \'charmap\' codec can\'t decode byte 0x90 in position 261: character maps to <undefined>"}'}}
+2026-05-13 23:18:50,440 - workflowexecutor - ERROR - \u274c Task generation failed: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+2026-05-13 23:18:52,230 - langgraph.pregel._retry - INFO - Retrying task generate_tasks after 1.79 seconds (attempt 2) after HTTPStatusError Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_retry.py", line 242, in arun_with_retry
+    return await task.proc.ainvoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 705, in ainvoke
+    input = await asyncio.create_task(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        step.ainvoke(input, config, **kwargs), context=context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 473, in ainvoke
+    ret = await self.afunc(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+During task with name 'generate_tasks' and id 'd5d1174b-0eb3-690d-5665-3c7906408c1e'
+2026-05-13 23:18:52,276 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident b0798d4c-6e8e-44e9-81e1-1f8a288e477a
+2026-05-13 23:18:58,934 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 500 Internal Server Error"
+2026-05-13 23:18:58,935 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': 'b0798d4c-6e8e-44e9-81e1-1f8a288e477a', 'status': 'error', 'duration_ms': 6659.182548522949, 'timestamp': '2026-05-13T17:48:58.935887', 'error': {'type': 'Exception', 'message': 'Agent generate_tasks returned 500: {"detail":"Tasks extraction failed: \'charmap\' codec can\'t decode byte 0x90 in position 261: character maps to <undefined>"}'}}
+2026-05-13 23:18:58,936 - workflowexecutor - ERROR - \u274c Task generation failed: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+2026-05-13 23:18:58,986 - workflowexecutor - ERROR - \u274c Background Workflow Error for b0798d4c-6e8e-44e9-81e1-1f8a288e477a: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+Traceback (most recent call last):
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 244, in handle_result
+    t.result()
+    ~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\main.py", line 3479, in ainvoke
+    async for chunk in self.astream(
+    ...<29 lines>...
+            chunks.append(chunk)
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\main.py", line 3128, in astream
+    async for _ in runner.atick(
+    ...<16 lines>...
+            yield o
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_runner.py", line 304, in atick
+    await arun_with_retry(
+    ...<15 lines>...
+    )
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\pregel\_retry.py", line 242, in arun_with_retry
+    return await task.proc.ainvoke(task.input, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 705, in ainvoke
+    input = await asyncio.create_task(
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        step.ainvoke(input, config, **kwargs), context=context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\langgraph\_internal\_runnable.py", line 473, in ainvoke
+    ret = await self.afunc(*args, **kwargs)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 443, in _generate_tasks_node
+    result = await self.task_generator_agent.post(data, incident_id=incident_id)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "G:\code\Inspecta\Executor\src\workflowexecutor.py", line 55, in post
+    resp.raise_for_status()  # Ensure we don't proceed on 500 errors
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "g:\code\Inspecta\Executor\.venv\Lib\site-packages\httpx\_models.py", line 829, in raise_for_status
+    raise HTTPStatusError(message, request=request, response=self)
+httpx.HTTPStatusError: Server error '500 Internal Server Error' for url 'http://localhost:8003/generate_tasks'
+For more information check: https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/500
+During task with name 'generate_tasks' and id 'd5d1174b-0eb3-690d-5665-3c7906408c1e'
+2026-05-13 23:19:13,786 - workflowexecutor - INFO - \U0001f4dd Incident d519c863-877c-4353-a146-97a43ffed4f4 uploaded and queued for processing
+2026-05-13 23:19:13,789 - httpx - INFO - HTTP Request: POST http://testserver/inspections/1cd01e00-d0ad-4f94-9cf2-116710ef7127/upload-incident "HTTP/1.1 200 OK"
+2026-05-13 23:19:15,873 - workflowexecutor - INFO - \U0001f3ac Extracting audio for incident d519c863-877c-4353-a146-97a43ffed4f4
+2026-05-13 23:19:24,616 - httpx - INFO - HTTP Request: POST http://localhost:8001/extract_audio "HTTP/1.1 200 OK"
+2026-05-13 23:19:24,617 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'extract_audio', 'url': 'http://localhost:8001/extract_audio', 'incident_id': 'd519c863-877c-4353-a146-97a43ffed4f4', 'status': 'success', 'duration_ms': 8744.057893753052, 'timestamp': '2026-05-13T17:49:24.617419', 'response_keys': ['status', 'audio_url', 'metadata']}
+2026-05-13 23:19:24,659 - workflowexecutor - INFO - \u2705 Audio extracted: G:\code\Inspecta\Data\CompanyStorage3\uploads\c93dce88-672a-4d6b-8536-e563cbe4af7d_audio.mp3
+2026-05-13 23:19:24,708 - workflowexecutor - INFO - \U0001f399\ufe0f Transcribing audio for incident d519c863-877c-4353-a146-97a43ffed4f4
+2026-05-13 23:19:32,060 - httpx - INFO - HTTP Request: POST http://localhost:8002/transcribe "HTTP/1.1 200 OK"
+2026-05-13 23:19:32,062 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'transcribe', 'url': 'http://localhost:8002/transcribe', 'incident_id': 'd519c863-877c-4353-a146-97a43ffed4f4', 'status': 'success', 'duration_ms': 7353.622198104858, 'timestamp': '2026-05-13T17:49:32.061985', 'response_keys': ['status', 'transcript', 'segments_json_url', 'metadata']}
+2026-05-13 23:19:32,062 - workflowexecutor - INFO - \u2705 Transcription complete (135 chars, max = 1000), segments URL: G:\code\Inspecta\Data\CompanyStorage3\uploads\c93dce88-672a-4d6b-8536-e563cbe4af7d_audio_transcribe.json
+2026-05-13 23:19:32,118 - workflowexecutor - INFO - \U0001f4cb Generating tasks for incident d519c863-877c-4353-a146-97a43ffed4f4
+2026-05-13 23:19:39,516 - httpx - INFO - HTTP Request: POST http://localhost:8003/generate_tasks "HTTP/1.1 200 OK"
+2026-05-13 23:19:39,518 - langsmith_config - INFO - External Agent Call: {'event': 'external_agent_call', 'agent': 'generate_tasks', 'url': 'http://localhost:8003/generate_tasks', 'incident_id': 'd519c863-877c-4353-a146-97a43ffed4f4', 'status': 'success', 'duration_ms': 7399.111747741699, 'timestamp': '2026-05-13T17:49:39.518091', 'response_keys': ['status', 'tasks_count', 'tasks_json_url', 'metadata']}
+2026-05-13 23:19:39,518 - workflowexecutor - INFO - Received 3 tasks from agent.
+2026-05-13 23:19:39,519 - workflowexecutor - INFO - Extracted summary: The provided transcript segments are largely unclear and contain incomplete or irrelevant information, making it difficult to ascertain the current site status. No specific observations related to farming operations or safety issues are evident., from tasks JSON URL: G:\code\Inspecta\Data\CompanyStorage3\uploads\c93dce88-672a-4d6b-8536-e563cbe4af7d_audio_transcribe_tasks.json
+2026-05-13 23:19:42,940 - workflowexecutor - INFO - \u2705 Generated 1 task(s) for incident d519c863-877c-4353-a146-97a43ffed4f4
+2026-05-13 23:19:43,040 - workflowexecutor - INFO - \u2705 Workflow completed successfully for incident d519c863-877c-4353-a146-97a43ffed4f4
+2026-05-13 23:19:47,510 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:06,493 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:14,610 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:26,827 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:29,876 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:32,904 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:35,940 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:38,974 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:42,022 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:45,068 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:48,118 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:51,168 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:54,205 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:20:57,247 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:21:00,301 - httpx - INFO - HTTP Request: GET http://testserver/incidents/87d29c65-a96a-4e6b-84ff-865f51c0dba8/status "HTTP/1.1 200 OK"
+2026-05-13 23:21:00,302 - main - INFO - \U0001f6d1 Shutdown initiated. Cleaning up resources...
+2026-05-13 23:21:00,302 - workflowexecutor - INFO - LangGraph Checkpointer connection closed.
+2026-05-13 23:21:00,302 - main - INFO - \u2705 Checkpointer pool closed.
+2026-05-13 23:21:00,302 - main - INFO - \u23f3 Waiting for 2 background tasks to settle...
+2026-05-13 23:21:05,303 - main - INFO - \U0001f44b Shutdown complete.
