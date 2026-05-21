@@ -34,3 +34,14 @@ Start-Sleep -Seconds 10
 Write-Host "🧪 Running Integration Test..." -ForegroundColor Yellow
 cd G:\code\Inspecta\Executor\src
 #python G:\code\Inspecta\Executor\src\test_executor.py
+
+# --- 5. Run backend UI ---
+Write-Host "🚀 Starting Backend UI on Port 8004..." -ForegroundColor Cyan
+cd G:\code\Inspecta\UI\Backend
+.\.venv\Scripts\Activate.ps1
+& '.\.venv\Scripts\python.exe' -m uvicorn main:app --host 0.0.0.0 --port 8004 --loop asyncio --reload
+
+# --- 6. Run frontend UI ---
+Write-Host "🚀 Starting Frontend UI on Port 3000..." -ForegroundColor Cyan
+cd G:\code\Inspecta\UI\inspecta-dashboard
+npm run dev

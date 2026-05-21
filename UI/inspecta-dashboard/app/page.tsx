@@ -3,15 +3,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
+import { getCompanyId, setCompanyId } from '@/lib/company-context';
 
-interface Site {
-  id: string;
-  name: string;
-  floor: string;
-  lastModified: string;
+interface SiteInspection {
+  site_id: string;
+  site_name: string;
   address?: string;
-  company_name?: string;
-  industry_name?: string;
+  inspection_id: string | null;
+  inspection_created_at?: string;
+  label: string;
 }
 
 interface Incident {
@@ -38,18 +38,19 @@ interface Task {
   end_time: number;
   video_url?: string;
   area: string;
-  created_at: string;
+  created_at: string;  
 }
 
 export default function ReviewerDashboard() {
   // State management
-  const [sites, setSites] = useState<Site[]>([]);
+  const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [companyId, setCompanyIdState] = useState<number | null>(null);
   const [filters, setFilters] = useState({
     severity: 'all',
     task_type: 'all',
@@ -57,20 +58,18 @@ export default function ReviewerDashboard() {
   });
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
   const [isVideoCollapsed, setIsVideoCollapsed] = useState(false);
-  const [selectedSite, setSelectedSite] = useState<string>('');
-  const [selectedIncident, setSelectedIncident] = useState<string>('');
+  const [selectedInspection, setSelectedInspection] = useState<string>('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingDescription, setEditingDescription] = useState('');
   const [taskSaveLoading, setTaskSaveLoading] = useState(false);
   const [taskEditError, setTaskEditError] = useState<string | null>(null);
   const [pendingPlayTask, setPendingPlayTask] = useState<{ id: string; start: number; end: number } | null>(null);
-  // FIX 1: Track playing state to conditionally show/hide the overlay button
   const [isPlaying, setIsPlaying] = useState(false);
 
   // Loading and error states
-  const [sitesLoading, setSitesLoading] = useState(true);
-  const [sitesError, setSitesError] = useState<string | null>(null);
+  const [siteInspectionsLoading, setSiteInspectionsLoading] = useState(true);
+  const [siteInspectionsError, setSiteInspectionsError] = useState<string | null>(null);
   const [incidentsLoading, setIncidentsLoading] = useState(false);
   const [incidentsError, setIncidentsError] = useState<string | null>(null);
   const [tasksLoading, setTasksLoading] = useState(false);
@@ -80,58 +79,68 @@ export default function ReviewerDashboard() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Fetch sites on component mount
+  // Initialize company ID on mount
   useEffect(() => {
-    const fetchSites = async () => {
+    const id = getCompanyId();
+    setCompanyIdState(id);
+  }, []);
+
+  // Fetch site-inspections on component mount
+  useEffect(() => {
+    const fetchSiteInspections = async () => {
       try {
-        setSitesLoading(true);
-        setSitesError(null);
-        const response = await fetch('/api/sites');
+        setSiteInspectionsLoading(true);
+        setSiteInspectionsError(null);
+        const id = companyId || getCompanyId();
+        const response = await fetch(`/frontend-api/site-inspections?companyId=${id}`);
 
         if (!response.ok) {
-          throw new Error(`Failed to fetch sites: ${response.statusText}`);
+          throw new Error(`Failed to fetch site-inspections: ${response.statusText}`);
         }
 
-        const data = await response.json();
-        setSites(data);
+        const apiResponse = await response.json();
+        const combinedData = apiResponse.data || [];
+        setSiteInspections(combinedData);
 
-        // Auto-select first site
-        if (data.length > 0) {
-          setSelectedSite(data[0].id);
+        // Auto-select first inspection (must have valid inspection_id)
+        if (combinedData.length > 0 && combinedData[0].inspection_id) {
+          setSelectedInspection(combinedData[0].inspection_id);
         }
       } catch (error) {
-        console.error('Error fetching sites:', error);
-        setSitesError(error instanceof Error ? error.message : 'Failed to fetch sites');
+        console.error('Error fetching site-inspections:', error);
+        setSiteInspectionsError(error instanceof Error ? error.message : 'Failed to fetch site-inspections');
       } finally {
-        setSitesLoading(false);
+        setSiteInspectionsLoading(false);
       }
     };
 
-    fetchSites();
-  }, []);
+    fetchSiteInspections();
+  }, [companyId]);
 
-  // Fetch incidents when site changes
+  // Fetch incidents when inspection changes
   useEffect(() => {
-    if (!selectedSite) return;
+    if (!selectedInspection) return;
 
     const fetchIncidents = async () => {
       try {
         setIncidentsLoading(true);
         setIncidentsError(null);
-        const response = await fetch(`/api/incidents?siteId=${selectedSite}`);
+        const id = companyId || getCompanyId();
+        const response = await fetch(`/frontend-api/incidents?inspectionId=${selectedInspection}&companyId=${id}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch incidents: ${response.statusText}`);
         }
 
-        const data = await response.json();
-        setIncidents(data);
+        const apiResponse = await response.json();
+        const incidentsData = apiResponse.data || [];
+        setIncidents(incidentsData);
 
-        // Auto-select first incident
-        if (data.length > 0) {
-          setSelectedIncident(data[0].id);
+        // If there are incidents, get tasks from the first one
+        if (incidentsData.length > 0) {
+          // Get tasks from first incident
+          fetchTasksForIncident(incidentsData[0].id);
         } else {
-          setSelectedIncident('');
           setTasks([]);
         }
       } catch (error) {
@@ -143,47 +152,39 @@ export default function ReviewerDashboard() {
     };
 
     fetchIncidents();
-  }, [selectedSite]);
+  }, [selectedInspection, companyId]);
 
-  // Fetch tasks when incident changes
-  useEffect(() => {
-    if (!selectedIncident) return;
+  // Helper function to fetch tasks for an incident
+  const fetchTasksForIncident = async (incidentId: string) => {
+    try {
+      setTasksLoading(true);
+      setTasksError(null);
+      const id = companyId || getCompanyId();
+      console.log(`Fetching tasks for incident ${incidentId}...`);
+      const response = await fetch(`/frontend-api/tasks?incidentId=${incidentId}&companyId=${id}`);
 
-    const fetchTasks = async () => {
-      try {
-        setTasksLoading(true);
-        setTasksError(null);
-        console.log(`Fetching tasks for incident ${selectedIncident}...`);
-        const response = await fetch(`/api/tasks?incidentId=${selectedIncident}`);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch tasks: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Fetched tasks:', data);
-        setTasks(data);
-
-        // Expand all tasks initially
-        setExpandedTasks(new Set(data.map((_: any, idx: number) => idx)));
-      } catch (error) {
-        console.error('Error fetching tasks:', error);
-        setTasksError(error instanceof Error ? error.message : 'Failed to fetch tasks');
-      } finally {
-        setTasksLoading(false);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch tasks: ${response.statusText}`);
       }
-    };
 
-    fetchTasks();
-  }, [selectedIncident]);
+      const apiResponse = await response.json();
+      const tasksData = apiResponse.data || [];
+      console.log('Fetched tasks:', tasksData);
+      setTasks(tasksData);
+
+      // Expand all tasks initially
+      setExpandedTasks(new Set(tasksData.map((_: any, idx: number) => idx)));
+    } catch (error) {
+      console.error('Error fetching tasks:', error);
+      setTasksError(error instanceof Error ? error.message : 'Failed to fetch tasks');
+    } finally {
+      setTasksLoading(false);
+    }
+  };
 
   useEffect(() => {
     setHasAutoPaused(false);
   }, [activeTask?.id]);
-
-  const handleSiteChange = (siteId: string) => {
-    setSelectedSite(siteId);
-  };
 
   const handleTaskClick = (task: Task, shouldPlay = false) => {
     console.log(`Task clicked: ${task.id} : {task.task_title}`);
@@ -297,8 +298,9 @@ export default function ReviewerDashboard() {
     try {
       setTaskSaveLoading(true);
       setTaskEditError(null);
+      const id = companyId || getCompanyId();
 
-      const response = await fetch('/api/tasks', {
+      const response = await fetch('/frontend-api/tasks', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -307,6 +309,7 @@ export default function ReviewerDashboard() {
           id: task.id,
           task_title: trimmedTitle,
           task_description: trimmedDescription,
+          company_id: id,
         }),
       });
 
@@ -395,7 +398,7 @@ export default function ReviewerDashboard() {
       return videoUrl;
     }
 
-    return `/api/video?path=${encodeURIComponent(videoUrl)}`;
+    return `/frontend-api/video?path=${encodeURIComponent(videoUrl)}`;
   };
 
   const filteredTasks = tasks.filter(task => {
@@ -436,18 +439,18 @@ export default function ReviewerDashboard() {
 
           <div className="flex items-center gap-3 justify-end">
             <div className={`relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-2 text-sm text-white shadow-sm`}>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">Site</span>
-              {sitesLoading ? (
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">Inspection</span>
+              {siteInspectionsLoading ? (
                 <Loader className="w-4 h-4 animate-spin text-white/70 ml-2" />
               ) : (
                 <select
-                  value={selectedSite}
-                  onChange={(e) => handleSiteChange(e.target.value)}
+                  value={selectedInspection}
+                  onChange={(e) => setSelectedInspection(e.target.value)}
                   className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
                 >
-                  {sites.length === 0 && <option className="text-slate-900 bg-white">No sites available</option>}
-                  {sites.map(site => (
-                    <option key={site.id} value={site.id} className="text-slate-900 bg-white">{site.name} - {site.floor}</option>
+                  {siteInspections.length === 0 && <option className="text-slate-900 bg-white">No inspections available</option>}
+                  {siteInspections.map(item => (
+                    <option key={`${item.site_id}-${item.inspection_id}`} value={item.inspection_id || item.site_id} className="text-slate-900 bg-white">{item.label}</option>
                   ))}
                 </select>
               )}
@@ -459,8 +462,13 @@ export default function ReviewerDashboard() {
                 <Loader className="w-4 h-4 animate-spin text-white/70 ml-2" />
               ) : (
                 <select
-                  value={selectedIncident}
-                  onChange={(e) => setSelectedIncident(e.target.value)}
+                  value={incidents.length > 0 && tasks.length > 0 ? incidents[0]?.id || '' : ''}
+                  onChange={(e) => {
+                    const incidentId = e.target.value;
+                    if (incidentId) {
+                      fetchTasksForIncident(incidentId);
+                    }
+                  }}
                   className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
                 >
                   {incidents.length === 0 && <option className="text-slate-900 bg-white">No incidents available</option>}
@@ -517,11 +525,11 @@ export default function ReviewerDashboard() {
       </header>
 
       {/* Error Messages */}
-      {(sitesError || incidentsError || tasksError) && (
+      {(siteInspectionsError || incidentsError || tasksError) && (
         <div className="bg-red-50 border-b border-red-200 px-6 py-3 flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-red-800">
-            {sitesError && <div>Sites Error: {sitesError}</div>}
+            {siteInspectionsError && <div>Site-Inspections Error: {siteInspectionsError}</div>}
             {incidentsError && <div>Incidents Error: {incidentsError}</div>}
             {tasksError && <div>Tasks Error: {tasksError}</div>}
           </div>

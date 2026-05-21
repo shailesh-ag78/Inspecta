@@ -1,38 +1,42 @@
-import { query } from '@/lib/db';
+import { getIncidentsForSite, getIncidentsForInspection } from '@/lib/backend-client';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const siteId = searchParams.get('siteId');
+    const inspectionId = searchParams.get('inspectionId');
+    const companyId = searchParams.get('companyId');
 
-    if (!siteId) {
+    if (!companyId) {
       return NextResponse.json(
-        { error: 'siteId query parameter is required' },
+        { error: 'companyId query parameter is required' },
         { status: 400 }
       );
     }
 
-    const result = await query(
-      `SELECT 
-        i.id, 
-        insp.id as inspection_id,
-        i.created_at,
-        COUNT(it.id) as task_count,
-        MAX(CASE WHEN it.status_id = 1 THEN 1 ELSE 0 END) as has_pending,
-        MAX(CASE WHEN it.status_id = 2 THEN 1 ELSE 0 END) as has_in_progress,
-        MAX(CASE WHEN it.status_id = 4 THEN 1 ELSE 0 END) as has_completed
-      FROM incidents i
-      LEFT JOIN inspections insp ON i.inspection_id = insp.id
-      LEFT JOIN incident_tasks it ON i.id = it.incident_id
-      WHERE insp.site_id = $1
-      GROUP BY i.id, insp.id
-      ORDER BY i.created_at DESC
-      LIMIT 50`,
-      [siteId]
-    );
+    // Support both siteId (legacy) and inspectionId (new)
+    if (!siteId && !inspectionId) {
+      return NextResponse.json(
+        { error: 'Either siteId or inspectionId query parameter is required' },
+        { status: 400 }
+      );
+    }
 
-    const incidents = result.rows.map((incident, index) => {
+    let incidents;
+    if (inspectionId) {
+      incidents = await getIncidentsForInspection(
+        inspectionId,
+        parseInt(companyId)
+      );
+    } else {
+      incidents = await getIncidentsForSite(
+        parseInt(siteId!),
+        parseInt(companyId)
+      );
+    }
+
+    const formattedIncidents = incidents.map((incident) => {
       const status = incident.has_pending 
         ? 'pending' 
         : incident.has_in_progress 
@@ -60,7 +64,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json(incidents, { status: 200 });
+    return NextResponse.json({ status: 'success', data: formattedIncidents }, { status: 200 });
   } catch (error) {
     console.error('Error fetching incidents:', error);
     return NextResponse.json(

@@ -1,38 +1,24 @@
-Prompt for Antigravity 
+You are an expert full-stack engineer specializing in Google Cloud Platform (GCP) and high-performance, mobile-optimized web architectures.
 
-- resolve all ToDo comments in the code
-- add audit logs in the code
-- implement firebase authentication. After validating companyid from firebase token, extract site id and inspector id from the token and pass it to the executor    
-- 
+Your task is to generate a production-ready, multi-tenant web application called "InspectaWeb". The core feature of this platform is allowing users to record or select large site video files via a mobile web browser (Safari/Chrome) and upload them directly to Google Cloud Storage (GCS) using chunked, resilient streams.
 
+### Real-Life Architecture References
+Replicate the user experience, core streaming mechanics, and reliability of the following real-world applications:
+1. Loom & Vimeo Mobile Web: For their capture UX. The interface must use native HTML5 media captures to instantly launch the phone's rear camera when tapped, and seamlessly initiate uploading without blocking the user interface.
+2. Uppy.io Dashboard: For its responsive, native-app-like web UI. It must include a smooth file-picker card, persistent visual progress indicators (percentage bars), error state updates, and graceful pause/resume handling.
+3. Supabase Storage / Tus.io: For their backend streaming architecture. The application must treat uploads as chunked streams rather than singular HTTP POST requests to guarantee resilience over unreliable cellular networks.
 
-For testing
-- IN postman add custom headers
-X-Company-Id	101	Simulates your company_id
-X-Storage-Id	storage_alpha_99	Simulates your company_storage_id
-Content-Type	application/json	Standard for your POST/PUT requests
+### Strict Mobile Web Constraints to Solve
+You must programmatically safeguard the upload process against standard mobile browser limitations:
+1. Phone Sleep/Dim Interruption: Mobile OS browsers kill active HTTP connections seconds after a user locks the screen or the screen goes to sleep. You MUST implement the HTML5 Screen Wake Lock API (`navigator.wakeLock`) to keep the device active while an upload is in progress.
+2. Spotty Cellular Connections: If a network drops out at 80%, the application must not restart from 0%. You MUST implement GCS Resumable Upload sessions that chunk data sequentially, query byte-offsets on error via 308 Resume Incomplete loops, and pick up exactly where the connection broke.
+3. Google Cloud Storage Math Rule: GCS strictly enforces that every non-final chunk MUST be an exact multiple of 256 KiB ($256 \times 1024$ bytes). You MUST write precise buffer slicing math to guarantee this constraint is met.
 
-import httpx
-import os
+### Technical Stack & Deliverables
+Please write code using React/TypeScript (Frontend) and Node.js/Express (Backend). Generate the following clear deliverables:
 
-class ExternalAgentClient:
-    """Standardized client for calling external inspection agents."""
-    def __init__(self, base_url: str):
-        self.base_url = base_url.rstrip("/")
-        self.timeout = httpx.Timeout(120.0, connect=60.0) # Long timeout for processing
-
-    async def call_agent(self, endpoint: str, payload: dict = None, files: dict = None):
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            try:
-                if files:
-                    # For Transcription (Sends the file stream)
-                    response = await client.post(f"{self.base_url}{endpoint}", files=files, data=payload)
-                else:
-                    # For Analysis (Sends JSON metadata/transcripts)
-                    response = await client.post(f"{self.base_url}{endpoint}", json=payload)
-                
-                response.raise_for_status() # Ensure we don't proceed on 500 errors
-                return response.json()
-            except Exception as e:
-                print(f"Agent Call Failed [{endpoint}]: {e}")
-                return {"error": str(e), "status": "failed"}
+1. BACKEND: A Python Fast API endpoint using the official `@google-cloud/storage` SDK. It must accept `filename` and `contentType`, request a Resumable Upload Session URI (`action: "resumable"`), and securely return the session location tracking URI to the frontend.
+2. FRONTEND COMPONENT: A React component styled with Tailwind CSS optimized for a mobile viewport.
+   - Include an `<input type="file" accept="video/*" capture="environment">` to target the rear camera.
+   - Include the Screen Wake Lock wrapper to prevent mobile sleep states during transfers.
+3. FRONTEND UPLOAD ENGINE: An asynchronous JavaScript chunk-slicing engine. It must read the local file, slice it into uniform 1MB blocks (ensuring compliance with the 256 KiB GCS rule), and fire consecutive `PUT` requests using the `Content-Range: bytes X-Y/Total` headers. Implement an exponential backoff loop to automatically retry chunk failures.
