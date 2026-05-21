@@ -1,10 +1,44 @@
-import { query } from '@/lib/db';
+import { getTasksForIncident, updateTask } from '@/lib/backend-client';
 import { NextRequest, NextResponse } from 'next/server';
+
+// Helper function to map task type IDs to labels
+function getTaskTypeLabel(taskTypeId: number): string {
+  const labels: Record<number, string> = {
+    1: 'install',
+    2: 'repair',
+    3: 'verify',
+    4: 'clear',
+  };
+  return labels[taskTypeId] || 'verify';
+}
+
+// Helper function to map status IDs to labels
+function getTaskStatusLabel(statusId: number): string {
+  const labels: Record<number, string> = {
+    1: 'pending',
+    2: 'in_progress',
+    3: 'review',
+    4: 'completed',
+    5: 'failed',
+  };
+  return labels[statusId] || 'pending';
+}
+
+// Helper function to map severity IDs to labels
+function getSeverityLabel(severityId: number): string {
+  const labels: Record<number, string> = {
+    1: 'Severe',
+    2: 'Regular',
+    3: 'Low',
+  };
+  return labels[severityId] || 'Regular';
+}
 
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const incidentId = searchParams.get('incidentId');
+    const companyId = searchParams.get('companyId');
 
     if (!incidentId) {
       return NextResponse.json(
@@ -13,70 +47,35 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const result = await query(
-      `SELECT 
-        it.id,
-        it.task_title,
-        it.task_description,
-        it.severity_id,
-        it.status_id,
-        it.task_type_id,
-        it.video_start_ms,
-        it.video_end_ms,
-        it.video_url,
-        it.task_artifacts,
-        tsl.label as status_label,
-        tty.label as task_type_label,
-        ts.label as severity_label,
-        it.created_at
-      FROM incident_tasks it
-      LEFT JOIN task_statuses_lookup tsl ON it.status_id = tsl.id
-      LEFT JOIN task_type_lookup tty ON it.task_type_id = tty.id
-      LEFT JOIN task_severity_lookup ts ON it.severity_id = ts.id
-      WHERE it.incident_id = $1
-      ORDER BY it.created_at ASC`,
-      [incidentId]
-    );
+    if (!companyId) {
+      return NextResponse.json(
+        { error: 'companyId query parameter is required' },
+        { status: 400 }
+      );
+    }
 
-    const tasks = result.rows.map((task) => {
-      // Map task_type_id to task_type string
-      const taskTypeMap: Record<number, string> = {
-        1: 'install',
-        2: 'repair',
-        3: 'verify',
-        4: 'clear'
-      };
+    const tasks = await getTasksForIncident(incidentId, parseInt(companyId));
 
-      // Map status_id to task_status string
-      const statusMap: Record<number, string> = {
-        1: 'pending',
-        2: 'in_progress',
-        3: 'review',
-        4: 'completed',
-        5: 'failed'
-      };
+    const formattedTasks = tasks.map((task) => ({
+      id: String(task.id),
+      task_title: task.task_title,
+      task_description: task.task_description || '',
+      severity_id: task.severity_id || 2,
+      status_id: task.status_id || 1,
+      task_type_id: task.task_type_id || 3,
+      task_status: getTaskStatusLabel(task.status_id),
+      task_type: getTaskTypeLabel(task.task_type_id),
+      severity_label: getSeverityLabel(task.severity_id),
+      status_label: getTaskStatusLabel(task.status_id),
+      start_time: Math.floor(task.video_start_ms || 0),
+      end_time: Math.floor(task.video_end_ms || 0),
+      video_url: task.video_url,
+      task_artifacts: task.task_artifacts || [],
+      area: 'Task Area', // Placeholder - could be extracted from artifacts
+      created_at: new Date(task.created_at).toISOString(),
+    }));
 
-      return {
-        id: String(task.id),
-        task_title: task.task_title,
-        task_description: task.task_description || '',
-        severity_id: task.severity_id || 2,
-        status_id: task.status_id || 1,
-        task_type_id: task.task_type_id || 3,
-        task_status: statusMap[task.status_id] || 'pending',
-        task_type: taskTypeMap[task.task_type_id] || 'verify',
-        severity_label: task.severity_label || 'Regular',
-        status_label: task.status_label || 'Pending',
-        start_time: Math.floor((task.video_start_ms || 0)),
-        end_time: Math.floor((task.video_end_ms || 0)),
-        video_url: task.video_url,
-        task_artifacts: task.task_artifacts || [],
-        area: 'Task Area', // Placeholder - could be extracted from artifacts
-        created_at: new Date(task.created_at).toISOString(),
-      };
-    });
-
-    return NextResponse.json(tasks, { status: 200 });
+    return NextResponse.json(formattedTasks, { status: 200 });
   } catch (error) {
     console.error('Error fetching tasks:', error);
     return NextResponse.json(
@@ -92,29 +91,44 @@ export async function PATCH(request: NextRequest) {
     const taskId = body?.id;
     const taskDescription = body?.task_description;
     const taskTitle = body?.task_title;
+    const companyId = body?.company_id;
 
     if (!taskId) {
       return NextResponse.json({ error: 'Task id is required' }, { status: 400 });
     }
     if (typeof taskDescription !== 'string') {
-      return NextResponse.json({ error: 'Task description must be a string' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Task description must be a string' },
+        { status: 400 }
+      );
     }
     if (typeof taskTitle !== 'string') {
-      return NextResponse.json({ error: 'Task title must be a string' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'Task title must be a string' },
+        { status: 400 }
+      );
+    }
+    if (!companyId) {
+      return NextResponse.json(
+        { error: 'Company ID is required' },
+        { status: 400 }
+      );
     }
 
-    const updateResult = await query(
-      'UPDATE incident_tasks SET task_description = $1, task_title = $2 WHERE id = $3 RETURNING id, task_description, task_title',
-      [taskDescription.trim(), taskTitle.trim(), taskId]
-    );
+    const updatedTask = await updateTask(taskId, companyId, {
+      task_title: taskTitle,
+      task_description: taskDescription,
+    });
 
-    if (updateResult.rowCount === 0) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-    }
-
-    return NextResponse.json(updateResult.rows[0], { status: 200 });
+    return NextResponse.json(updatedTask, { status: 200 });
   } catch (error) {
     console.error('Error updating task:', error);
+    if (
+      error instanceof Error &&
+      error.message.includes('Task not found')
+    ) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
     return NextResponse.json(
       { error: 'Failed to update task', details: String(error) },
       { status: 500 }

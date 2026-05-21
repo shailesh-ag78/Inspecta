@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
+import { getCompanyId, setCompanyId } from '@/lib/company-context';
 
 interface Site {
   id: string;
@@ -38,7 +39,7 @@ interface Task {
   end_time: number;
   video_url?: string;
   area: string;
-  created_at: string;
+  created_at: string;  
 }
 
 export default function ReviewerDashboard() {
@@ -50,6 +51,7 @@ export default function ReviewerDashboard() {
   const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [companyId, setCompanyIdState] = useState<number | null>(null);
   const [filters, setFilters] = useState({
     severity: 'all',
     task_type: 'all',
@@ -80,13 +82,20 @@ export default function ReviewerDashboard() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Initialize company ID on mount
+  useEffect(() => {
+    const id = getCompanyId();
+    setCompanyIdState(id);
+  }, []);
+
   // Fetch sites on component mount
   useEffect(() => {
     const fetchSites = async () => {
       try {
         setSitesLoading(true);
         setSitesError(null);
-        const response = await fetch('/api/sites');
+        const id = companyId || getCompanyId();
+        const response = await fetch(`/api/sites?companyId=${id}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch sites: ${response.statusText}`);
@@ -118,7 +127,8 @@ export default function ReviewerDashboard() {
       try {
         setIncidentsLoading(true);
         setIncidentsError(null);
-        const response = await fetch(`/api/incidents?siteId=${selectedSite}`);
+        const id = companyId || getCompanyId();
+        const response = await fetch(`/api/incidents?siteId=${selectedSite}&companyId=${id}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch incidents: ${response.statusText}`);
@@ -143,7 +153,7 @@ export default function ReviewerDashboard() {
     };
 
     fetchIncidents();
-  }, [selectedSite]);
+  }, [selectedSite, companyId]);
 
   // Fetch tasks when incident changes
   useEffect(() => {
@@ -153,8 +163,9 @@ export default function ReviewerDashboard() {
       try {
         setTasksLoading(true);
         setTasksError(null);
+        const id = companyId || getCompanyId();
         console.log(`Fetching tasks for incident ${selectedIncident}...`);
-        const response = await fetch(`/api/tasks?incidentId=${selectedIncident}`);
+        const response = await fetch(`/api/tasks?incidentId=${selectedIncident}&companyId=${id}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch tasks: ${response.statusText}`);
@@ -175,7 +186,7 @@ export default function ReviewerDashboard() {
     };
 
     fetchTasks();
-  }, [selectedIncident]);
+  }, [selectedIncident, companyId]);
 
   useEffect(() => {
     setHasAutoPaused(false);
@@ -297,6 +308,7 @@ export default function ReviewerDashboard() {
     try {
       setTaskSaveLoading(true);
       setTaskEditError(null);
+      const id = companyId || getCompanyId();
 
       const response = await fetch('/api/tasks', {
         method: 'PATCH',
@@ -307,6 +319,7 @@ export default function ReviewerDashboard() {
           id: task.id,
           task_title: trimmedTitle,
           task_description: trimmedDescription,
+          company_id: id,
         }),
       });
 

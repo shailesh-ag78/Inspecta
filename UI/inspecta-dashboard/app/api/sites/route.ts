@@ -1,35 +1,30 @@
-import { query } from '@/lib/db';
+import { getAllSites } from '@/lib/backend-client';
 import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const result = await query(
-      `SELECT 
-        s.id, 
-        s.site_name as name, 
-        s.address,
-        c.name as company_name,
-        i.name as industry_name,
-        COUNT(insp.id) as inspection_count
-      FROM sites s
-      LEFT JOIN companies c ON s.company_id = c.id
-      LEFT JOIN industries_lookup i ON s.industry_id = i.id
-      LEFT JOIN inspections insp ON s.id = insp.site_id
-      GROUP BY s.id, c.name, i.name
-      LIMIT 100`
-    );
+    const searchParams = request.nextUrl.searchParams;
+    const companyId = searchParams.get('companyId');
+    console.log('Received GET /api/sites request with companyId:', companyId);
 
-    const sites = result.rows.map((site) => ({
+    if (!companyId) {
+      return NextResponse.json(
+        { error: 'companyId query parameter is required' },
+        { status: 400 }
+      );
+    }
+
+    const sites = await getAllSites(Number(companyId));
+
+    const formattedSites = sites.map((site) => ({
       id: String(site.id),
       name: site.name,
-      address: site.address,
-      company_name: site.company_name,
-      industry_name: site.industry_name,
-      floor: site.address ? `${site.address}` : 'Unknown',
-      inspection_count: parseInt(site.inspection_count),
+      address: site.address || null,
+      company_name: site.company_id,
+      industry_id: site.industry_id
     }));
 
-    return NextResponse.json(sites, { status: 200 });
+    return NextResponse.json(formattedSites, { status: 200 });
   } catch (error) {
     console.error('Error fetching sites:', error);
     return NextResponse.json(
