@@ -37,13 +37,13 @@ export async function GET(request: NextRequest) {
     }
 
     const formattedIncidents = incidents.map((incident) => {
-      const status = incident.has_pending 
-        ? 'pending' 
-        : incident.has_in_progress 
-        ? 'active' 
-        : incident.has_completed 
-        ? 'completed' 
-        : 'pending';
+      const status = incident.has_pending
+        ? 'pending'
+        : incident.has_in_progress
+          ? 'active'
+          : incident.has_completed
+            ? 'completed'
+            : 'pending';
 
       const formattedDate = new Date(incident.created_at).toLocaleString('en-GB', {
         day: 'numeric',

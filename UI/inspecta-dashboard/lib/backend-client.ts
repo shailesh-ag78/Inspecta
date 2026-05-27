@@ -16,7 +16,6 @@ async function callBackend<T = any>(
   options?: RequestInit
 ): Promise<BackendResponse<T>> {
   const url = `${BACKEND_URL}${path}`;
-
   try {
     const response = await fetch(url, {
       ...options,
