@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 import { getCompanyId, setCompanyId } from '@/lib/company-context';
@@ -38,7 +38,7 @@ interface Task {
   end_time: number;
   video_url?: string;
   area: string;
-  created_at: string;  
+  created_at: string;
 }
 
 export default function ReviewerDashboard() {
@@ -47,7 +47,7 @@ export default function ReviewerDashboard() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  const [expandedTasks, setExpandedTasks] = useState<Set<number>>(new Set());
+  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [companyId, setCompanyIdState] = useState<number | null>(null);
@@ -59,6 +59,7 @@ export default function ReviewerDashboard() {
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
   const [isVideoCollapsed, setIsVideoCollapsed] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<string>('');
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingDescription, setEditingDescription] = useState('');
@@ -125,6 +126,11 @@ export default function ReviewerDashboard() {
       try {
         setIncidentsLoading(true);
         setIncidentsError(null);
+
+        // Reset current selection and tasks to prevent stale/wrong ID fetches
+        setSelectedIncidentId('');
+        setTasks([]);
+
         const id = companyId || getCompanyId();
         const response = await fetch(`/frontend-api/incidents?inspectionId=${selectedInspection}&companyId=${id}`);
 
@@ -136,11 +142,11 @@ export default function ReviewerDashboard() {
         const incidentsData = apiResponse.data || [];
         setIncidents(incidentsData);
 
-        // If there are incidents, get tasks from the first one
+        // Auto-select the first incident if available
         if (incidentsData.length > 0) {
-          // Get tasks from first incident
-          fetchTasksForIncident(incidentsData[0].id);
+          setSelectedIncidentId(incidentsData[0].id);
         } else {
+          setSelectedIncidentId('');
           setTasks([]);
         }
       } catch (error) {
@@ -155,39 +161,51 @@ export default function ReviewerDashboard() {
   }, [selectedInspection, companyId]);
 
   // Helper function to fetch tasks for an incident
-  const fetchTasksForIncident = async (incidentId: string) => {
+  const fetchTasksForIncident = useCallback(async (incidentId: string) => {
     try {
       setTasksLoading(true);
       setTasksError(null);
       const id = companyId || getCompanyId();
-      console.log(`Fetching tasks for incident ${incidentId}...`);
-      const response = await fetch(`/frontend-api/tasks?incidentId=${incidentId}&companyId=${id}`);
 
+      const response = await fetch(`/frontend-api/tasks?incidentId=${incidentId}&companyId=${id}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tasks: ${response.statusText}`);
       }
 
       const apiResponse = await response.json();
-      const tasksData = apiResponse.data || [];
-      console.log('Fetched tasks:', tasksData);
+      //console.log("🔍 API Response:", apiResponse);
+      //const tasksData = apiResponse.data || [];
+      const tasksData = Array.isArray(apiResponse) ? apiResponse : (apiResponse.data || []);
+      console.log("%c >>> SUCCESS: Tasks received", "color: white; background: green", tasksData);
+
       setTasks(tasksData);
 
       // Expand all tasks initially
-      setExpandedTasks(new Set(tasksData.map((_: any, idx: number) => idx)));
+      setExpandedTasks(new Set(tasksData.map((t) => t.id)));
     } catch (error) {
-      console.error('Error fetching tasks:', error);
+      console.error('CRITICAL: Error fetching tasks:', error);
       setTasksError(error instanceof Error ? error.message : 'Failed to fetch tasks');
     } finally {
       setTasksLoading(false);
     }
-  };
+  }, [companyId]);
+
+  // Fetch tasks when selectedIncidentId changes
+  useEffect(() => {
+    if (!selectedIncidentId) {
+      setTasks([]);
+      return;
+    }
+    console.log("%c >>> TRIGGER: Fetching tasks for Incident:", "color: white; background: blue; font-weight: bold", selectedIncidentId);
+    fetchTasksForIncident(selectedIncidentId);
+  }, [selectedIncidentId, fetchTasksForIncident]);
 
   useEffect(() => {
     setHasAutoPaused(false);
   }, [activeTask?.id]);
 
   const handleTaskClick = (task: Task, shouldPlay = false) => {
-    console.log(`Task clicked: ${task.id} : {task.task_title}`);
+    console.log(`Task clicked: ${task.id} : ${task.task_title}`);
     setActiveTask(task);
     setHasAutoPaused(false);
     if (shouldPlay) {
@@ -210,10 +228,10 @@ export default function ReviewerDashboard() {
     if (activeTask && videoRef.current) {
       // Reset the auto-pause flag for the new task range
       setHasAutoPaused(false);
-      
+
       // Manually set the video time to the start of the new task
       videoRef.current.currentTime = activeTask.start_time;
-      
+
       // Clear any pending play tasks as we've handled the seek manually
       setPendingPlayTask(null);
     }
@@ -260,12 +278,12 @@ export default function ReviewerDashboard() {
     }
   };
 
-  const toggleTaskExpansion = (index: number) => {
+  const toggleTaskExpansion = (taskId: string) => {
     const newExpanded = new Set(expandedTasks);
-    if (newExpanded.has(index)) {
-      newExpanded.delete(index);
+    if (newExpanded.has(taskId)) {
+      newExpanded.delete(taskId);
     } else {
-      newExpanded.add(index);
+      newExpanded.add(taskId);
     }
     setExpandedTasks(newExpanded);
   };
@@ -342,9 +360,9 @@ export default function ReviewerDashboard() {
     }
   };
 
-  const openTaskForEditing = (task: Task, index: number) => {
+  const openTaskForEditing = (task: Task) => {
     const nextExpanded = new Set(expandedTasks);
-    nextExpanded.add(index);
+    nextExpanded.add(task.id);
     setExpandedTasks(nextExpanded);
     startEditingTask(task);
   };
@@ -383,6 +401,12 @@ export default function ReviewerDashboard() {
 
   const handleVideoTimeUpdate = () => {
     if (!activeTask || !videoRef.current || hasAutoPaused) return;
+
+    // Reset auto-pause flag if the user seeks back manually
+    if (videoRef.current.currentTime < activeTask.end_time - 1) {
+      setHasAutoPaused(false);
+    }
+
     if (videoRef.current.currentTime >= activeTask.end_time) {
       videoRef.current.pause();
       setHasAutoPaused(true); // "Unlock" the video so subsequent plays work
@@ -462,18 +486,17 @@ export default function ReviewerDashboard() {
                 <Loader className="w-4 h-4 animate-spin text-white/70 ml-2" />
               ) : (
                 <select
-                  value={incidents.length > 0 && tasks.length > 0 ? incidents[0]?.id || '' : ''}
-                  onChange={(e) => {
-                    const incidentId = e.target.value;
-                    if (incidentId) {
-                      fetchTasksForIncident(incidentId);
-                    }
-                  }}
+                  value={selectedIncidentId}
+                  onChange={(e) => setSelectedIncidentId(e.target.value)}
                   className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
                 >
                   {incidents.length === 0 && <option className="text-slate-900 bg-white">No incidents available</option>}
                   {incidents.map(incident => (
-                    <option key={incident.id} value={incident.id} className="text-slate-900 bg-white">{incident.title}</option>
+                    <option key={incident.id} value={incident.id} className="text-slate-900 bg-white">
+                      {incident.title ||
+                        `Incident ${incident.id.slice(0, 4)} - ${incident.created ? new Date(incident.created).toLocaleTimeString() : 'Recent'}`
+                      }
+                    </option>
                   ))}
                 </select>
               )}
@@ -504,11 +527,10 @@ export default function ReviewerDashboard() {
                           setTheme(t);
                           setShowSettingsMenu(false);
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 ${
-                          theme.id === t.id
-                            ? 'bg-white/10 text-white'
-                            : 'hover:bg-slate-800 text-slate-200'
-                        }`}
+                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 ${theme.id === t.id
+                          ? 'bg-white/10 text-white'
+                          : 'hover:bg-slate-800 text-slate-200'
+                          }`}
                       >
                         <div className="font-medium">{t.name}</div>
                         <div className="text-xs opacity-75 mt-1">
@@ -564,7 +586,7 @@ export default function ReviewerDashboard() {
                   <div>
                     <select
                       value={filters.severity}
-                      onChange={(e) => setFilters({...filters, severity: e.target.value})}
+                      onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
                       className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all">All Severities</option>
@@ -576,7 +598,7 @@ export default function ReviewerDashboard() {
                   <div>
                     <select
                       value={filters.task_type}
-                      onChange={(e) => setFilters({...filters, task_type: e.target.value})}
+                      onChange={(e) => setFilters({ ...filters, task_type: e.target.value })}
                       className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all">All Types</option>
@@ -589,7 +611,7 @@ export default function ReviewerDashboard() {
                   <div>
                     <select
                       value={filters.task_status}
-                      onChange={(e) => setFilters({...filters, task_status: e.target.value})}
+                      onChange={(e) => setFilters({ ...filters, task_status: e.target.value })}
                       className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all">All Statuses</option>
@@ -606,32 +628,35 @@ export default function ReviewerDashboard() {
           </div>
 
           {/* Tasks List */}
-          {filteredTasks.length === 0 && !tasksLoading ? (
+          {tasksLoading ? (
+            <div className="flex flex-col items-center justify-center py-24 text-blue-500">
+              <Loader className="w-10 h-10 animate-spin mb-4" />
+              <p className="text-sm font-medium animate-pulse">Loading tasks from backend...</p>
+            </div>
+          ) : filteredTasks.length === 0 ? (
             <div className="text-center py-12 text-slate-500">
               <AlertCircle className="w-12 h-12 mx-auto mb-4 opacity-50" />
               <p>No tasks available for this incident.</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredTasks.map((task, index) => {
-                const isExpanded = expandedTasks.has(index);
+              {filteredTasks.map((task) => {
+                const isExpanded = expandedTasks.has(task.id);
                 return (
                   <div
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
-                    className={`cursor-pointer bg-white/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${
-                      activeTask?.id === task.id
-                        ? `border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20`
-                        : `${theme.cardBorder} hover:border-blue-300`
-                    }`}
+                    className={`cursor-pointer bg-white/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${activeTask?.id === task.id
+                      ? `border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20`
+                      : `${theme.cardBorder} hover:border-blue-300`
+                      }`}
                   >
                     {/* Task Header - Always Visible */}
                     <div className="space-y-2 p-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex items-start gap-3 min-w-0">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg ${
-                            task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600 text-white' : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                          }`}>
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg ${task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600 text-white' : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
+                            }`}>
                             <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[10px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
                           </div>
                           <div className="min-w-0">
@@ -664,7 +689,7 @@ export default function ReviewerDashboard() {
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  openTaskForEditing(task, index);
+                                  openTaskForEditing(task);
                                 }}
                                 title="Modify task"
                                 className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
@@ -683,15 +708,14 @@ export default function ReviewerDashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${
-                            task.severity_id === 1 ? 'bg-red-600' : 'bg-yellow-500'
-                          }`}>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${task.severity_id === 1 ? 'bg-red-600' : 'bg-yellow-500'
+                            }`}>
                             {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
                           </span>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              toggleTaskExpansion(index);
+                              toggleTaskExpansion(task.id);
                             }}
                             className="text-slate-500 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
                           >

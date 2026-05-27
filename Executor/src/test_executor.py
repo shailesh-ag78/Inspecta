@@ -13,10 +13,10 @@ import shutil
 #TEST_VIDEO_PATH = r"G:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
 TEST_VIDEO_PATH = r"G:\code\Inspecta\data\test_data\test_videos"
 
-COMPANY_ID = "3"
-STORAGE_ID = "CompanyStorage3"
-INSPECTOR_ID = "3"
-SITE_ID = "3"
+COMPANY_ID = "2"
+STORAGE_ID = "CompanyStorage2"
+INSPECTOR_ID = "2"
+SITE_ID = "2"
 
 def test_full_workflow_integration():
     """
@@ -34,22 +34,17 @@ def test_full_workflow_integration():
 
         # print("\n------------------ [STEP 1] Create Real Inspection ------------------")
         inspection_payload = {"site_id": SITE_ID, "inspector_id": INSPECTOR_ID}
-        
-        p = Path(TEST_VIDEO_PATH)
+        resp_insp = client.post("/inspections", json=inspection_payload, headers=headers)
+        assert resp_insp.status_code == 200, f"Failed to create inspection: {resp_insp.text}"
+        inspection_id = resp_insp.json()["inspection_id"]
+        print(f"✅ Created Inspection: {inspection_id}")
 
+        incident_ids = []
         # Use rglob("*") to recursively find all files and directories
         # and filter for only files using .is_file()
         video_files = [str(f.resolve()) for f in Path(TEST_VIDEO_PATH).glob('*.mp4')]
-        incident_ids = []
         for file_path in video_files:
             print(f"\n--- Processing file: {file_path} ---")
-            
-            resp_insp = client.post("/inspections", json=inspection_payload, headers=headers)
-            assert resp_insp.status_code == 200, f"Failed to create inspection: {resp_insp.text}"
-            inspection_id = resp_insp.json()["inspection_id"]
-            print(f"✅ Created Inspection: {inspection_id}")
-            # Temporarily hardcoding an existing inspection ID for testing, since creating a new one may have side effects or require cleanup
-            #inspection_id = "27822a7e-d0de-42b1-9316-ee82e359939a"
         
             print("\n------------------ [STEP 2] Get Real Upload URL ------------------")
             request_headers = headers.copy()

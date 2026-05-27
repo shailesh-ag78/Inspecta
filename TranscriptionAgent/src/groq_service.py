@@ -5,7 +5,6 @@ from typing import List, Dict, Any
 from urllib import response
 from pathlib import Path
 import dotenv
-from flask import json
 from pydub import AudioSegment
 from groq import Groq
 from datetime import datetime

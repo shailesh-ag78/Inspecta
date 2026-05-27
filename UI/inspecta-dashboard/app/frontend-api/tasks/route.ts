@@ -1,4 +1,5 @@
 import { getTasksForIncident, updateTask } from '@/lib/backend-client';
+import { debug } from 'console';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Helper function to map task type IDs to labels
@@ -75,7 +76,9 @@ export async function GET(request: NextRequest) {
       created_at: new Date(task.created_at).toISOString(),
     }));
 
-    return NextResponse.json(formattedTasks, { status: 200 });
+    const jsonstring = JSON.parse(JSON.stringify(formattedTasks));
+    return NextResponse.json(jsonstring, { status: 200 });
+    //return NextResponse.json(formattedTasks, { status: 200 });
   } catch (error) {
     console.error('Error fetching tasks:', error);
     return NextResponse.json(

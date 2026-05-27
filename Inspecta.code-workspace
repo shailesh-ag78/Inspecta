@@ -28,22 +28,42 @@
     "settings": {
         "editor.fontSize": 14,
         "powershell.cwd": "Executor",
-        "python.terminal.executeInFileDir": false
+        "python.terminal.executeInFileDir": false,
+        "terminal.integrated.env.windows": {
+            "PYTHONPATH": "${workspaceFolder}\\Executor"
+        }
     },
     "launch": {
         "version": "0.2.0",
         "configurations": [
             {
-                "name": "Python Debugger: Transcribe Test Module",
-                "type": "debugpy",
+                "name": "Debug: Executor",
+                "type": "python",
                 "request": "launch",
-                "module": "src.test_app",
-                "cwd": "${workspaceFolder:TranscriptionAgent}",
-                "console": "integratedTerminal",
+                "module": "uvicorn",
+                "args": [
+                    "src.main:app", // Using relative path inside Executor
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    "8000",
+                    "--reload"
+                ],
+                "jinja": true,
+                "cwd": "${workspaceFolder:Executor}", // Specifically target the Executor folder
                 "env": {
-                    "PYTHONPATH": "${workspaceFolder:TranscriptionAgent}"
-                },
-                "justMyCode": true
+                    "PYTHONPATH": "${workspaceFolder:Executor}"
+                }
+            }
+        ],
+        "compounds": [
+            {
+                "name": "Debug All Services",
+                "configurations": [
+                    "Debug: Executor",
+                    "Debug: Audio Agent",
+                    "Debug: Integration Test"
+                ]
             }
         ]
         //         "configurations": [
@@ -60,6 +80,5 @@
         //         "justMyCode": true
         //     }
         // ]
-
-    },
+    }
 }

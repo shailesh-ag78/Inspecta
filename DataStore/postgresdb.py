@@ -136,7 +136,8 @@ class IncidentRepository:
                     "SELECT * FROM incident_tasks WHERE incident_id = %s ORDER BY created_at ASC", 
                     (incident_id,)
                 )
-                return [dict(row) for row in await cur.fetchall()]
+                rows = await cur.fetchall()
+                return [dict(row) for row in rows]
 
     async def get_incident(self, company_id: int, incident_id: str) -> Optional[Dict]:
         """Fetches incident details by ID."""

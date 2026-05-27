@@ -1,29 +1,61 @@
 {
     "version": "0.2.0",
-    "configurations": [{
-        "name": "Debug: Executor",
-        "type": "python",
-        "request": "launch",
-        "module": "uvicorn",
-        "args": [
-            "Executor.src.main:app", // Point to the app relative to the root
-            "--host", "0.0.0.0", 
-            "--port", "8000",
-            "--reload"
-        ],
-        "jinja": true,
-        "cwd": "${workspaceFolder}", // Stay in the project root (D:\code\Inspecta)
-        "env": {
-            "PYTHONPATH": "${workspaceFolder}:${workspaceFolder}/Executor"
+    "configurations": [
+        {
+            "name": "Debug: Executor Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "src.main:app",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000",
+                "--reload"
+            ],
+            "jinja": true,
+            "cwd": "${workspaceFolder}/Executor",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/Executor/src;${workspaceFolder}/Executor"
+            }
+        },
+        {
+            "name": "Debug: Pytest Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "${file}",
+                "-s",
+                "-v"
+            ],
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/Executor",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/Executor/src;${workspaceFolder}/Executor"
+            }
+        },
+        {
+            "name": "Debug: Current Python File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}/Executor",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/Executor/src;${workspaceFolder}/Executor"
+            }
         }
-    }],
+    ],
     "compounds": [
         {
             "name": "Debug All Services",
-            "configurations": ["Debug: Executor", "Debug: Audio Agent", "Debug: Integration Test"]
+            "configurations": [
+                "Debug: Executor Server",
+                "Debug: Audio Agent",
+                "Debug: Integration Test"
+            ]
         }
-    ],
-    "termsinal.integrated.env.windows": {
-        "PYTHONPATH": "d:\\code\\Inspecta\\Executor"
-    }
+    ]
 }
