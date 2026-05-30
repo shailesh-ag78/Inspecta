@@ -173,10 +173,11 @@ export default function ReviewerDashboard() {
       }
 
       const apiResponse = await response.json();
-      //console.log("🔍 API Response:", apiResponse);
-      //const tasksData = apiResponse.data || [];
       const tasksData = Array.isArray(apiResponse) ? apiResponse : (apiResponse.data || []);
       console.log("%c >>> SUCCESS: Tasks received", "color: white; background: green", tasksData);
+      tasksData.forEach((task: any, index: number) => {
+        console.log(`⏱️ Start Time: ${task.start_time}s | End Time: ${task.end_time}s  => 🎬 [Task ${index + 1}] Title: "${task.task_title}"`);
+      });
 
       setTasks(tasksData);
 
@@ -205,7 +206,6 @@ export default function ReviewerDashboard() {
   }, [activeTask?.id]);
 
   const handleTaskClick = (task: Task, shouldPlay = false) => {
-    console.log(`Task clicked: ${task.id} : ${task.task_title}`);
     setActiveTask(task);
     setHasAutoPaused(false);
     if (shouldPlay) {
@@ -239,10 +239,8 @@ export default function ReviewerDashboard() {
 
 
   const formatTime = (seconds: number) => {
-    console.log(`Formatting time for ${seconds} seconds`);
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    console.log(`Formatting time: ${seconds}s as ${mins}m:${secs}s`);
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
