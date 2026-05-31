@@ -162,18 +162,36 @@ class IncidentRepository:
                     (audio_path, incident_id)
                 )
 
-    async def update_task_review(self, company_id: int, task_id: str, comments: str, status_id: int):
+    async def update_task(self, company_id: int, task_id: str, title: str, description: str):
         """Human-in-the-loop: Update task after expert review."""
         async with self.session(company_id) as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
                     """
                     UPDATE incident_tasks 
-                    SET task_review_comments = %s, status_id = %s 
+                    SET task_title = %s, task_description = %s 
+                    WHERE id = %s
+                    RETURNING *
+                    """,
+                    (title, description, task_id)
+                )
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
+    async def update_task_review(self, company_id: int, task_id: str, comments: str):
+        """Human-in-the-loop: Update task after expert review."""
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    UPDATE incident_tasks 
+                    SET task_review_comments = %s 
                     WHERE id = %s
                     """,
-                    (comments, status_id, task_id)
+                    (comments, task_id)
                 )
+                row = await cur.fetchone()
+                return dict(row) if row else None
 
     async def create_inspection(self, company_id: int, site_id: int) -> Optional[str]:
             """Inserts a new inspection record and returns the UUID."""

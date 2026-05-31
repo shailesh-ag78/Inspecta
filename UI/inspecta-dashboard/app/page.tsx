@@ -304,8 +304,8 @@ export default function ReviewerDashboard() {
     const trimmedTitle = editingTitle.trim();
     const trimmedDescription = editingDescription.trim();
     if (
-      trimmedTitle === task.task_title.trim() &&
-      trimmedDescription === task.task_description.trim()
+      trimmedTitle === (task.task_title || '').trim() &&
+      trimmedDescription === (task.task_description || '').trim()
     ) {
       cancelEditingTask();
       return;
@@ -337,15 +337,15 @@ export default function ReviewerDashboard() {
       const updatedTask = await response.json();
       setTasks((prevTasks) => prevTasks.map((item) => item.id === task.id ? {
         ...item,
-        task_title: updatedTask.task_title || trimmedTitle,
-        task_description: updatedTask.task_description || trimmedDescription,
+        task_title: updatedTask?.task_title || trimmedTitle,
+        task_description: updatedTask?.task_description || trimmedDescription,
       } : item));
 
       if (activeTask?.id === task.id) {
         setActiveTask({
           ...task,
-          task_title: updatedTask.task_title || trimmedTitle,
-          task_description: updatedTask.task_description || trimmedDescription,
+          task_title: updatedTask?.task_title || trimmedTitle,
+          task_description: updatedTask?.task_description || trimmedDescription,
         });
       }
 
@@ -653,8 +653,12 @@ export default function ReviewerDashboard() {
                     <div className="space-y-2 p-2.5">
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex items-start gap-3 min-w-0">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg ${task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600 text-white' : 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                            }`}>
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg text-white ${
+                            task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600' :
+                            task.severity_id === 2 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' :
+                            task.severity_id === 3 ? 'bg-gradient-to-br from-green-400 to-green-600' :
+                            'bg-gradient-to-br from-yellow-400 to-orange-500'
+                          }`}>
                             <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[10px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
                           </div>
                           <div className="min-w-0">
@@ -663,6 +667,7 @@ export default function ReviewerDashboard() {
                                 <input
                                   value={editingTitle}
                                   onChange={(e) => setEditingTitle(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
                                   /*className="flex-[1.15] min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"*/
                                   /* Changed flex-[1.15] to w-80 (320px) */
                                   className="w-96 min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
@@ -706,8 +711,11 @@ export default function ReviewerDashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${task.severity_id === 1 ? 'bg-red-600' : 'bg-yellow-500'
-                            }`}>
+                          <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${
+                            task.severity_id === 1 ? 'bg-red-600' : 
+                            task.severity_id === 3 ? 'bg-green-600' : 
+                            'bg-yellow-500'
+                          }`}>
                             {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
                           </span>
                           <button
@@ -732,6 +740,7 @@ export default function ReviewerDashboard() {
                               <textarea
                                 value={editingDescription}
                                 onChange={(e) => setEditingDescription(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
                                 rows={4}
                                 className="w-full rounded-2xl border border-slate-300/80 bg-slate-50 p-3 text-sm text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                               />

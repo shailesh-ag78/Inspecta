@@ -1,3 +1,5 @@
+import os
+import sys
 import asyncio
 from http.client import HTTPException
 from importlib import metadata
@@ -9,12 +11,14 @@ from typing import Any, Literal, TypedDict, Annotated, List, Optional
 from typing import cast
 import operator
 import httpx
-import os
-import sys
+
+# Add the project root to sys.path so we can import from the 'datastore' package
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
+sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.getcwd())
 
 # Import the Repository
-from database import IncidentRepository, TaskStatus, TaskSeverity, TaskType
+from DataStore.postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType
 
 # LangChain / LangGraph imports
 from langgraph.graph import StateGraph, START, END
@@ -24,7 +28,7 @@ from langgraph.types import RetryPolicy
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver # Use .aio
 
 # LangSmith imports
-from langsmith_config import get_langsmith_config, WorkflowTracer
+from .langsmith_config import get_langsmith_config, WorkflowTracer
 
 logger = logging.getLogger(__name__)
 

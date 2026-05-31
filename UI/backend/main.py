@@ -259,8 +259,8 @@ async def update_task(
         updated = await repository.update_task(
             company_id=companyId,
             task_id=taskId,
-            comments=task_update.task_description,
-            status_id=TaskStatus.PENDING
+            title=task_update.task_title,
+            description=task_update.task_description
         )
         
         return {"status": "success", "data": updated}
@@ -277,15 +277,17 @@ async def update_task_review(
 ):
     """Update a task after expert review"""
     try:
-        await repository.update_task_review(
+        updated = await repository.update_task_review(
             company_id=companyId,
             task_id=taskId,
             comments=review.comments,
             status_id=review.status_id
         )
-        
-        return {"status": "success", "message": "Task review updated"}
+
+        return {"status": "success", "data": updated}
     except Exception as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail="Task not found")
         raise HTTPException(status_code=500, detail=str(e))
 
 # ============ Sites Endpoints ============

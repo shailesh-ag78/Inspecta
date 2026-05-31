@@ -15,9 +15,9 @@
                 "--reload"
             ],
             "jinja": true,
-            "cwd": "${workspaceFolder}/Executor",
+            "cwd": "${workspaceFolder}/Executor/src",
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/Executor/src;${workspaceFolder}/Executor"
+                "PYTHONPATH": "${workspaceFolder}/Executor/src;${workspaceFolder}/Executor;${workspaceFolder}/DataStore"
             }
         },
         {

@@ -1,22 +1,29 @@
 import asyncio
 import os
 import sys
+
+# Set up paths so we can import 'src' as a package. 
+# This prevents "ImportError: attempted relative import with no known parent package" from main.py
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from fastapi.testclient import TestClient
-from main import app
+from src.main import app
 from pathlib import Path
 import shutil
 
 # 1. Configuration Constants
 # Ensure these match your actual local setup
 #DB_DSN = os.getenv("DATABASE_URL", "dbname=inspecta_db user=postgres password=passwd host=localhost port=5432")
-#DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
+#DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecclsta_db")
 #TEST_VIDEO_PATH = r"G:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
 TEST_VIDEO_PATH = r"G:\code\Inspecta\data\test_data\test_videos"
 
 COMPANY_ID = "2"
 STORAGE_ID = "CompanyStorage2"
 INSPECTOR_ID = "2"
-SITE_ID = "2"
+SITE_ID = "3"
+INSPECTION_ID = "f25c14d6-e6f9-48dc-a15d-33f5fb2aab77"
+#INSPECTION_ID = ""
 
 def test_full_workflow_integration():
     """
@@ -33,17 +40,21 @@ def test_full_workflow_integration():
         }
 
         # print("\n------------------ [STEP 1] Create Real Inspection ------------------")
-        inspection_payload = {"site_id": SITE_ID, "inspector_id": INSPECTOR_ID}
-        resp_insp = client.post("/inspections", json=inspection_payload, headers=headers)
-        assert resp_insp.status_code == 200, f"Failed to create inspection: {resp_insp.text}"
-        inspection_id = resp_insp.json()["inspection_id"]
-        print(f"✅ Created Inspection: {inspection_id}")
+        if(not INSPECTION_ID):
+            inspection_payload = {"site_id": SITE_ID, "inspector_id": INSPECTOR_ID}
+            resp_insp = client.post("/inspections", json=inspection_payload, headers=headers)
+            assert resp_insp.status_code == 200, f"Failed to create inspection: {resp_insp.text}"
+            inspection_id = resp_insp.json()["inspection_id"]
+            print(f"✅ Created Inspection: {inspection_id}")
+        else:
+            inspection_id = INSPECTION_ID
+            print(f"✅ Using Existing Inspection: {inspection_id}")
 
         incident_ids = []
         # Use rglob("*") to recursively find all files and directories
         # and filter for only files using .is_file()
-        video_files = [str(f.resolve()) for f in Path(TEST_VIDEO_PATH).glob('*.mp4')]
-        for file_path in video_files:
+        files_to_process = [str(f.resolve()) for f in Path(TEST_VIDEO_PATH).glob('*') if f.suffix.lower() in ['.mp4', '.mp3']]
+        for file_path in files_to_process:
             print(f"\n--- Processing file: {file_path} ---")
         
             print("\n------------------ [STEP 2] Get Real Upload URL ------------------")

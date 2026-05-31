@@ -3,20 +3,22 @@ import os
 import logging
 import datetime
 import sys
+
+# This MUST happen before any async code or loop initialization
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
+
 import uuid
 from fastapi import FastAPI, HTTPException, Request
 from dotenv import load_dotenv
 import uvicorn
 
-from workflowexecutor import WorkflowExecutor
+from .workflowexecutor import WorkflowExecutor
 from langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
 from google.cloud import storage
 from typing import Optional, Tuple
-
-# This MUST happen before any async code or loop initialization
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from contextlib import asynccontextmanager
 
@@ -52,6 +54,9 @@ logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 # --- 1. Lifecycle Management ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if sys.platform == "win32":
+        loop = asyncio.get_event_loop()
+
     # Initialize LangSmith at startup
     langsmith_config = get_langsmith_config()
     logger.info("✅ LangSmith configured")
