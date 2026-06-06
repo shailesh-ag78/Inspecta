@@ -3,17 +3,10 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const companyId = searchParams.get('companyId');
+    const authHeader = request.headers.get('authorization');
+    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
 
-    if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId query parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    const combinations = await getSiteInspectionCombinations(Number(companyId));
+    const combinations = await getSiteInspectionCombinations(authHeaders);
 
     const formattedCombinations = combinations.map((combo) => ({
       site_id: String(combo.site_id),

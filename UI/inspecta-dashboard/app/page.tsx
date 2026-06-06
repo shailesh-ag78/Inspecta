@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 import { getCompanyId, setCompanyId } from '@/lib/company-context';
+import { auth, googleProvider } from '@/lib/firebase';
+import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 
 interface SiteInspection {
   site_id: string;
@@ -41,7 +43,27 @@ interface Task {
   created_at: string;
 }
 
+// Authenticated fetch wrapper that automatically appends Firebase ID token
+async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const user = auth.currentUser;
+  const headers = { ...options.headers } as Record<string, string>;
+  
+  if (user) {
+    const token = await user.getIdToken();
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  return fetch(url, {
+    ...options,
+    headers,
+  });
+}
+
 export default function ReviewerDashboard() {
+  // Auth state management
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
   // State management
   const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -76,6 +98,28 @@ export default function ReviewerDashboard() {
   const [tasksLoading, setTasksLoading] = useState(false);
   const [tasksError, setTasksError] = useState<string | null>(null);
 
+  // Listen for Firebase auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (usr) => {
+      setUser(usr);
+      setAuthLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (err) {
+      console.error('Login failed:', err);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setShowSettingsMenu(false);
+  };
+
   const [hasAutoPaused, setHasAutoPaused] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -93,7 +137,7 @@ export default function ReviewerDashboard() {
         setSiteInspectionsLoading(true);
         setSiteInspectionsError(null);
         const id = companyId || getCompanyId();
-        const response = await fetch(`/frontend-api/site-inspections?companyId=${id}`);
+        const response = await authenticatedFetch(`/frontend-api/site-inspections?companyId=${id}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch site-inspections: ${response.statusText}`);
@@ -132,7 +176,7 @@ export default function ReviewerDashboard() {
         setTasks([]);
 
         const id = companyId || getCompanyId();
-        const response = await fetch(`/frontend-api/incidents?inspectionId=${selectedInspection}&companyId=${id}`);
+        const response = await authenticatedFetch(`/frontend-api/incidents?inspectionId=${selectedInspection}&companyId=${id}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch incidents: ${response.statusText}`);
@@ -167,7 +211,7 @@ export default function ReviewerDashboard() {
       setTasksError(null);
       const id = companyId || getCompanyId();
 
-      const response = await fetch(`/frontend-api/tasks?incidentId=${incidentId}&companyId=${id}`);
+      const response = await authenticatedFetch(`/frontend-api/tasks?incidentId=${incidentId}&companyId=${id}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tasks: ${response.statusText}`);
       }
@@ -316,7 +360,7 @@ export default function ReviewerDashboard() {
       setTaskEditError(null);
       const id = companyId || getCompanyId();
 
-      const response = await fetch('/frontend-api/tasks', {
+      const response = await authenticatedFetch('/frontend-api/tasks', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -430,25 +474,72 @@ export default function ReviewerDashboard() {
     return true;
   });
 
+  if (authLoading) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-950 text-blue-500">
+        <Loader className="w-12 h-12 animate-spin mb-4" />
+        <p className="text-sm font-medium animate-pulse">Initializing security module...</p>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-white p-6 relative overflow-hidden">
+        {/* Decorative background glow blobs */}
+        <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-blue-500/10 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-purple-500/10 blur-[120px] pointer-events-none" />
+
+        <div className="w-full max-w-md bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[28px] p-8 shadow-[0_0_50px_rgba(0,0,0,0.8)] relative z-10 transition-all hover:border-white/20">
+          <div className="flex flex-col items-center text-center">
+            {/* Glow Logo */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-md animate-pulse" />
+              <img src="/InspectaLogo.png" alt="Inspecta Logo" className="relative h-20 w-20 rounded-full object-cover border border-white/20" />
+            </div>
+
+            <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-orange-400 to-purple-400 text-transparent bg-clip-text">
+              INSPECTA
+            </h1>
+            <p className="text-slate-400 text-sm mt-2 font-medium">Secure Task Reviewer Portal</p>
+            
+            <div className="h-[1px] w-full bg-white/10 my-6" />
+
+            <h2 className="text-xl font-bold text-white mb-2">Access Granted via Google Auth</h2>
+            <p className="text-xs text-slate-400 max-w-xs mb-8">
+              Authenticate using your company Google Workspace account to securely view task evidence and inspections.
+            </p>
+
+            <button
+              onClick={handleLogin}
+              className="w-full flex items-center justify-center gap-3 px-6 py-3.5 bg-white text-slate-950 font-bold rounded-2xl shadow-lg transition-all hover:bg-slate-100 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l3.66-2.85z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.85c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+              Sign in with Google
+            </button>
+          </div>
+        </div>
+        
+        <div className="absolute bottom-6 text-[10px] text-slate-600 font-mono">
+          SECURE CONNECTION • AES-256 ENCRYPTION
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`h-screen flex flex-col bg-gradient-to-br ${theme.background.gradient}`}>
       {/* Header */}
       <header className={`${theme.header.bg} ${theme.header.text} shrink-0 border-b border-slate-300/20 shadow-lg`}>
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4 justify-start">
-            {/* <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center text-white shadow-sm">
-              <span className="font-black text-lg">I</span>
-            </div> */}
-            {/* <div className="h-11 w-11 rounded-[14px] bg-white/10 border border-white/10 flex items-center justify-center shadow-sm">
-              <img src="/inspectalogo2.png" alt="Logo" className="h-full w-full object-cover rounded-full" />
-            </div> */}
             <img src="/InspectaLogo.png" alt="Logo" className="h-14 w-14 rounded-full object-cover drop-shadow-[0_0_12px_rgba(59,130,246,0.7)]" />
             <div>
-              {/* <div className="text-[12px] uppercase tracking-[0.10em] font-bold 
-                bg-gradient-to-r from-[#60A5FA] via-[#7C3AED] to-[#A78BFA] 
-                text-transparent bg-clip-text drop-shadow-md">
-                INSPECTA
-              </div> */}
               <div className="text-[12px] uppercase tracking-[0.10em] font-bold 
                 bg-gradient-to-r from-[#3B82F6] via-[#FB923C] to-[#8B5CF6] 
                 text-transparent bg-clip-text drop-shadow-md">
@@ -504,19 +595,27 @@ export default function ReviewerDashboard() {
             <div className="relative">
               <button
                 onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white transition hover:bg-white/20"
+                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white overflow-hidden transition hover:bg-white/20 cursor-pointer"
                 title="Profile Settings"
               >
-                <User className="w-5 h-5" />
+                {user?.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName || "User"} className="h-full w-full object-cover" />
+                ) : (
+                  <User className="w-5 h-5" />
+                )}
               </button>
               {showSettingsMenu && (
                 <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-50">
-                  <div className="px-4 py-3 border-b border-slate-700">
-                    <div className="font-medium text-white">Profile</div>
-                    <div className="text-xs text-slate-400 mt-1">Settings</div>
-                    <div className="text-[10px] text-slate-500 mt-2">Ver 6.0</div>
+                  <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3">
+                    {user?.photoURL && (
+                      <img src={user.photoURL} alt="" className="h-10 w-10 rounded-full border border-slate-700" />
+                    )}
+                    <div className="min-w-0">
+                      <div className="font-semibold text-white truncate">{user?.displayName || "Task Reviewer"}</div>
+                      <div className="text-xs text-slate-400 truncate">{user?.email}</div>
+                    </div>
                   </div>
-                  <div className="p-2">
+                  <div className="p-2 border-b border-slate-800">
                     <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
                     {Object.values(themes).map((t) => (
                       <button
@@ -525,7 +624,7 @@ export default function ReviewerDashboard() {
                           setTheme(t);
                           setShowSettingsMenu(false);
                         }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 ${theme.id === t.id
+                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 cursor-pointer ${theme.id === t.id
                           ? 'bg-white/10 text-white'
                           : 'hover:bg-slate-800 text-slate-200'
                           }`}
@@ -536,6 +635,15 @@ export default function ReviewerDashboard() {
                         </div>
                       </button>
                     ))}
+                  </div>
+                  <div className="p-2 border-t border-slate-800">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Sign Out
+                    </button>
                   </div>
                 </div>
               )}

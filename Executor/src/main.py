@@ -46,10 +46,10 @@ ALLOWED_TYPES = {
 
 # Set this in your environment or .env file: ENV_MODE=local
 ENV_MODE = os.getenv("ENV_MODE", "local")
+logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
+
 # Define your local root (where files actually live on your PC)
 LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"G:\code\Inspecta\Data"))
-
-logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
 # --- 1. Lifecycle Management ---
 @asynccontextmanager

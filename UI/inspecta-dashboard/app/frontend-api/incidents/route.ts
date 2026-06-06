@@ -23,16 +23,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const authHeader = request.headers.get('authorization');
+    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
+
     let incidents;
     if (inspectionId) {
       incidents = await getIncidentsForInspection(
         inspectionId,
-        parseInt(companyId)
+        authHeaders
       );
     } else {
       incidents = await getIncidentsForSite(
         parseInt(siteId!),
-        parseInt(companyId)
+        authHeaders
       );
     }
 

@@ -12,7 +12,7 @@ if sys.platform == 'win32':
 datastore_path = Path(__file__).parent.parent.parent / "DataStore"
 sys.path.append(str(datastore_path))
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -35,7 +35,30 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global repository
+# ============ Authentication ============
+from firebase_admin import auth
+
+@app.middleware("http")
+async def verify_firebase_token(request: Request, call_next):
+    try:
+        # 1. Grab the Token from the 'Authorization' Header
+        id_token = request.headers.get("Authorization", "").replace("Bearer ", "")
+        
+        # 2. Verify with Firebase
+        decoded_token = auth.verify_id_token(id_token)
+        
+        # 3. Extract the SECURE company_id from the token claims
+        # This CANNOT be faked by the UI
+        request.state.company_id = decoded_token.get("company_id")
+        request.state.company_storage_id = decoded_token.get("company_storage_id")
+    except Exception:
+        # If token is fake or expired, we don't set the company_id
+        request.state.company_id = None
+        request.state.company_storage_id = None
+        
+    return await call_next(request)
+
+# ============ Global repository ============
 repository: Optional[IncidentRepository] = None
 
 @app.on_event("startup")
@@ -100,23 +123,27 @@ async def health_check():
 
 @app.get("/api/incidents")
 async def get_incidents_for_site_or_inspection(
+    request: Request,
     siteId: int = Query(None, description="Site ID"),
-    inspectionId: str = Query(None, description="Inspection ID"),
-    companyId: int = Query(..., description="Company ID")
+    inspectionId: str = Query(None, description="Inspection ID")
 ):
     """Fetch incidents for a given site or inspection"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         if not siteId and not inspectionId:
             raise HTTPException(status_code=400, detail="Either siteId or inspectionId is required")
         
         if inspectionId:
-            print(f"Received GET /api/incidents request for inspectionId {inspectionId} and companyId {companyId}")
-            incidents = await repository.get_incidents_for_inspection(inspectionId, companyId)
+            print(f"Received GET /api/incidents request for inspectionId {inspectionId} and companyId {company_id}")
+            incidents = await repository.get_incidents_for_inspection(inspectionId, company_id)
         else:
-            print(f"Received GET /api/incidents request for siteId {siteId} and companyId {companyId}")
+            print(f"Received GET /api/incidents request for siteId {siteId} and companyId {company_id}")
             # ToDO: Implement get_incidents_for_site in repository if not already done
             # or reuse get_site_inspection_combinations() by making SiteId as optional input
-            incidents = await repository.get_incidents_for_site(siteId, companyId)
+            incidents = await repository.get_incidents_for_site(siteId, company_id)
         
         print(f"✅ Fetched {len(incidents)} incidents")
         return {"status": "success", "data": incidents}
@@ -127,16 +154,20 @@ async def get_incidents_for_site_or_inspection(
 @app.get("/api/incidents/{incidentId}")
 async def get_incident(
     incidentId: str,
-    companyId: int = Query(..., description="Company ID")
+    request: Request
 ):
     """Fetch a specific incident"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         # Verify ownership
-        owns = await repository.verify_incident_ownership(companyId, incidentId)
+        owns = await repository.verify_incident_ownership(company_id, incidentId)
         if not owns:
             raise HTTPException(status_code=403, detail="Incident not found or access denied")
         
-        incident = await repository.get_incident(companyId, incidentId)
+        incident = await repository.get_incident(company_id, incidentId)
         if not incident:
             raise HTTPException(status_code=404, detail="Incident not found")
         
@@ -148,17 +179,21 @@ async def get_incident(
 
 @app.post("/api/incidents")
 async def create_incident(
-    companyId: int = Query(..., description="Company ID"),
+    request: Request,
     incident: IncidentInput = None
 ):
     """Create a new incident"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         gps_coords = None
         if incident.gps_lat is not None and incident.gps_lon is not None:
             gps_coords = (incident.gps_lat, incident.gps_lon)
         
         incident_id = await repository.create_incident(
-            company_id=companyId,
+            company_id=company_id,
             inspection_id=incident.inspection_id,
             inspector_id=incident.inspector_id,
             video_url=incident.video_url,
@@ -174,17 +209,21 @@ async def create_incident(
 @app.patch("/api/incidents/{incidentId}/audio")
 async def update_incident_audio(
     incidentId: str,
-    audio_url: str = Query(..., description="Audio URL path"),
-    companyId: int = Query(..., description="Company ID")
+    request: Request,
+    audio_url: str = Query(..., description="Audio URL path")
 ):
     """Update incident audio URL"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         # Verify ownership
-        owns = await repository.verify_incident_ownership(companyId, incidentId)
+        owns = await repository.verify_incident_ownership(company_id, incidentId)
         if not owns:
             raise HTTPException(status_code=403, detail="Incident not found or access denied")
         
-        await repository.update_incident_audio(companyId, incidentId, audio_url)
+        await repository.update_incident_audio(company_id, incidentId, audio_url)
         
         return {"status": "success", "message": "Audio URL updated"}
     except HTTPException:
@@ -195,11 +234,15 @@ async def update_incident_audio(
 @app.get("/api/incidents/{incidentId}/progress")
 async def get_incident_progress(
     incidentId: str,
-    companyId: int = Query(..., description="Company ID")
+    request: Request
 ):
     """Fetch incident progress (audio URL)"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
-        progress = await repository.get_incident_progress(companyId, incidentId)
+        progress = await repository.get_incident_progress(company_id, incidentId)
         return {"status": "success", "data": progress}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -209,11 +252,15 @@ async def get_incident_progress(
 @app.get("/api/incidents/{incidentId}/tasks")
 async def get_tasks_for_incident(
     incidentId: str,
-    companyId: int = Query(..., description="Company ID")
+    request: Request
 ):
     """Fetch all tasks for an incident"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
-        tasks = await repository.get_tasks_for_incident(companyId, incidentId)
+        tasks = await repository.get_tasks_for_incident(company_id, incidentId)
         return {"status": "success", "data": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -221,14 +268,18 @@ async def get_tasks_for_incident(
 @app.post("/api/incidents/{incidentId}/tasks/bulk")
 async def bulk_add_tasks(
     incidentId: str,
-    companyId: int = Query(..., description="Company ID"),
+    request: Request,
     inspectionId: str = Query(..., description="Inspection ID"),
     tasks: List[TaskInput] = None
 ):
     """Bulk add tasks to an incident"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         # Verify incident ownership
-        owns = await repository.verify_incident_ownership(companyId, incidentId)
+        owns = await repository.verify_incident_ownership(company_id, incidentId)
         if not owns:
             raise HTTPException(status_code=403, detail="Incident not found or access denied")
         
@@ -236,7 +287,7 @@ async def bulk_add_tasks(
         tasks_data = [task.dict() for task in tasks]
         
         await repository.bulk_add_incident_tasks(
-            company_id=companyId,
+            company_id=company_id,
             incident_id=incidentId,
             inspection_id=inspectionId,
             tasks=tasks_data
@@ -251,13 +302,17 @@ async def bulk_add_tasks(
 @app.patch("/api/tasks/{taskId}")
 async def update_task(
     taskId: str,
-    companyId: int = Query(..., description="Company ID"),
+    request: Request,
     task_update: TaskUpdateInput = None
 ):
     """Update a task's title and description"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         updated = await repository.update_task(
-            company_id=companyId,
+            company_id=company_id,
             task_id=taskId,
             title=task_update.task_title,
             description=task_update.task_description
@@ -272,13 +327,17 @@ async def update_task(
 @app.patch("/api/tasks/{taskId}/review")
 async def update_task_review(
     taskId: str,
-    companyId: int = Query(..., description="Company ID"),
+    request: Request,
     review: TaskReviewInput = None
 ):
     """Update a task after expert review"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
         updated = await repository.update_task_review(
-            company_id=companyId,
+            company_id=company_id,
             task_id=taskId,
             comments=review.comments,
             status_id=review.status_id
@@ -293,12 +352,14 @@ async def update_task_review(
 # ============ Sites Endpoints ============
 
 @app.get("/api/sites")
-async def get_sites(
-    companyId: int = Query(..., description="Company ID")
-):
+async def get_sites(request: Request):
     """Fetch all sites for a company"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
-        sites = await repository.get_sites_for_company(companyId)
+        sites = await repository.get_sites_for_company(company_id)
         
         # Format sites for JSON response - ensure all fields are JSON-serializable
         formatted_sites = []
@@ -323,12 +384,14 @@ async def get_sites(
 # ============ Site-Inspection Endpoints ============
 
 @app.get("/api/site-inspections")
-async def get_site_inspections(
-    companyId: int = Query(..., description="Company ID")
-):
+async def get_site_inspections(request: Request):
     """Fetch all Site-Inspection combinations for a company"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
-        combinations = await repository.get_site_inspection_combinations(companyId)
+        combinations = await repository.get_site_inspection_combinations(company_id)
         
         # Format combinations for JSON response
         formatted_combinations = []
@@ -342,7 +405,7 @@ async def get_site_inspections(
             }
             formatted_combinations.append(formatted_combo)
         
-        print(f"✅ Fetched {len(formatted_combinations)} site-inspection combinations for companyId {companyId}")
+        print(f"✅ Fetched {len(formatted_combinations)} site-inspection combinations for companyId {company_id}")
         return {"status": "success", "data": formatted_combinations}
     except Exception as e:
         print(f"❌ Error fetching site-inspections: {e}")
@@ -354,11 +417,18 @@ async def get_site_inspections(
 
 @app.get("/api/companies/{companyId}")
 async def get_company_info(
-    companyId: int
+    companyId: int,
+    request: Request
 ):
     """Fetch company information"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if int(company_id) != companyId:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
     try:
-        company = await repository.get_company_info(companyId)
+        company = await repository.get_company_info(company_id)
         if not company:
             raise HTTPException(status_code=404, detail="Company not found")
         
@@ -372,12 +442,16 @@ async def get_company_info(
 
 @app.post("/api/inspections")
 async def create_inspection(
-    companyId: int = Query(..., description="Company ID"),
+    request: Request,
     siteId: int = Query(..., description="Site ID")
 ):
     """Create a new inspection"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
-        inspection_id = await repository.create_inspection(companyId, siteId)
+        inspection_id = await repository.create_inspection(company_id, siteId)
         
         return {"status": "success", "data": {"inspection_id": inspection_id}}
     except Exception as e:
@@ -386,11 +460,15 @@ async def create_inspection(
 @app.get("/api/inspections/{inspectionId}/verify")
 async def verify_inspection_ownership(
     inspectionId: str,
-    companyId: int = Query(..., description="Company ID")
+    request: Request
 ):
     """Verify inspection ownership"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
     try:
-        owns = await repository.verify_inspection_ownership(companyId, inspectionId)
+        owns = await repository.verify_inspection_ownership(company_id, inspectionId)
         
         return {"status": "success", "data": {"owns": owns}}
     except Exception as e:

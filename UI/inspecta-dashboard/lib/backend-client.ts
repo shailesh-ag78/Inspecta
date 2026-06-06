@@ -41,36 +41,38 @@ async function callBackend<T = any>(
 
 export async function getIncidentsForSite(
   siteId: number,
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<any[]> {
   const response = await callBackend<any[]>(
-    `/api/incidents?siteId=${siteId}&companyId=${companyId}`
+    `/api/incidents?siteId=${siteId}`,
+    { headers }
   );
   return response.data || [];
 }
 
 export async function getIncidentsForInspection(
   inspectionId: string,
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<any[]> {
   const response = await callBackend<any[]>(
-    `/api/incidents?inspectionId=${inspectionId}&companyId=${companyId}`
+    `/api/incidents?inspectionId=${inspectionId}`,
+    { headers }
   );
   return response.data || [];
 }
 
 export async function getIncident(
   incidentId: string,
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<any> {
   const response = await callBackend(
-    `/api/incidents/${incidentId}?companyId=${companyId}`
+    `/api/incidents/${incidentId}`,
+    { headers }
   );
   return response.data;
 }
 
 export async function createIncident(
-  companyId: number,
   incident: {
     inspection_id: string;
     inspector_id: number;
@@ -79,13 +81,15 @@ export async function createIncident(
     gps_lat?: number;
     gps_lon?: number;
     metadata?: any;
-  }
+  },
+  headers?: Record<string, string>
 ): Promise<string> {
   const response = await callBackend<{ incident_id: string }>(
-    `/api/incidents?companyId=${companyId}`,
+    `/api/incidents`,
     {
       method: 'POST',
       body: JSON.stringify(incident),
+      headers,
     }
   );
   return response.data?.incident_id || '';
@@ -94,20 +98,24 @@ export async function createIncident(
 export async function updateIncidentAudio(
   incidentId: string,
   audioUrl: string,
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<void> {
   await callBackend(
-    `/api/incidents/${incidentId}/audio?audio_url=${encodeURIComponent(audioUrl)}&companyId=${companyId}`,
-    { method: 'PATCH' }
+    `/api/incidents/${incidentId}/audio?audio_url=${encodeURIComponent(audioUrl)}`,
+    {
+      method: 'PATCH',
+      headers,
+    }
   );
 }
 
 export async function getIncidentProgress(
   incidentId: string,
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<any> {
   const response = await callBackend(
-    `/api/incidents/${incidentId}/progress?companyId=${companyId}`
+    `/api/incidents/${incidentId}/progress`,
+    { headers }
   );
   return response.data;
 }
@@ -116,42 +124,45 @@ export async function getIncidentProgress(
 
 export async function getTasksForIncident(
   incidentId: string,
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<any[]> {
   const response = await callBackend<any[]>(
-    `/api/incidents/${incidentId}/tasks?companyId=${companyId}`
+    `/api/incidents/${incidentId}/tasks`,
+    { headers }
   );
   return response.data || [];
 }
 
 export async function bulkAddTasks(
   incidentId: string,
-  companyId: number,
   inspectionId: string,
-  tasks: any[]
+  tasks: any[],
+  headers?: Record<string, string>
 ): Promise<void> {
   await callBackend(
-    `/api/incidents/${incidentId}/tasks/bulk?companyId=${companyId}&inspectionId=${inspectionId}`,
+    `/api/incidents/${incidentId}/tasks/bulk?inspectionId=${inspectionId}`,
     {
       method: 'POST',
       body: JSON.stringify(tasks),
+      headers,
     }
   );
 }
 
 export async function updateTask(
   taskId: string,
-  companyId: number,
   taskUpdate: {
     task_title: string;
     task_description: string;
-  }
+  },
+  headers?: Record<string, string>
 ): Promise<any> {
   const response = await callBackend(
-    `/api/tasks/${taskId}?companyId=${companyId}`,
+    `/api/tasks/${taskId}`,
     {
       method: 'PATCH',
       body: JSON.stringify(taskUpdate),
+      headers,
     }
   );
   return response.data;
@@ -159,17 +170,18 @@ export async function updateTask(
 
 export async function updateTaskReview(
   taskId: string,
-  companyId: number,
   review: {
     comments: string;
     status_id: number;
-  }
+  },
+  headers?: Record<string, string>
 ): Promise<void> {
   await callBackend(
-    `/api/tasks/${taskId}/review?companyId=${companyId}`,
+    `/api/tasks/${taskId}/review`,
     {
       method: 'PATCH',
       body: JSON.stringify(review),
+      headers,
     }
   );
 }
@@ -177,45 +189,61 @@ export async function updateTaskReview(
 // ============ Sites API ============
 
 export async function getAllSites(
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<any[]> {
-  const response = await callBackend<any[]>(`/api/sites?companyId=${companyId}`);
+  const response = await callBackend<any[]>(
+    `/api/sites`,
+    { headers }
+  );
   return response.data || [];
 }
 
 export async function getSiteInspectionCombinations(
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<any[]> {
-  const response = await callBackend<any[]>(`/api/site-inspections?companyId=${companyId}`);
+  const response = await callBackend<any[]>(
+    `/api/site-inspections`,
+    { headers }
+  );
   return response.data || [];
 }
 
 // ============ Company API ============
 
-export async function getCompanyInfo(companyId: number): Promise<any> {
-  const response = await callBackend(`/api/companies/${companyId}`);
+export async function getCompanyInfo(
+  companyId: number,
+  headers?: Record<string, string>
+): Promise<any> {
+  const response = await callBackend(
+    `/api/companies/${companyId}`,
+    { headers }
+  );
   return response.data;
 }
 
 // ============ Inspections API ============
 
 export async function createInspection(
-  companyId: number,
-  siteId: number
+  siteId: number,
+  headers?: Record<string, string>
 ): Promise<string> {
   const response = await callBackend<{ inspection_id: string }>(
-    `/api/inspections?companyId=${companyId}&siteId=${siteId}`,
-    { method: 'POST' }
+    `/api/inspections?siteId=${siteId}`,
+    {
+      method: 'POST',
+      headers,
+    }
   );
   return response.data?.inspection_id || '';
 }
 
 export async function verifyInspectionOwnership(
   inspectionId: string,
-  companyId: number
+  headers?: Record<string, string>
 ): Promise<boolean> {
   const response = await callBackend<{ owns: boolean }>(
-    `/api/inspections/${inspectionId}/verify?companyId=${companyId}`
+    `/api/inspections/${inspectionId}/verify`,
+    { headers }
   );
   return response.data?.owns || false;
 }

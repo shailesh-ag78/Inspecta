@@ -39,7 +39,6 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const incidentId = searchParams.get('incidentId');
-    const companyId = searchParams.get('companyId');
 
     if (!incidentId) {
       return NextResponse.json(
@@ -48,14 +47,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId query parameter is required' },
-        { status: 400 }
-      );
-    }
+    const authHeader = request.headers.get('authorization');
+    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
 
-    const tasks = await getTasksForIncident(incidentId, parseInt(companyId));
+    const tasks = await getTasksForIncident(incidentId, authHeaders);
 
     const formattedTasks = tasks.map((task) => ({
       id: String(task.id),
@@ -78,7 +73,6 @@ export async function GET(request: NextRequest) {
 
     const jsonstring = JSON.parse(JSON.stringify(formattedTasks));
     return NextResponse.json(jsonstring, { status: 200 });
-    //return NextResponse.json(formattedTasks, { status: 200 });
   } catch (error) {
     console.error('Error fetching tasks:', error);
     return NextResponse.json(
@@ -94,7 +88,6 @@ export async function PATCH(request: NextRequest) {
     const taskId = body?.id;
     const taskDescription = body?.task_description;
     const taskTitle = body?.task_title;
-    const companyId = body?.company_id;
 
     if (!taskId) {
       return NextResponse.json({ error: 'Task id is required' }, { status: 400 });
@@ -111,17 +104,14 @@ export async function PATCH(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!companyId) {
-      return NextResponse.json(
-        { error: 'Company ID is required' },
-        { status: 400 }
-      );
-    }
 
-    const updatedTask = await updateTask(taskId, companyId, {
+    const authHeader = request.headers.get('authorization');
+    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
+
+    const updatedTask = await updateTask(taskId, {
       task_title: taskTitle,
       task_description: taskDescription,
-    });
+    }, authHeaders);
 
     return NextResponse.json(updatedTask, { status: 200 });
   } catch (error) {

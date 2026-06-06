@@ -3,24 +3,17 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const companyId = searchParams.get('companyId');
-    console.log('Received GET /frontend-api/sites request with companyId:', companyId);
+    const authHeader = request.headers.get('authorization');
+    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
 
-    if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId query parameter is required' },
-        { status: 400 }
-      );
-    }
-
-    const sites = await getAllSites(Number(companyId));
+    const sites = await getAllSites(authHeaders);
 
     const formattedSites = sites.map((site) => ({
       id: String(site.id),
       name: site.name,
       address: site.address || null,
-      company_name: site.company_id,
+      company_id: site.company_id,
+      company_name: site.company_name || null,
       industry_id: site.industry_id
     }));
 
