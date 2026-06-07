@@ -16,6 +16,8 @@ from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
+import firebase_admin
+from firebase_admin import credentials, auth
 import asyncio
 import os
 from postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType, Industry
@@ -26,33 +28,48 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for the Next.js frontend
+# ============ CORS Configuration ============
+# Do not change the sequence. This shall happen before custom middleware @app.middleware("http")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "*"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
+print("✅ CORS Middleware configured for localhost:3000")
 
 # ============ Authentication ============
-from firebase_admin import auth
 
 @app.middleware("http")
 async def verify_firebase_token(request: Request, call_next):
+    # 1. Skip verification for OPTIONS requests (CORS preflight)
+    # These don't carry Authorization headers and are handled by CORSMiddleware
+    if request.method == "OPTIONS" or request.url.path == "/health":
+        return await call_next(request)
+
     try:
-        # 1. Grab the Token from the 'Authorization' Header
-        id_token = request.headers.get("Authorization", "").replace("Bearer ", "")
+        # 2. Grab the Token from the 'Authorization' Header
+        auth_header = request.headers.get("Authorization", "")
         
-        # 2. Verify with Firebase
+        if not auth_header:
+            print(f"⚠️ No Authorization header sent from client for {request.url.path}")
+
+        if not auth_header.startswith("Bearer "):
+            print(f"⚠️ No Bearer token found for {request.method} {request.url.path}")
+            request.state.company_id = None
+            return await call_next(request)
+
+        id_token = auth_header.replace("Bearer ", "")
+        
+        # 3. Verify with Firebase
         decoded_token = auth.verify_id_token(id_token)
         
-        # 3. Extract the SECURE company_id from the token claims
-        # This CANNOT be faked by the UI
         request.state.company_id = decoded_token.get("company_id")
         request.state.company_storage_id = decoded_token.get("company_storage_id")
-    except Exception:
-        # If token is fake or expired, we don't set the company_id
+        print(f"✅ Authenticated: Company {request.state.company_id}")
+    except Exception as e:
+        print(f"❌ Token verification failed: {e}")
         request.state.company_id = None
         request.state.company_storage_id = None
         
@@ -68,8 +85,19 @@ async def startup_event():
     
     dsn  = os.getenv("db_dsn", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
 
+    # Initialize Firebase Admin SDK
+    try:
+        cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(str(cert_path))
+            firebase_admin.initialize_app(cred)
+        print("✅ Firebase Admin initialized")
+    except Exception as e:
+        print(f"❌ Firebase initialization error: {e}")
+
     # Initialize repository with connection pool
     repository = IncidentRepository(dsn=dsn)
+    #await repository.open()
     
     print("✅ Connection pool initialized and ready")
 
@@ -79,6 +107,7 @@ async def shutdown_event():
     global repository
     
     if repository:
+        await repository.close()
         print("✅ Repository closed")
 
 # ============ Pydantic Models ============

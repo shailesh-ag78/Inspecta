@@ -1,0 +1,15 @@
+# Ignore python virtual environments anywhere in the workspace
+**/.venv/
+**/venv/
+
+# Ignore Next.js build artifacts and cache anywhere in the workspace
+**/.next/
+
+# Ignore Node.js modules anywhere in the workspace
+**/node_modules/
+
+# Optional: Ignore other heavy build or lock files
+**/dist/
+**/build/
+**/.git/
+*.log

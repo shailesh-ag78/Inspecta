@@ -7,11 +7,13 @@ export async function GET(request: NextRequest) {
     const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
 
     const combinations = await getSiteInspectionCombinations(authHeaders);
-
     const formattedCombinations = combinations.map((combo) => ({
       site_id: String(combo.site_id),
       site_name: combo.site_name,
       address: combo.address || null,
+      city: combo.city || null,
+      state: combo.state || null,
+      zip: combo.zip || null,
       inspection_id: combo.inspection_id ? String(combo.inspection_id) : null,
       inspection_created_at: combo.inspection_created_at || null,
       // Display label for dropdown

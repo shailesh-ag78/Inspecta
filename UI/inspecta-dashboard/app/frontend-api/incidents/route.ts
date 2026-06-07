@@ -6,15 +6,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const siteId = searchParams.get('siteId');
     const inspectionId = searchParams.get('inspectionId');
-    const companyId = searchParams.get('companyId');
-
-    if (!companyId) {
-      return NextResponse.json(
-        { error: 'companyId query parameter is required' },
-        { status: 400 }
-      );
-    }
-
     // Support both siteId (legacy) and inspectionId (new)
     if (!siteId && !inspectionId) {
       return NextResponse.json(

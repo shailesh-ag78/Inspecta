@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
-import { getCompanyId, setCompanyId } from '@/lib/company-context';
 import { auth, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 
@@ -72,7 +71,6 @@ export default function ReviewerDashboard() {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
-  const [companyId, setCompanyIdState] = useState<number | null>(null);
   const [filters, setFilters] = useState({
     severity: 'all',
     task_type: 'all',
@@ -124,20 +122,15 @@ export default function ReviewerDashboard() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Initialize company ID on mount
+  // Fetch site-inspections when user is authenticated
   useEffect(() => {
-    const id = getCompanyId();
-    setCompanyIdState(id);
-  }, []);
+    if (authLoading || !user) return;
 
-  // Fetch site-inspections on component mount
-  useEffect(() => {
     const fetchSiteInspections = async () => {
       try {
         setSiteInspectionsLoading(true);
         setSiteInspectionsError(null);
-        const id = companyId || getCompanyId();
-        const response = await authenticatedFetch(`/frontend-api/site-inspections?companyId=${id}`);
+        const response = await authenticatedFetch(`/frontend-api/site-inspections`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch site-inspections: ${response.statusText}`);
@@ -160,7 +153,7 @@ export default function ReviewerDashboard() {
     };
 
     fetchSiteInspections();
-  }, [companyId]);
+  }, [user, authLoading]);
 
   // Fetch incidents when inspection changes
   useEffect(() => {
@@ -175,8 +168,7 @@ export default function ReviewerDashboard() {
         setSelectedIncidentId('');
         setTasks([]);
 
-        const id = companyId || getCompanyId();
-        const response = await authenticatedFetch(`/frontend-api/incidents?inspectionId=${selectedInspection}&companyId=${id}`);
+        const response = await authenticatedFetch(`/frontend-api/incidents?inspectionId=${selectedInspection}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch incidents: ${response.statusText}`);
@@ -202,16 +194,15 @@ export default function ReviewerDashboard() {
     };
 
     fetchIncidents();
-  }, [selectedInspection, companyId]);
+  }, [selectedInspection]);
 
   // Helper function to fetch tasks for an incident
   const fetchTasksForIncident = useCallback(async (incidentId: string) => {
     try {
       setTasksLoading(true);
       setTasksError(null);
-      const id = companyId || getCompanyId();
 
-      const response = await authenticatedFetch(`/frontend-api/tasks?incidentId=${incidentId}&companyId=${id}`);
+      const response = await authenticatedFetch(`/frontend-api/tasks?incidentId=${incidentId}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tasks: ${response.statusText}`);
       }
@@ -226,14 +217,14 @@ export default function ReviewerDashboard() {
       setTasks(tasksData);
 
       // Expand all tasks initially
-      setExpandedTasks(new Set(tasksData.map((t) => t.id)));
+      setExpandedTasks(new Set(tasksData.map((t: any) => t.id)));
     } catch (error) {
       console.error('CRITICAL: Error fetching tasks:', error);
       setTasksError(error instanceof Error ? error.message : 'Failed to fetch tasks');
     } finally {
       setTasksLoading(false);
     }
-  }, [companyId]);
+  }, []);
 
   // Fetch tasks when selectedIncidentId changes
   useEffect(() => {
@@ -358,8 +349,6 @@ export default function ReviewerDashboard() {
     try {
       setTaskSaveLoading(true);
       setTaskEditError(null);
-      const id = companyId || getCompanyId();
-
       const response = await authenticatedFetch('/frontend-api/tasks', {
         method: 'PATCH',
         headers: {
@@ -369,7 +358,6 @@ export default function ReviewerDashboard() {
           id: task.id,
           task_title: trimmedTitle,
           task_description: trimmedDescription,
-          company_id: id,
         }),
       });
 
