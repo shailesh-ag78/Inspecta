@@ -1,9 +1,6 @@
 {
     "folders": [
         {
-            "path": "../Library"
-        },
-        {
             "path": "TranscriptionAgent"
         },
         {
@@ -23,6 +20,9 @@
         },
         {
             "path": "UI"
+        },
+        {
+            "path": "deployment"
         }
     ],
     "settings": {
