@@ -268,28 +268,34 @@ export default function ReviewerDashboard() {
     setHasAutoPaused(false);
 
     if (shouldPlay) {
+      isInitiatingPlayRef.current = true;
+      // Request playback once the media is ready (handled by effects and event listeners)
+      setPendingPlayTask({ id: task.id, start: task.start_time, end: task.end_time });
+
       if (videoRef.current) {
-        isInitiatingPlayRef.current = true;
+        const video = videoRef.current;
         const newSrc = getVideoSrc(task.video_url) || '';
-        // Resolve URL to compare with videoRef.current.src which returns absolute URL
-        let isDifferentSrc = false;
+        let isSameSrc = false;
         try {
-          const resolvedSrc = new URL(newSrc, window.location.href).href;
-          isDifferentSrc = videoRef.current.src !== resolvedSrc;
+          // Compare full resolved URLs
+          isSameSrc = video.src === new URL(newSrc, window.location.href).href;
         } catch (e) {
-          isDifferentSrc = videoRef.current.src !== newSrc;
+          isSameSrc = video.src === newSrc;
         }
 
-        if (isDifferentSrc) {
-          videoRef.current.src = newSrc;
-          videoRef.current.load();
+        // If source is same and ready, play immediately to preserve user gesture context
+        if (isSameSrc && video.readyState >= 2) {
+          video.currentTime = task.start_time;
+          video.play()
+            .then(() => {
+              setPendingPlayTask(null);
+              isInitiatingPlayRef.current = false;
+            })
+            .catch(err => {
+              console.error('Immediate task play failed:', err);
+              // Leave ref true so metadata/effects can try to recover playback
+            });
         }
-        videoRef.current.currentTime = task.start_time;
-        videoRef.current.play().catch(err => console.error('Immediate play failed:', err));
-        setPendingPlayTask(null);
-      } else {
-        // Otherwise queue it for the load cycle
-        setPendingPlayTask({ id: task.id, start: task.start_time, end: task.end_time });
       }
     } else {
       isInitiatingPlayRef.current = false;
@@ -300,8 +306,14 @@ export default function ReviewerDashboard() {
   const handleActiveVideoPlay = () => {
     if (!activeTask || !videoRef.current) return;
     const video = videoRef.current;
-    // Seek to task start time then play — direct call, no state indirection
-    video.currentTime = activeTask.start_time;
+    setHasAutoPaused(false);
+
+    // If current position is outside the task range or playback is stopped, reset to start
+    if (video.currentTime < activeTask.start_time - 0.1 || video.currentTime >= activeTask.end_time - 0.1) {
+      video.currentTime = activeTask.start_time;
+    }
+
+    isInitiatingPlayRef.current = true;
     video.play().catch((err) => console.error('Playback failed:', err));
   };
 
@@ -313,10 +325,15 @@ export default function ReviewerDashboard() {
   useEffect(() => {
     if (videoRef.current) {
       videoRef.current.pause();
+      // Force clear the source to stop background downloading
+      videoRef.current.src = "";
+      videoRef.current.load();
     }
+    isInitiatingPlayRef.current = false;
     setIsPlaying(false);
     setActiveTask(null);
     setPendingPlayTask(null);
+    prevTaskIdRef.current = null;
   }, [selectedInspection, selectedIncidentId]);
 
   // Update video position and panel state when activeTask changes
@@ -487,9 +504,13 @@ export default function ReviewerDashboard() {
     if (activeTask) {
       videoRef.current.currentTime = activeTask.start_time;
       if (pendingPlayTask && pendingPlayTask.id === activeTask.id) {
-        videoRef.current.play().catch((error) => {
-          console.error('Video play failed:', error);
-        });
+        videoRef.current.play()
+          .then(() => {
+            isInitiatingPlayRef.current = false;
+          })
+          .catch((error) => {
+            console.error('Video play failed on metadata load:', error);
+          });
       }
     }
     setPendingPlayTask(null);
