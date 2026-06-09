@@ -2,7 +2,7 @@
  * Backend API client for calling the Python FastAPI backend
  */
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8004';
+const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
 interface BackendResponse<T = any> {
   status: string;

@@ -36,9 +36,9 @@ EXTRACT_AUDIO_NODE = "extract_audio"
 TRANSCRIBE_NODE = "transcribe"
 GENERATE_TASKS_NODE = "generate_tasks"
 
-extract_audio_agent_url = "http://localhost:8001/extract_audio"
-transcribe_agent_url = "http://localhost:8002/transcribe"
-task_generator_agent_url = "http://localhost:8003/generate_tasks"
+extract_audio_agent_url = os.getenv("AGENT_AUDIOEXTRACT_URL", "http://localhost:8001").rstrip("/") + "/extract_audio"
+transcribe_agent_url = os.getenv("AGENT_TRANSCRIBE_URL", "http://localhost:8002").rstrip("/") + "/transcribe"
+task_generator_agent_url = os.getenv("AGENT_TASKGENERATOR_URL", "http://localhost:8003").rstrip("/") + "/generate_tasks"
 
 # Define your external agents
 class ExternalAgentProxy:
@@ -117,7 +117,7 @@ class WorkflowExecutor:
         about Postgres Checkpointers.
         """
         #db_dsn = "postgresql://postgres:passwd@localhost:5432/inspecta_db"
-        db_dsn =  "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require"
+        db_dsn = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require")
         # 1. Internalize Repository Creation
         repo = IncidentRepository(db_dsn)
         
