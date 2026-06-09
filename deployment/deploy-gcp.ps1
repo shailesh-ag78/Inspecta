@@ -183,7 +183,8 @@ gcloud run deploy Agent-audioextract `
     --min-instances=0 `
     --network=$VpcName `
     --subnet=$SubnetName `
-    --vpc-egress=private-ranges-only
+    --vpc-egress=private-ranges-only `
+    --max-instances=2
 
 Write-Host "Deploying Agent-transcribe (Transcription)..." -ForegroundColor Cyan
 gcloud run deploy Agent-transcribe `
@@ -194,7 +195,8 @@ gcloud run deploy Agent-transcribe `
     --min-instances=0 `
     --network=$VpcName `
     --subnet=$SubnetName `
-    --vpc-egress=private-ranges-only
+    --vpc-egress=private-ranges-only `
+    --max-instances=2
 
 Write-Host "Deploying Agent-taskgenerator (FieldReporter)..." -ForegroundColor Cyan
 gcloud run deploy Agent-taskgenerator `
@@ -205,7 +207,8 @@ gcloud run deploy Agent-taskgenerator `
     --min-instances=0 `
     --network=$VpcName `
     --subnet=$SubnetName `
-    --vpc-egress=private-ranges-only
+    --vpc-egress=private-ranges-only `
+    --max-instances=2
 
 # Fetch Agent URLs
 Write-Host "Retrieving agent endpoints..."
@@ -230,7 +233,8 @@ gcloud run deploy executor-service `
     --subnet=$SubnetName `
     --vpc-egress=private-ranges-only `
     --service-account="executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --set-env-vars="DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,ENV_MODE=production"
+    --set-env-vars="DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,ENV_MODE=production" `
+    --max-instances=2
 
 # Fetch Executor URL
 Write-Host "Retrieving executor endpoint..."
@@ -249,7 +253,8 @@ gcloud run deploy ui-backend-service `
     --subnet=$SubnetName `
     --vpc-egress=private-ranges-only `
     --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --set-env-vars="db_dsn=$DatabaseURL,EXECUTOR_SERVICE_URL=$ExecutorUrl,ENV_MODE=production"
+    --set-env-vars="db_dsn=$DatabaseURL,EXECUTOR_SERVICE_URL=$ExecutorUrl,ENV_MODE=production" `
+    --max-instances=2
 
 $UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
 Write-Host "UI Backend URL: $UiUrl" -ForegroundColor Green
