@@ -445,17 +445,14 @@ async def get_site_inspections(request: Request):
 
 # ============ Company Endpoints ============
 
-@app.get("/api/companies/{companyId}")
+@app.get("/api/companyinfo")
 async def get_company_info(
-    companyId: int,
     request: Request
 ):
     """Fetch company information"""
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    if int(company_id) != companyId:
-        raise HTTPException(status_code=403, detail="Forbidden")
 
     try:
         company = await repository.get_company_info(company_id)

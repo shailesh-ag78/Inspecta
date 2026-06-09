@@ -87,6 +87,8 @@ export default function ReviewerDashboard() {
   const [taskEditError, setTaskEditError] = useState<string | null>(null);
   const [pendingPlayTask, setPendingPlayTask] = useState<{ id: string; start: number; end: number } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [companyName, setCompanyName] = useState<string | null>(null);
+  const [companyNameLoading, setCompanyNameLoading] = useState(false);
 
   // Loading and error states
   const [siteInspectionsLoading, setSiteInspectionsLoading] = useState(true);
@@ -104,6 +106,35 @@ export default function ReviewerDashboard() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Fetch company name when user is authenticated and company_id is available
+  useEffect(() => {
+    if (!user) {
+      setCompanyName(null);
+      return;
+    }
+
+    const fetchCompanyName = async () => {
+      setCompanyNameLoading(true);
+      try {
+        setCompanyName(null);
+
+        const response = await authenticatedFetch(`/frontend-api/company`);
+        if (response.ok) {
+          const res = await response.json();
+          if (res.data) {
+            const name = res.data.company_name || 'Unknown Company';
+            setCompanyName(name.length > 15 ? name.substring(0, 15) + '...' : name);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching company name:', error);
+      } finally {
+        setCompanyNameLoading(false);
+      }
+    };
+    fetchCompanyName();
+  }, [user]);
 
   const handleLogin = async () => {
     try {
@@ -715,7 +746,9 @@ export default function ReviewerDashboard() {
                   </div>
                 )}
               </div>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70 mt-1">Company Name</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70 mt-1">
+                {companyNameLoading ? <Loader className="w-3 h-3 animate-spin inline-block" /> : companyName}
+              </span>
             </div>
           </div>
         </div>

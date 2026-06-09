@@ -211,14 +211,13 @@ export async function getSiteInspectionCombinations(
 // ============ Company API ============
 
 export async function getCompanyInfo(
-  companyId: number,
   headers?: Record<string, string>
 ): Promise<any> {
   const response = await callBackend(
-    `/api/companies/${companyId}`,
+    `/api/companyinfo`,
     { headers }
   );
-  return response.data;
+  return response.data || {};
 }
 
 // ============ Inspections API ============
