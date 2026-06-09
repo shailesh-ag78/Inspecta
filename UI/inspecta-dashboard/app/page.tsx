@@ -658,61 +658,64 @@ export default function ReviewerDashboard() {
               <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
             </div>
 
-            <div className="relative">
-              <button
-                onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                className="flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white overflow-hidden transition hover:bg-white/20 cursor-pointer"
-                title="Profile Settings"
-              >
-                {user?.photoURL ? (
-                  <img src={user.photoURL} alt={user.displayName || "User"} className="h-full w-full object-cover" />
-                ) : (
-                  <User className="w-5 h-5" />
-                )}
-              </button>
-              {showSettingsMenu && (
-                <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-50">
-                  <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3">
-                    {user?.photoURL && (
-                      <img src={user.photoURL} alt="" className="h-10 w-10 rounded-full border border-slate-700" />
-                    )}
-                    <div className="min-w-0">
-                      <div className="font-semibold text-white truncate">{user?.displayName || "Task Reviewer"}</div>
-                      <div className="text-xs text-slate-400 truncate">{user?.email}</div>
+            <div className="flex flex-col items-center">
+              <div className="relative">
+                <button
+                  onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white overflow-hidden transition hover:bg-white/20 cursor-pointer"
+                  title="Profile Settings"
+                >
+                  {user?.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || "User"} className="h-full w-full object-cover" />
+                  ) : (
+                    <User className="w-4 h-4" />
+                  )}
+                </button>
+                {showSettingsMenu && (
+                  <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-50">
+                    <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3">
+                      {user?.photoURL && (
+                        <img src={user.photoURL} alt="" className="h-10 w-10 rounded-full border border-slate-700" />
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-semibold text-white truncate">{user?.displayName || "Task Reviewer"}</div>
+                        <div className="text-xs text-slate-400 truncate">{user?.email}</div>
+                      </div>
+                    </div>
+                    <div className="p-2 border-b border-slate-800">
+                      <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
+                      {Object.values(themes).map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => {
+                            setTheme(t);
+                            setShowSettingsMenu(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 cursor-pointer ${theme.id === t.id
+                            ? 'bg-white/10 text-white'
+                            : 'hover:bg-slate-800 text-slate-200'
+                            }`}
+                        >
+                          <div className="font-medium">{t.name}</div>
+                          <div className="text-xs opacity-75 mt-1">
+                            <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="p-2 border-t border-slate-800">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Sign Out
+                      </button>
                     </div>
                   </div>
-                  <div className="p-2 border-b border-slate-800">
-                    <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
-                    {Object.values(themes).map((t) => (
-                      <button
-                        key={t.id}
-                        onClick={() => {
-                          setTheme(t);
-                          setShowSettingsMenu(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 cursor-pointer ${theme.id === t.id
-                          ? 'bg-white/10 text-white'
-                          : 'hover:bg-slate-800 text-slate-200'
-                          }`}
-                      >
-                        <div className="font-medium">{t.name}</div>
-                        <div className="text-xs opacity-75 mt-1">
-                          <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  <div className="p-2 border-t border-slate-800">
-                    <button
-                      onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer"
-                    >
-                      <LogOut className="w-4 h-4" />
-                      Sign Out
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
+              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70 mt-1">Company Name</span>
             </div>
           </div>
         </div>
@@ -733,12 +736,10 @@ export default function ReviewerDashboard() {
       {/* Main Content */}
       <main className="flex flex-1 overflow-hidden">
         {/* Left Pane - Task Feed */}
-        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto p-6 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300`}>
-          <div className="mb-4"></div>
-
+        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto px-6 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
           {/* Filters */}
-          <div className="mb-6 bg-slate-100/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-200/70">
-            <div className="flex items-center justify-between p-4 border-b border-slate-200/70">
+          <div className="sticky top-0 z-20 -mx-6 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-6 shadow-md">
+            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200/70 bg-slate-200/80">
               <h3 className="text-base font-semibold text-slate-900 flex items-center gap-3">
                 <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
                 Task Filters
@@ -753,45 +754,45 @@ export default function ReviewerDashboard() {
               </div>
             </div>
             {!isFiltersCollapsed && (
-              <div className="p-4">
+              <div className="px-6 py-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <select
                       value={filters.severity}
                       onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-                      className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
+                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
-                      <option value="all">All Severities</option>
-                      <option value="1">🔴 Severe</option>
-                      <option value="2">🟡 Regular</option>
-                      <option value="3">🟢 Low</option>
+                      <option value="all" className="text-xs">All Severities</option>
+                      <option value="1" className="text-xs">🔴 Severe</option>
+                      <option value="2" className="text-xs">🟡 Regular</option>
+                      <option value="3" className="text-xs">🟢 Low</option>
                     </select>
                   </div>
                   <div>
                     <select
                       value={filters.task_type}
                       onChange={(e) => setFilters({ ...filters, task_type: e.target.value })}
-                      className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
+                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
-                      <option value="all">All Types</option>
-                      <option value="install">🔧 Install</option>
-                      <option value="repair">🔨 Repair</option>
-                      <option value="verify">📋 Verify</option>
-                      <option value="clear">🧹 Clear</option>
+                      <option value="all" className="text-xs">All Types</option>
+                      <option value="install" className="text-xs">🔧 Install</option>
+                      <option value="repair" className="text-xs">🔨 Repair</option>
+                      <option value="verify" className="text-xs">📋 Verify</option>
+                      <option value="clear" className="text-xs">🧹 Clear</option>
                     </select>
                   </div>
                   <div>
                     <select
                       value={filters.task_status}
                       onChange={(e) => setFilters({ ...filters, task_status: e.target.value })}
-                      className={`w-full text-sm border ${theme.filters.border} rounded-lg px-3 py-2 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
+                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
-                      <option value="all">All Statuses</option>
-                      <option value="pending">● Pending</option>
-                      <option value="in_progress">⟳ In Progress</option>
-                      <option value="review">🔍 Review</option>
-                      <option value="completed">✓ Completed</option>
-                      <option value="failed">✗ Failed</option>
+                      <option value="all" className="text-xs">All Statuses</option>
+                      <option value="pending" className="text-xs">● Pending</option>
+                      <option value="in_progress" className="text-xs">⟳ In Progress</option>
+                      <option value="review" className="text-xs">🔍 Review</option>
+                      <option value="completed" className="text-xs">✓ Completed</option>
+                      <option value="failed" className="text-xs">✗ Failed</option>
                     </select>
                   </div>
                 </div>
