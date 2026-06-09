@@ -84,6 +84,16 @@ $FieldReporterScript = {
 }
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $FieldReporterScript
 #================================================================================
+Write-Host "🚀 Starting Executor on Port 8004..." -ForegroundColor Cyan
+#$Host.UI.RawUI.WindowTitle = "Agent - Executor (Port 8004)"
+$ExecutorScript = {
+    Set-Location "G:\code\Inspecta\Executor"
+    $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
+    .\.venv\Scripts\Activate.ps1
+    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8004 --loop asyncio
+}
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $ExecutorScript
+#================================================================================
 Write-Host "🚀 Starting Executor on Port 8000..." -ForegroundColor Green
 #$Host.UI.RawUI.WindowTitle = "Executor (Port 8000)"
 $ExecutorScript = {

@@ -43,17 +43,18 @@ class IncidentRepository:
         Maintains Row-Level Security by setting the session-level 
         company_id variable before any query is executed.
         """
-        async with await psycopg.AsyncConnection.connect(self.dsn, row_factory=dict_row) as conn:  # type: ignore
-            # 🚨 CHANGE 1: Wrapped execution inside an explicit transaction block.
-            # This forces PgBouncer to pin this specific database connection for everything inside the block.
+        # Neon requires SSL. Ensure your DSN includes 'sslmode=require' or we can add args here.
+        # Added connect_timeout to handle Neon compute "cold starts" (wake-up time).
+        async with await psycopg.AsyncConnection.connect(
+            self.dsn, 
+            row_factory=dict_row,
+            connect_timeout=10 
+        ) as conn:  # type: ignore
             async with conn.transaction():
-                # Apply your RLS variable locally within this transaction block
                 await conn.execute(
                     "SELECT set_config('app.current_company_id', %s, true)", 
                     (str(company_id),)
                 )
-                
-                # yield the connection for use in the calling context
                 yield conn
             
 

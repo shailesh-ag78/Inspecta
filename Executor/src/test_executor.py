@@ -13,17 +13,15 @@ import shutil
 
 # 1. Configuration Constants
 # Ensure these match your actual local setup
-#DB_DSN = os.getenv("DATABASE_URL", "dbname=inspecta_db user=postgres password=passwd host=localhost port=5432")
-#DB_DSN = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecclsta_db")
 #TEST_VIDEO_PATH = r"G:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
 TEST_VIDEO_PATH = r"G:\code\Inspecta\data\test_data\test_videos"
 
-COMPANY_ID = "2"
-STORAGE_ID = "CompanyStorage2"
-INSPECTOR_ID = "2"
+COMPANY_ID = "3"
+STORAGE_ID = "CompanyStorage3"
+INSPECTOR_ID = "3"
 SITE_ID = "3"
-INSPECTION_ID = "f25c14d6-e6f9-48dc-a15d-33f5fb2aab77"
-#INSPECTION_ID = ""
+INSPECTION_ID = ""
+#INSPECTION_ID = "f25c14d6-e6f9-48dc-a15d-33f5fb2aab77"
 
 def test_full_workflow_integration():
     """
@@ -50,7 +48,7 @@ def test_full_workflow_integration():
             inspection_id = INSPECTION_ID
             print(f"✅ Using Existing Inspection: {inspection_id}")
 
-        incident_ids = []
+        incident_ids = {}
         # Use rglob("*") to recursively find all files and directories
         # and filter for only files using .is_file()
         files_to_process = [str(f.resolve()) for f in Path(TEST_VIDEO_PATH).glob('*') if f.suffix.lower() in ['.mp4', '.mp3']]
@@ -87,17 +85,18 @@ def test_full_workflow_integration():
             incident_id = resp_inc.json()["incident_id"]
             print(f"✅ Incident Created: {incident_id}. LangGraph thread started")
 
-            incident_ids.append(incident_id)
+            file_name = os.path.basename(file_path)
+            incident_ids[file_name] = incident_id
             
         print(f"Found {len(incident_ids)} incidents:")
-        for incident_id in incident_ids:
-            print(f"\n------------------ Poll Status for {incident_id} (Wait for Processing) ------------------")
+        for file_name, incident_id in incident_ids.items():
+            print(f"\n------------------ Poll Status for {file_name} ({incident_id}) (Wait for Processing) ------------------")
             # Since LangGraph runs in a background task, we poll the status
             import time
             max_attempts = 15
             finished = False
             for i in range(max_attempts):
-                time.sleep(3) # Give nodes time to process
+                time.sleep(4) # Give nodes time to process
                 resp_status = client.get(f"/incidents/{incident_id}/status", headers=headers)
                 status_data = resp_status.json()
                 
@@ -107,8 +106,8 @@ def test_full_workflow_integration():
                     finished = True
                     break
         
-            assert finished, "Workflow did not complete within the timeout period."
-            print("✅ End-to-End Workflow Successful!")
+            assert finished, f"Workflow for {file_name} did not complete within the timeout period."
+            print(f"✅ End-to-End Workflow Successful for {file_name}!")
 
 if __name__ == "__main__":
     # Note: Using pytest to run this is recommended, but you can call it directly

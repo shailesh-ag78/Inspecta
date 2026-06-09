@@ -83,7 +83,8 @@ async def startup_event():
     """Initialize connection pool and repository on application startup"""
     global repository
     
-    dsn  = os.getenv("db_dsn", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
+    #dsn  = os.getenv("db_dsn", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
+    dsn  = os.getenv("db_dsn", "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require")
 
     # Initialize Firebase Admin SDK
     try:
