@@ -49,8 +49,6 @@ param(
 )
 
 $ENV_MODE = "production"
-$GROQ_API_KEY = ""
-$OPENAI_API_KEY = ""
 $OPENAI_MODEL = "gpt-4o"
 $MODEL_TEMPERATURE = "0.2"
 
@@ -80,7 +78,8 @@ $APIs = @(
     "artifactregistry.googleapis.com",
     "vpcaccess.googleapis.com",
     "compute.googleapis.com",
-    "iam.googleapis.com"
+    "iam.googleapis.com",
+    "secretmanager.googleapis.com"
 )
 
 foreach ($API in $APIs) {
@@ -126,7 +125,9 @@ Write-Host "`n[3/7] Setting up Service Accounts..." -ForegroundColor Yellow
 
 $SAs = @(
     @{ Name = "ui-service-sa"; Display = "UI Service Backend SA" },
-    @{ Name = "executor-service-sa"; Display = "LangChain Executor Service SA" }
+    @{ Name = "executor-service-sa"; Display = "LangChain Executor Service SA" },
+    @{ Name = "transcribe-service-sa"; Display = "Transcription Agent Service SA" },
+    @{ Name = "taskgen-service-sa"; Display = "Field Reporter Agent Service SA" }
 )
 
 foreach ($SA in $SAs) {
@@ -285,8 +286,10 @@ if ($DeployAgents) {
         --network=$VpcName `
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
+        --service-account="transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
+        --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest" `
         --max-instances=2 `
-        --set-env-vars="ENV_MODE=$ENV_MODE,GROQ_API_KEY=$GROQ_API_KEY"
+        --set-env-vars="ENV_MODE=$ENV_MODE"
 
     Write-Host "Deploying agent-taskgenerator (FieldReporter)..." -ForegroundColor Cyan
     gcloud run deploy agent-taskgenerator `
@@ -298,8 +301,10 @@ if ($DeployAgents) {
         --network=$VpcName `
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
+        --service-account="taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
+        --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest" `
         --max-instances=2 `
-        --set-env-vars="ENV_MODE=$ENV_MODE,$MODEL_TEMPERATURE=$MODEL_TEMPERATURE,OPENAI_API_KEY=$OPENAI_API_KEY,OPENAI_MODEL=$OPENAI_MODEL"
+        --set-env-vars="ENV_MODE=$ENV_MODE,OPENAI_MODEL=$OPENAI_MODEL,MODEL_TEMPERATURE=$MODEL_TEMPERATURE"
 
 
     # Fetch Agent URLs
@@ -403,6 +408,19 @@ Add-InvokerPolicy -ServiceName "executor-service" -ServiceAccount "ui-service-sa
 Add-InvokerPolicy -ServiceName "agent-audioextract" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
 Add-InvokerPolicy -ServiceName "agent-transcribe" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
 Add-InvokerPolicy -ServiceName "agent-taskgenerator" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
+
+# 7.2.1 Enable Agent service SAs to read secrets from Secret Manager
+Write-Host "Granting secretAccessor permissions for GROQ_API_KEY to transcribe-service-sa..."
+gcloud secrets add-iam-policy-binding GROQ_API_KEY `
+    --member="serviceAccount:transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+Write-Host "Granting secretAccessor permissions for OPENAI_API_KEY to taskgen-service-sa..."
+gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
+    --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
 
 # 7.3 Enable UI Service SA to verify Firebase auth tokens (Option A)
 Write-Host "Granting firebaseauth.admin role to ui-service-sa..."
