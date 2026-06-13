@@ -7,6 +7,18 @@ from pathlib import Path
 if sys.platform == 'win32':
     import asyncio
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # Force uvicorn to use SelectorEventLoop on Windows
+    try:
+        import uvicorn.loops.asyncio
+        def _asyncio_setup(use_subprocess: bool = False):
+            asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+        def _asyncio_loop_factory(use_subprocess: bool = False):
+            return lambda: asyncio.SelectorEventLoop()
+        # Patch both potential uvicorn attributes to cover all uvicorn versions
+        uvicorn.loops.asyncio.asyncio_setup = _asyncio_setup
+        uvicorn.loops.asyncio.asyncio_loop_factory = _asyncio_loop_factory
+    except Exception:
+        pass
 
 # Add DataStore to path so we can import postgresdb
 datastore_path = Path(__file__).parent.parent.parent / "DataStore"

@@ -5,3 +5,4 @@ requests
 pydub
 google-cloud-storage
 ffmpeg
+python-dotenv>=1.0.0  # Environment variable management
