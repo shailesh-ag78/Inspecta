@@ -151,6 +151,7 @@ async def transcribe_endpoint(request: TranscribeRequest):
         # Delete temporary files
         os.remove(audio_url_path)
         os.remove(transcibe_file_path)
+        transcibe_url = f"gs://{bucket_name}/{transcibe_url}"
         
     return {
         "status": "success",

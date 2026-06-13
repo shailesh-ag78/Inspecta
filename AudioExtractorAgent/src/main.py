@@ -146,9 +146,11 @@ async def extract_audio_endpoint(request: AudioExtractionRequest):
         bucket = gcs_client.bucket(gcp_bucket)
         new_audio_blob = bucket.blob(audio_url)
         new_audio_blob.upload_from_filename(audio_url_path)
+        
         # Delete temporary files
         os.remove(video_url_path)
         os.remove(audio_url_path)
+        audio_url = f"gs://{bucket_name}/{audio_url}"
     
     return {
         "status": "success",

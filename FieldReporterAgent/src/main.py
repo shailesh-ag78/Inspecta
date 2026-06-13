@@ -153,6 +153,7 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
         # Delete temporary files
         os.remove(transcript_url_path)
         os.remove(tasks_file_path)
+        tasks_url = f"gs://{bucket_name}/{tasks_url}"
         
     return {
         "status": "success",
