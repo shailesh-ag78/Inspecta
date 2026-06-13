@@ -1,0 +1,9 @@
+.venv
+__pycache__
+.env
+.vscode
+.env.example
+*.pyc
+*.pyo
+*.pyd
+inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json

@@ -642,8 +642,7 @@ export default function ReviewerDashboard() {
                 text-transparent bg-clip-text drop-shadow-md">
                 INSPECTA
               </div>
-
-              <div className="text-2xl font-bold">Task Dashboard</div>
+              <div className="text-2xl font-extrabold font-['Public_Sans']">Task Dashboard</div>
             </div>
           </div>
 
@@ -782,7 +781,7 @@ export default function ReviewerDashboard() {
                   onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
                   className={`text-white transition-all p-2 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
                 >
-                  <ChevronDown className={`w-5 h-5 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
+                  <ChevronDown className={`w-2 h-2 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
                 </button>
               </div>
             </div>

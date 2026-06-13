@@ -108,9 +108,10 @@ async def shutdown_event():
     """Close connection pool on application shutdown"""
     global repository
     
-    if repository:
+    if repository and hasattr(repository, 'close'):
         await repository.close()
         print("✅ Repository closed")
+
 
 # ============ Pydantic Models ============
 
@@ -560,5 +561,5 @@ if __name__ == "__main__":
     uvicorn.run(
         app,
         host="0.0.0.0",
-        port=int(os.getenv("BACKEND_PORT", 8000))
+        port=int(os.getenv("BACKEND_PORT", 8080))
     )

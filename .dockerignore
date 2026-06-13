@@ -1,6 +1,7 @@
-# --- Environment / Secrets ---
-#.env
-#*.env
+# Ignore python virtual environments anywhere in the workspace
+**/.venv/
+**/venv/
+
 secret.json
 venv/
 .venv/
@@ -9,7 +10,6 @@ venv/
 
 # --- Inspecta Data Storage ---
 # We ignore the entire Data folder so videos and audio are never pushed
-./data/*
 Data/
 documentation/
 CompanyStorage*/
@@ -25,6 +25,7 @@ processed/
 # Exclude Git and IDE settings
 .git/
 .github/
+.vscode/
 .idea/
 
 # --- Audio Agent Specifics ---

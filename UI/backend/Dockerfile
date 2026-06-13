@@ -12,7 +12,6 @@ COPY UI/backend /app/UI/backend
 
 ENV PYTHONPATH=/app
 
-EXPOSE 8000
+# Run the application (Cloud Run requires binding to the $PORT env variable, default to 8000 locally)
+CMD ["sh", "-c", "uvicorn UI.backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
-# Run the application
-CMD ["uvicorn", "UI.backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
