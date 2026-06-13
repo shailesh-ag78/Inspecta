@@ -15,11 +15,15 @@ import httpx
 from google.cloud import storage
 from typing import Tuple
 from urllib.parse import urlparse
+import dotenv
 
 # Add the project root to sys.path so we can import from the 'datastore' package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 sys.path.append(os.path.abspath(os.path.dirname(__file__)))
 sys.path.append(os.getcwd())
+
+env_path = Path(__file__).parent.parent / ".env"
+dotenv.load_dotenv(dotenv_path=env_path)
 
 # Import the Repository
 from DataStore.postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType

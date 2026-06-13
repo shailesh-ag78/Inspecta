@@ -48,6 +48,12 @@ param(
     [string]$BuildNumber
 )
 
+$ENV_MODE = "production"
+$GROQ_API_KEY = ""
+$OPENAI_API_KEY = ""
+$OPENAI_MODEL = "gpt-4o"
+$MODEL_TEMPERATURE = "0.2"
+
 $ErrorActionPreference = "Stop"
 
 # Use timestamp as build number if not provided
@@ -265,7 +271,9 @@ if ($DeployAgents) {
         --network=$VpcName `
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
-        --max-instances=2
+        --max-instances=2 `
+        --set-env-vars="ENV_MODE=$ENV_MODE"
+
 
     Write-Host "Deploying agent-transcribe (Transcription)..." -ForegroundColor Cyan
     gcloud run deploy agent-transcribe `
@@ -277,7 +285,8 @@ if ($DeployAgents) {
         --network=$VpcName `
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
-        --max-instances=2
+        --max-instances=2 `
+        --set-env-vars="ENV_MODE=$ENV_MODE,GROQ_API_KEY=$GROQ_API_KEY"
 
     Write-Host "Deploying agent-taskgenerator (FieldReporter)..." -ForegroundColor Cyan
     gcloud run deploy agent-taskgenerator `
@@ -289,7 +298,9 @@ if ($DeployAgents) {
         --network=$VpcName `
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
-        --max-instances=2
+        --max-instances=2 `
+        --set-env-vars="ENV_MODE=$ENV_MODE,$MODEL_TEMPERATURE=$MODEL_TEMPERATURE,OPENAI_API_KEY=$OPENAI_API_KEY,OPENAI_MODEL=$OPENAI_MODEL"
+
 
     # Fetch Agent URLs
     Write-Host "Retrieving agent endpoints..."
@@ -317,9 +328,9 @@ if ($DeployAgents) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-env-vars="DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,ENV_MODE=production" `
-        --max-instances=2
-
+        --max-instances=2 `
+        --set-env-vars="db_dsn=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,ENV_MODE=$ENV_MODE"
+        
     # Fetch Executor URL
     Write-Host "Retrieving executor endpoint..."
     $ExecutorUrl = (gcloud run services describe executor-service --region=$Region --format="value(status.url)")

@@ -54,7 +54,7 @@ $AudioScript = {
     Set-Location "G:\code\Inspecta\AudioExtractorAgent"
     $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
     .\.venv\Scripts\Activate.ps1
-    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8001 --loop asyncio
+    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8001 --loop asyncio --reload
 }
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $AudioScript
@@ -68,7 +68,7 @@ $TranscribeScript = {
     Set-Location "G:\code\Inspecta\TranscriptionAgent"
     $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
     .\.venv\Scripts\Activate.ps1
-    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8002 --loop asyncio
+    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8002 --loop asyncio --reload
 }
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $TranscribeScript
@@ -80,7 +80,7 @@ $FieldReporterScript = {
     Set-Location "G:\code\Inspecta\FieldReporterAgent"
     $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
     .\.venv\Scripts\Activate.ps1
-    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8003 --loop asyncio
+    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8003 --loop asyncio --reload
 }
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $FieldReporterScript
 #================================================================================
@@ -92,7 +92,7 @@ $ExecutorScript = {
     .\.venv\Scripts\Activate.ps1
     & '.\.venv\Scripts\python.exe' -m src.main
 }
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $ExecutorScript
+Start-Process powershell -ArgumentList "-NoExit", "-Command", $ExecutorScript 
 #================================================================================
 Write-Host "✅ All agents spawned successfully!" -ForegroundColor Green
 

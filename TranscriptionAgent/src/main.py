@@ -10,22 +10,27 @@ from google.cloud import storage
 import logging
 from typing import Tuple
 from urllib.parse import urlparse
+import dotenv
 
 from src.groq_service import GroqService
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='.\\transcription_agent.log',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Set this in your environment or .env file: ENV_MODE=local
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+dotenv.load_dotenv(dotenv_path=env_path)
+
 ENV_MODE = os.getenv("ENV_MODE", "local")
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)
-LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"g:\code\Inspecta\Data"))
+# Detect operating system: use '/tmp' for Linux (GCP Cloud Run), and Windows path locally
+default_root = "/tmp" if os.name != "nt" else r"g:\code\Inspecta\Data"
+LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", default_root))
 LOCAL_TEMP_FOLDER = os.path.join(LOCAL_STORAGE_ROOT, "temp")
 if not os.path.exists(LOCAL_TEMP_FOLDER):
     os.makedirs(LOCAL_TEMP_FOLDER)

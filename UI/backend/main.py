@@ -20,7 +20,12 @@ import firebase_admin
 from firebase_admin import credentials, auth
 import asyncio
 import os
+import dotenv
 from postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType, Industry
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+dotenv.load_dotenv(dotenv_path=env_path)
 
 app = FastAPI(
     title="Inspecta UI Backend API",
@@ -84,8 +89,8 @@ async def startup_event():
     """Initialize connection pool and repository on application startup"""
     global repository
     
-    #dsn  = os.getenv("db_dsn", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
-    dsn  = os.getenv("db_dsn", "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require")
+    dsn  = os.getenv("db_dsn", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
+    #dsn  = os.getenv("db_dsn", "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require")
 
     # Initialize Firebase Admin SDK
     try:

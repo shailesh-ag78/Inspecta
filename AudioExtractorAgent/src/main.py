@@ -8,17 +8,20 @@ from typing import Optional, Dict, Any
 from pathlib import Path
 from google.cloud import storage
 import logging
+import dotenv
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='.\\audio_extarctor.log',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Set this in your environment or .env file: ENV_MODE=local
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+dotenv.load_dotenv(dotenv_path=env_path)
+
 ENV_MODE = os.getenv("ENV_MODE", "local")
-logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
+logger.info(f"🚀 Starting AudioExtractorAgent with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)
 LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"g:\code\Inspecta\Data"))
@@ -89,6 +92,7 @@ async def extract_audio_endpoint(request: AudioExtractionRequest):
 
     logger.info(f"Video URL: {video_url}")
     logger.info(f"Metadata: {metadata}")
+    logger.info(f"ENV_MODE: {ENV_MODE}")
 
     gcp_bucket = ""
     
@@ -159,6 +163,7 @@ def audio_extraction(video_url_path: str, audio_url_path: str):
     Extracts high-quality mono audio from video.
     Ready for single-file transcription.
     """
+    logger.info(f"Extracting audio from {video_url_path} to {audio_url_path}")
     try:
         # Run ffmpeg command
         # We use mono (ac 1) and 16kHz (ar 16000) for best AI recognition

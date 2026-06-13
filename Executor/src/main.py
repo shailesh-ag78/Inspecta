@@ -10,8 +10,9 @@ if sys.platform == "win32":
 
 import uuid
 from fastapi import FastAPI, HTTPException, Request
-from dotenv import load_dotenv
+import dotenv
 import uvicorn
+from pathlib import Path
 
 from .workflowexecutor import WorkflowExecutor
 from langsmith_config import get_langsmith_config
@@ -22,14 +23,10 @@ from urllib.parse import urlparse
 
 from contextlib import asynccontextmanager
 
-# Load environment variables from .env file
-# load_dotenv()
-
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='.\\executor.log',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -44,8 +41,10 @@ ALLOWED_TYPES = {
     "audio/x-wav": ".wav"
 }
 
-# Set this in your environment or .env file: ENV_MODE=local
-ENV_MODE = os.getenv("ENV_MODE", "local_test")
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+dotenv.load_dotenv(dotenv_path=env_path)
+ENV_MODE = os.getenv("ENV_MODE", "local")
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)

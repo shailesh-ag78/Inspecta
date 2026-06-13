@@ -15,8 +15,7 @@ from .openai_service import OpenAIService
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    filename='.\\task_generator.log',
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
@@ -29,8 +28,9 @@ MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 logger.info(f"🚀 Starting Executor with {env_path} ENV_MODE={ENV_MODE}   {MODEL} (temp={MODEL_TEMPERATURE})")
 
-# Define your local root (where files actually live on your PC)
-LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"G:\code\Inspecta\Data"))
+# Detect operating system: use '/tmp' for Linux (GCP Cloud Run), and Windows path locally
+default_root = "/tmp" if os.name != "nt" else r"g:\code\Inspecta\Data"
+LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", default_root))
 LOCAL_TEMP_FOLDER = os.path.join(LOCAL_STORAGE_ROOT, "temp")
 if not os.path.exists(LOCAL_TEMP_FOLDER):
     os.makedirs(LOCAL_TEMP_FOLDER)
