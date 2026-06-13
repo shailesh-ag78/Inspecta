@@ -1,3 +1,12 @@
+
+# =======================  To Debug in VSCODE interactively : move to G:\code\Inspecta\Executor\src and Press F5   =======================
+# =======================  If you want to use GCP then execute command : gcloud auth application-default login   =======================
+# $env:GOOGLE_APPLICATION_CREDENTIALS="G:\code\Inspecta\deployment\inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
+# gcloud storage buckets add-iam-policy-binding gs://inspecta-file-bucket --member="serviceAccount:firebase-adminsdk-fbsvc@inspecta-360.iam.gserviceaccount.com" --role="roles/storage.objectAdmin"
+# ====================================================
+
+
+from google.cloud import storage
 import asyncio
 import os
 import sys
@@ -10,18 +19,45 @@ from fastapi.testclient import TestClient
 from src.main import app
 from pathlib import Path
 import shutil
+from urllib.parse import urlparse
+from typing import Tuple
 
 # 1. Configuration Constants
 # Ensure these match your actual local setup
 #TEST_VIDEO_PATH = r"G:\code\Inspecta\Data\test_data\Farm_Video1.mp4"
 TEST_VIDEO_PATH = r"G:\code\Inspecta\data\test_data\test_videos"
 
-COMPANY_ID = "3"
-STORAGE_ID = "CompanyStorage3"
-INSPECTOR_ID = "3"
-SITE_ID = "3"
-INSPECTION_ID = ""
-#INSPECTION_ID = "f25c14d6-e6f9-48dc-a15d-33f5fb2aab77"
+INSPCTA_FILE_BUCKET = "inspecta-file-bucket"
+UPLOADS_FOLDER = "uploads"
+
+COMPANY_ID = "1"
+STORAGE_ID = "CompanyStorage1"
+INSPECTOR_ID = "1"
+SITE_ID = "1"
+#INSPECTION_ID = ""
+INSPECTION_ID = "95a1e321-08c1-4aac-a9f1-1ce4304109fd"
+ENV_MODE = "production"
+
+def extract_bucket_and_blob(http_url: str) -> Tuple[str, str]:
+    """
+    Parses a GCS HTTP URL and returns a tuple of (bucket_name, blob_name).
+    Strips out all query parameters and signatures automatically.
+    """
+    # 1. Parse the URL to isolate the network path
+    parsed_url = urlparse(http_url)
+    
+    # 2. Clean and split the path
+    # Removes leading slash and splits only at the first slash
+    path_parts = parsed_url.path.strip("/").split("/", 1)
+    
+    if len(path_parts) < 2:
+        raise ValueError("Invalid GCS HTTP URL structure.")
+        
+    bucket_name = path_parts[0]
+    blob_name = path_parts[1]
+    
+    return bucket_name, blob_name
+
 
 def test_full_workflow_integration():
     """
@@ -62,18 +98,28 @@ def test_full_workflow_integration():
             assert resp_url.status_code == 200
             upload_data = resp_url.json()
             real_upload_path = upload_data["upload_url"]
+            blob_name = upload_data["blob_name"]
             print(f"✅ Received Upload Path: {real_upload_path}")
         
-            # In a real scenario, the UI would upload the file to 'real_upload_path'.
-            # For this test, we manually copy it to simulate a successful upload.    
-            shutil.copy(file_path, real_upload_path)
-            print("✅ Simulated file upload to local storage.")
-
+            if(ENV_MODE == "local"):
+                # In a real scenario, the UI would upload the file to 'real_upload_path'.
+                # For this test, we manually copy it to simulate a successful upload.    
+                shutil.copy(file_path, real_upload_path)
+                print("✅ Simulated file upload to local storage.")
+            else:
+                # Upload to GCS
+                gcs_client = storage.Client()
+                bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+                #blob = bucket.blob(f"{UPLOADS_FOLDER}/{blob_name}")
+                blob = bucket.blob(blob_name)
+                blob.upload_from_filename(file_path)
+                print(f"✅ Uploaded to GCS: {file_path}")
 
             print("\n------------------ [STEP 3] Trigger Real Incident Upload & LangGraph ------------------")
+            file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{blob_name}" if ENV_MODE != "local" else real_upload_path
             incident_payload = {
                 "inspector_id": INSPECTOR_ID,
-                "file_url": real_upload_path,
+                "file_url": file_url_payload,
                 "site_id": SITE_ID
             }
             resp_inc = client.post(

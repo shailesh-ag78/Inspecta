@@ -1,0 +1,20 @@
+﻿[
+    {
+        "maxAgeSeconds":  3600,
+        "method":  [
+                       "PUT",
+                       "GET",
+                       "POST",
+                       "DELETE",
+                       "OPTIONS"
+                   ],
+        "responseHeader":  [
+                               "Content-Type",
+                               "Access-Control-Allow-Origin"
+                           ],
+        "origin":  [
+                       "https://yourdomain.com",
+                       "http://localhost:3000"
+                   ]
+    }
+]

@@ -15,7 +15,10 @@ LANGSMITH_LOG_LEVEL=INFO
 
 # Database (PostgreSQL)
 #DATABASE_URL=dbname=inspecta_local user=postgres password=passwd host=localhost port=5432
-DATABASE_URL=postgresql://postgres:passwd@localhost:5432/inspecta_local
+DATABASE_URL=postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require
+AGENT_AUDIOEXTRACT_URL=http://localhost:8001
+AGENT_TRANSCRIBE_URL=http://localhost:8002
+AGENT_TASKGENERATOR_URL=http://localhost:8003
 
 # Environment Mode
 ENV_MODE=local

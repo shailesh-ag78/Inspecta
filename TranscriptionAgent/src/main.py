@@ -8,6 +8,8 @@ from typing import List, Optional, Dict, Any
 from pathlib import Path
 from google.cloud import storage
 import logging
+from typing import Tuple
+from urllib.parse import urlparse
 
 from src.groq_service import GroqService
 
@@ -18,9 +20,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-INSPCTA_FILE_BUCKET = "inspecta-file-bucket"
-UPLOADS_FOLDER = "uploads"
-
 # Set this in your environment or .env file: ENV_MODE=local
 ENV_MODE = os.getenv("ENV_MODE", "local")
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
@@ -30,6 +29,23 @@ LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"g:\code\I
 LOCAL_TEMP_FOLDER = os.path.join(LOCAL_STORAGE_ROOT, "temp")
 if not os.path.exists(LOCAL_TEMP_FOLDER):
     os.makedirs(LOCAL_TEMP_FOLDER)
+
+def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
+    """
+    Splits a gs:// URI into bucket_name and blob_name.
+    """
+    # Parse the URI using standard URL rules
+    parsed = urlparse(gs_uri)
+    
+    # Check if the protocol is correct
+    if parsed.scheme != "gs":
+        raise ValueError("URI scheme must be 'gs'")
+        
+    bucket_name = parsed.netloc
+    # Strip the leading slash from the path to get the exact blob name
+    blob_name = parsed.path.lstrip("/")
+    
+    return bucket_name, blob_name
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -74,6 +90,7 @@ async def transcribe_endpoint(request: TranscribeRequest):
     
     logger.info(f"Transcribing audio_url: {audio_url}, metadata: {metadata}")
     
+    gcp_bucket = ""
     if(ENV_MODE == "local"):
         if not os.path.exists(audio_url):
             raise HTTPException(status_code=400, detail=f"Audio file not found at: {audio_url}")
@@ -88,12 +105,12 @@ async def transcribe_endpoint(request: TranscribeRequest):
         if not gcs_client:
              raise HTTPException(status_code=500, detail="GCS client not initialized")
 
-        #full_gcp_path = f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/UPLOADS_FOLDER/{filename}"    
-        blob_name = audio_url.replace(f"gs://{INSPCTA_FILE_BUCKET}/", "")
-        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+        bucket_name, blob_name = extract_bucket_and_blob_from_gs(audio_url)
+        bucket = gcs_client.bucket(bucket_name)
         blob = bucket.get_blob(blob_name)   # blob = {company_storage_id}/UPLOADS_FOLDER/{filename}"
         if not blob:
             raise HTTPException(status_code=400, detail=f"Audio file not found at: {audio_url}")
+        gcp_bucket = bucket_name    
 
         filename = blob_name.rsplit("/", 1)[-1]
         name_without_ext = filename.rsplit(".", 1)[0]  # Handle multiple dots correctly (e.g., "video.v1_audio.mp3")
@@ -123,7 +140,7 @@ async def transcribe_endpoint(request: TranscribeRequest):
     # 4. Return Result
     if(ENV_MODE != "local"):
         # Upload Transcript file in GCS storage folder and set transcibe_url
-        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+        bucket = gcs_client.bucket(gcp_bucket)
         new_transcibe_blob = bucket.blob(transcibe_url)
         new_transcibe_blob.upload_from_filename(transcibe_file_path)
         # Delete temporary files

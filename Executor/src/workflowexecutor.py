@@ -1,3 +1,4 @@
+from httpx import _content
 import os
 import sys
 import asyncio
@@ -11,6 +12,9 @@ from typing import Any, Literal, TypedDict, Annotated, List, Optional
 from typing import cast
 import operator
 import httpx
+from google.cloud import storage
+from typing import Tuple
+from urllib.parse import urlparse
 
 # Add the project root to sys.path so we can import from the 'datastore' package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -36,9 +40,34 @@ EXTRACT_AUDIO_NODE = "extract_audio"
 TRANSCRIBE_NODE = "transcribe"
 GENERATE_TASKS_NODE = "generate_tasks"
 
-extract_audio_agent_url = os.getenv("AGENT_AUDIOEXTRACT_URL", "http://localhost:8001").rstrip("/") + "/extract_audio"
-transcribe_agent_url = os.getenv("AGENT_TRANSCRIBE_URL", "http://localhost:8002").rstrip("/") + "/transcribe"
-task_generator_agent_url = os.getenv("AGENT_TASKGENERATOR_URL", "http://localhost:8003").rstrip("/") + "/generate_tasks"
+def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
+    """
+    Splits a gs:// URI into bucket_name and blob_name.
+    """
+    # Parse the URI using standard URL rules
+    parsed = urlparse(gs_uri)
+    
+    # Check if the protocol is correct
+    if parsed.scheme != "gs":
+        raise ValueError("URI scheme must be 'gs'")
+        
+    bucket_name = parsed.netloc
+    # Strip the leading slash from the path to get the exact blob name
+    blob_name = parsed.path.lstrip("/")
+    
+    return bucket_name, blob_name
+
+def get_agent_endpoint(env_var_name: str, default_url: str, suffix: str) -> str:
+    base_url = os.getenv(env_var_name, default_url).rstrip("/")
+    # If the configured URL already ends with the path suffix, return it directly
+    if base_url.endswith(suffix):
+        return base_url
+    return f"{base_url}{suffix}"
+
+extract_audio_agent_url = get_agent_endpoint("AGENT_AUDIOEXTRACT_URL", "http://localhost:8001", "/extract_audio")
+transcribe_agent_url = get_agent_endpoint("AGENT_TRANSCRIBE_URL", "http://localhost:8002", "/transcribe")
+task_generator_agent_url = get_agent_endpoint("AGENT_TASKGENERATOR_URL", "http://localhost:8003", "/generate_tasks")
+
 
 # Define your external agents
 class ExternalAgentProxy:
@@ -579,24 +608,27 @@ def get_tasklist_from_url(tasks_json_url: str, video_url : str, env_mode: str = 
     Utility function to fetch the generated tasks JSON from a URL.
     This can be a local file path or a GCS URL depending on the environment.
     """
+    data = ""
     summary = "No summary available."
     tasks = []
     
     if(env_mode != "local"):
         logger.info(f"Fetching tasks JSON from {tasks_json_url} in {env_mode} environment...")
-        #if tasks_json_url.startswith("gs://"):
-            # TO DO: Fetch from GCS
-            # if not gcs_client:
-            #     raise RuntimeError("GCS client not initialized")
-            
-            # bucket_name, blob_name = parse_gcs_url(url)
-            # bucket = gcs_client.bucket(bucket_name)
-            # blob = bucket.get_blob(blob_name)
-            # if not blob:
-            #     raise FileNotFoundError(f"File not found in GCS at {url}")
-            
-            # content = blob.download_as_text()
-            # return json.loads(content)
+        #TO DO: Fetch from GCS
+        gcs_client = storage.Client()
+        if not gcs_client:
+            raise RuntimeError("GCS client not initialized")
+
+        # File name example : "gs://inspecta-file-bucket/<company_storage>/uploads/a1b2-c3d4.json"
+        bucket_name, blob_name = extract_bucket_and_blob_from_gs(tasks_json_url)
+        bucket = gcs_client.bucket(bucket_name)
+        blob = bucket.get_blob(blob_name)
+
+        if blob and blob.exists():
+            # Downloads directly and parses into a Python dict
+            data = json.loads(blob.download_as_text())
+        else:
+            raise FileNotFoundError(f"The blob {blob_name} was not found.")
     else:
         # if not os.path.exists(tasks_json_url):
         #     raise HTTPException(status_code=400, detail=f"Tasks file not found at: {tasks_json_url}")
@@ -604,25 +636,25 @@ def get_tasklist_from_url(tasks_json_url: str, video_url : str, env_mode: str = 
         with open(tasks_json_url, "r") as f:
             data = json.load(f)
         
-        # 2. Extract the Summary
-        summary = data.get("summary", "No summary available.")
-        
-        # 3. Extract the Task List array
-        tasks = [
-            {
-                "task_title": t.get('task_title'),
-                "task_description": t.get('task_description'),
-                "task_original_description": "",
-                "video_url": t.get('video_url', video_url), 
-                "video_start_ms": t.get('start_time', 0),
-                "video_end_ms": t.get('end_time', 0),
-                "task_artifacts": [],
-                "status_id": t.get('status_id', TaskStatus.PENDING),
-                "severity_id": t.get('severity_id', TaskSeverity.REGULAR),
-                "task_type_id": t.get('task_type', TaskType.VERIFY)
-            } for t in data.get("tasks", [])
-        ]
-        
-        #4 ToDo : Handle Clarification Needed element
-        
+    # 2. Extract the Summary
+    summary = data.get("summary", "No summary available.")
+    
+    # 3. Extract the Task List array
+    tasks = [
+        {
+            "task_title": t.get('task_title'),
+            "task_description": t.get('task_description'),
+            "task_original_description": "",
+            "video_url": t.get('video_url', video_url), 
+            "video_start_ms": t.get('start_time', 0),
+            "video_end_ms": t.get('end_time', 0),
+            "task_artifacts": [],
+            "status_id": t.get('status_id', TaskStatus.PENDING),
+            "severity_id": t.get('severity_id', TaskSeverity.REGULAR),
+            "task_type_id": t.get('task_type', TaskType.VERIFY)
+        } for t in data.get("tasks", [])
+    ]
+    
+    #4 ToDo : Handle Clarification Needed element  
+    #      
     return summary, tasks

@@ -90,30 +90,19 @@ $ExecutorScript = {
     Set-Location "G:\code\Inspecta\Executor"
     $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
     .\.venv\Scripts\Activate.ps1
-    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8004 --loop asyncio
+    & '.\.venv\Scripts\python.exe' -m src.main
 }
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $ExecutorScript
 #================================================================================
-Write-Host "🚀 Starting Executor on Port 8004..." -ForegroundColor Green
-#$Host.UI.RawUI.WindowTitle = "Executor (Port 8000)"
-$ExecutorScript = {
-    
-    Set-Location "G:\code\Inspecta\Executor"
-    $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
-    .\.venv\Scripts\Activate.ps1
-    & '.\.venv\Scripts\python.exe' -m uvicorn src.main:app --host 0.0.0.0 --port 8004 --loop asyncio
-}
-#Start-Process powershell -ArgumentList "-NoExit", "-Command", $ExecutorScript
-#================================================================================
 Write-Host "✅ All agents spawned successfully!" -ForegroundColor Green
 
-Write-Host "🚀 Starting Backend UI on Port 8000..." -ForegroundColor Cyan
-#$Host.UI.RawUI.WindowTitle = "Backend UI (Port 8000)"
+Write-Host "🚀 Starting Backend UI on Port 8080..." -ForegroundColor Cyan
+#$Host.UI.RawUI.WindowTitle = "Backend UI (Port 8080)"
 $BackendUIScript = {
     Set-Location "G:\code\Inspecta\UI\Backend"
     $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
     .\.venv\Scripts\Activate.ps1
-    & '.\.venv\Scripts\python.exe' -m uvicorn main:app --host 0.0.0.0 --port 8000 --loop asyncio --reload
+    & '.\.venv\Scripts\python.exe' -m uvicorn main:app --host 0.0.0.0 --port 8080 --loop asyncio --reload
 }
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $BackendUIScript
 #================================================================================

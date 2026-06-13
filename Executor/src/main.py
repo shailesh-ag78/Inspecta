@@ -8,7 +8,6 @@ import sys
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
-
 import uuid
 from fastapi import FastAPI, HTTPException, Request
 from dotenv import load_dotenv
@@ -19,6 +18,7 @@ from langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
 from google.cloud import storage
 from typing import Optional, Tuple
+from urllib.parse import urlparse
 
 from contextlib import asynccontextmanager
 
@@ -45,11 +45,29 @@ ALLOWED_TYPES = {
 }
 
 # Set this in your environment or .env file: ENV_MODE=local
-ENV_MODE = os.getenv("ENV_MODE", "local")
+ENV_MODE = os.getenv("ENV_MODE", "local_test")
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)
 LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"G:\code\Inspecta\Data"))
+
+def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
+    """
+    Splits a gs:// URI into bucket_name and blob_name.
+    """
+    # Parse the URI using standard URL rules
+    parsed = urlparse(gs_uri)
+    
+    # Check if the protocol is correct
+    if parsed.scheme != "gs":
+        raise ValueError("URI scheme must be 'gs'")
+        
+    bucket_name = parsed.netloc
+    # Strip the leading slash from the path to get the exact blob name
+    blob_name = parsed.path.lstrip("/")
+    
+    return bucket_name, blob_name
+
 
 # --- 1. Lifecycle Management ---
 @asynccontextmanager
@@ -108,7 +126,7 @@ from firebase_admin import auth
 async def verify_firebase_token(request: Request, call_next):
     try:
         # 1. Check if we are in local testing mode
-        if ENV_MODE == "local":
+        if ENV_MODE.lower() in ["local", "local_test"]:
             # Bypass Firebase and read IDs directly from headers for testing
             request.state.company_id = request.headers.get("X-Company-Id")
             request.state.company_storage_id = request.headers.get("X-Storage-Id")
@@ -173,7 +191,7 @@ async def create_inspection_endpoint(
 class IncidentUploadRequest(BaseModel):
     # Mandatory fields
     inspector_id: int
-    file_url: str = Field(..., description="Full GCS path, e.g., gs://inspecta-file-bucket/f83k-92js/uploads/file.mp4")
+    file_url: str = Field(..., description="Full GCS path, e.g., gs://<bucket_name>/f83k-92js/uploads/file.mp4")
     # Optional fields (defaulting to None)
     site_id: Optional[int] = None
     gps_coordinates: Optional[Tuple[float, float]] = None # (lat, long)
@@ -195,6 +213,7 @@ async def upload_incident_endpoint(
         raise HTTPException(status_code=401, detail="Invalid storage")
 
     # 1. Security Check: Prevent Directory Traversal
+    incident_file = ""
     if ENV_MODE == "local":
         # Resolve the path to its absolute form to handle any "../" tricks
         data.file_url = os.path.abspath(data.file_url)
@@ -209,6 +228,8 @@ async def upload_incident_endpoint(
         #if not data.file_url.startswith(f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"):
         allowed_prefix =  f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"
 
+    print(f"allowed_prefix : {allowed_prefix}")
+    print(f"data.file_url : {data.file_url}")
     if not data.file_url.startswith(allowed_prefix):
         raise HTTPException(status_code=403, detail="Security Violation: Invalid storage path.")
 
@@ -221,8 +242,9 @@ async def upload_incident_endpoint(
         file_size = os.path.getsize(data.file_url)
     else:
         # 2. GCS File Metadata Check (Existence and Size)
-        blob_name = data.file_url.replace("gs://{INSPCTA_FILE_BUCKET}/", "")
-        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+        #gs_uri = "gs://inspecta-file-bucket/CompanyStorage1/uploads/my-file.mp4"
+        bucket_name, blob_name = extract_bucket_and_blob_from_gs(data.file_url)
+        bucket = gcs_client.bucket(bucket_name)
         blob = bucket.get_blob(blob_name)  # blob = {company_storage_id}/UPLOADS_FOLDER/{filename}"
         if not blob:
             raise HTTPException(status_code=404, detail="File not found.")
@@ -280,17 +302,15 @@ async def get_upload_url(request: Request):
     company_storage_id = getattr(request.state, "company_storage_id", None)
     if company_storage_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
-
     content_type = request.headers.get("Content-Type")
     if content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Unsupported file type")
-
     """
     Server-side generation of the destination.
     The UI never decides the path.
     """
     # 1. Standard Logic (Same for both)
-    ext = ALLOWED_TYPES.get(content_type, ".bin")
+    ext = ALLOWED_TYPES.get(content_type, ".mp4")
     unique_name = f"{uuid.uuid4()}{ext}"
     
     # This is the "relative" path inside the bucket or root folder
@@ -310,7 +330,8 @@ async def get_upload_url(request: Request):
             "storage_type": "local"
         }
     else:
-        # 3. GCP Logic (Your original code)
+        # 3. GCP Logic
+        gcs_client = storage.Client()
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
         blob = bucket.blob(blob_name)
         url = blob.generate_signed_url(

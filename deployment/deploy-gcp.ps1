@@ -16,8 +16,12 @@
 .PARAMETER GcpAdminEmail
     The Google email address for the admin DevOps user (inspectaGCPAdmin).
 .EXAMPLE
-    .\deploy-gcp.ps1 -ProjectID "inspecta-495004" -DatabaseURL "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require" -GcpViewerEmail "shailesh.ag78@gmail.com" -GcpAdminEmail "sa.socialprofile@gmail.com" -UIOnly:$true
+    .\deploy-gcp.ps1 -ProjectID "inspecta-495004" -DatabaseURL "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require" -GcpViewerEmail "shailesh.ag78@gmail.com" -GcpAdminEmail "sa.socialprofile@gmail.com" -DeployUI:$true -DeployAgents:$true
 #>
+
+# TODO: Enable API Gateway and define rate limits (quotas) directly on it. UI Backend service will be called only from API Gateway
+# Enable Firebase Autehtication at API Gateway level
+
 param(
     [Parameter(Mandatory = $true)]
     [string]$ProjectID,
@@ -35,10 +39,22 @@ param(
     [string]$GcpAdminEmail,
 
     [Parameter(Mandatory = $false)]
-    [switch]$UIOnly
+    [switch]$DeployUI,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$DeployAgents,
+
+    [Parameter(Mandatory = $false)]
+    [string]$BuildNumber
 )
 
 $ErrorActionPreference = "Stop"
+
+# Use timestamp as build number if not provided
+if ([string]::IsNullOrEmpty($BuildNumber)) {
+    $BuildNumber = Get-Date -Format "yyyyMMdd-HHmmss"
+}
+
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🚀 Starting Inspecta Multi-Agent Deployment to GCP" -ForegroundColor Cyan
@@ -139,13 +155,47 @@ if (-not $RegistryExists) {
     catch {
         if ($_ -like "*ALREADY_EXISTS*") {
             Write-Host "Artifact Registry $RegistryName already exists (handled catch)."
-        } else {
+        }
+        else {
             throw $_
         }
     }
 }
 else {
     Write-Host "Artifact Registry $RegistryName already exists."
+}
+
+# Configure cleanup policy to keep only the latest 2 images of each service/package
+Write-Host "Configuring repository cleanup policies..."
+$PolicyJson = @'
+[
+  {
+    "name": "keep-latest-two",
+    "action": {
+      "type": "Keep"
+    },
+    "mostRecentVersions": {
+      "keepCount": 2
+    }
+  }
+]
+'@
+$PolicyFilePath = Join-Path $PSScriptRoot "cleanup-policy.json"
+$PolicyJson | Out-File -FilePath $PolicyFilePath -Encoding utf8
+
+try {
+    gcloud artifacts repositories set-cleanup-policies $RegistryName `
+        --location=$Region `
+        --policy=$PolicyFilePath `
+        --quiet
+}
+catch {
+    Write-Warning "Could not set Artifact Registry cleanup policy: $_"
+}
+finally {
+    if (Test-Path $PolicyFilePath) {
+        Remove-Item $PolicyFilePath
+    }
 }
 
 Write-Host "Configuring Docker authentication..."
@@ -160,26 +210,33 @@ Write-Host "`n[5/7] Building and pushing Docker container images..." -Foreground
 $OriginalDir = Get-Location
 Set-Location "$PSScriptRoot\.."
 
-$Services = @(
-    @{ Target = "ui-backend"; DockerfilePath = "UI/backend/Dockerfile" }
-)
+$Services = @()
 
-if (-not $UIOnly) {
+if ($DeployUI) {
+    $Services += @{ Target = "ui-backend"; DockerfilePath = "UI/backend/Dockerfile" }
+}
+
+if ($DeployAgents) {
     $Services += @(
-        @{ Target = "Agent-audioextract"; DockerfilePath = "AudioExtractorAgent/Dockerfile" },
-        @{ Target = "Agent-transcribe"; DockerfilePath = "TranscriptionAgent/Dockerfile" },
-        @{ Target = "Agent-taskgenerator"; DockerfilePath = "FieldReporterAgent/Dockerfile" },
+        @{ Target = "agent-audioextract"; DockerfilePath = "AudioExtractorAgent/Dockerfile" },
+        @{ Target = "agent-transcribe"; DockerfilePath = "TranscriptionAgent/Dockerfile" },
+        @{ Target = "agent-taskgenerator"; DockerfilePath = "FieldReporterAgent/Dockerfile" },
         @{ Target = "executor"; DockerfilePath = "Executor/Dockerfile" }
     )
 }
 
 foreach ($Svc in $Services) {
-    $Tag = "$Region-docker.pkg.dev/$ProjectID/$RegistryName/$($Svc.Target):latest"
-    Write-Host "`nBuilding $($Svc.Target) Docker Image..." -ForegroundColor Cyan
-    docker build -t $Tag -f $($Svc.DockerfilePath) .
+    $TagLatest = "$Region-docker.pkg.dev/$ProjectID/$RegistryName/$($Svc.Target):latest"
+    $TagVersion = "$Region-docker.pkg.dev/$ProjectID/$RegistryName/$($Svc.Target):$BuildNumber"
     
-    Write-Host "Pushing $Tag to Artifact Registry..." -ForegroundColor Cyan
-    docker push $Tag
+    Write-Host "`nBuilding $($Svc.Target) Docker Image (tags: $BuildNumber, latest)..." -ForegroundColor Cyan
+    docker build -t $TagVersion -t $TagLatest -f $($Svc.DockerfilePath) .
+    
+    Write-Host "Pushing $TagVersion to Artifact Registry..." -ForegroundColor Cyan
+    docker push $TagVersion
+    
+    Write-Host "Pushing $TagLatest to Artifact Registry..." -ForegroundColor Cyan
+    docker push $TagLatest
 }
 
 # Return to script directory
@@ -197,10 +254,10 @@ $AgentAudioExtractUrl = ""
 $AgentTranscribeUrl = ""
 $AgentTaskGeneratorUrl = ""
 
-if (-not $UIOnly) {
-    Write-Host "Deploying Agent-audioextract (AudioExtractor)..." -ForegroundColor Cyan
-    gcloud run deploy Agent-audioextract `
-        --image="$RegistryUri/Agent-audioextract:latest" `
+if ($DeployAgents) {
+    Write-Host "Deploying agent-audioextract (AudioExtractor)..." -ForegroundColor Cyan
+    gcloud run deploy agent-audioextract `
+        --image="$RegistryUri/agent-audioextract:$BuildNumber" `
         --region=$Region `
         --ingress=internal `
         --no-allow-unauthenticated `
@@ -210,9 +267,9 @@ if (-not $UIOnly) {
         --vpc-egress=private-ranges-only `
         --max-instances=2
 
-    Write-Host "Deploying Agent-transcribe (Transcription)..." -ForegroundColor Cyan
-    gcloud run deploy Agent-transcribe `
-        --image="$RegistryUri/Agent-transcribe:latest" `
+    Write-Host "Deploying agent-transcribe (Transcription)..." -ForegroundColor Cyan
+    gcloud run deploy agent-transcribe `
+        --image="$RegistryUri/agent-transcribe:$BuildNumber" `
         --region=$Region `
         --ingress=internal `
         --no-allow-unauthenticated `
@@ -222,9 +279,9 @@ if (-not $UIOnly) {
         --vpc-egress=private-ranges-only `
         --max-instances=2
 
-    Write-Host "Deploying Agent-taskgenerator (FieldReporter)..." -ForegroundColor Cyan
-    gcloud run deploy Agent-taskgenerator `
-        --image="$RegistryUri/Agent-taskgenerator:latest" `
+    Write-Host "Deploying agent-taskgenerator (FieldReporter)..." -ForegroundColor Cyan
+    gcloud run deploy agent-taskgenerator `
+        --image="$RegistryUri/agent-taskgenerator:$BuildNumber" `
         --region=$Region `
         --ingress=internal `
         --no-allow-unauthenticated `
@@ -236,9 +293,9 @@ if (-not $UIOnly) {
 
     # Fetch Agent URLs
     Write-Host "Retrieving agent endpoints..."
-    $AgentAudioExtractUrl = (gcloud run services describe Agent-audioextract --region=$Region --format="value(status.url)")
-    $AgentTranscribeUrl = (gcloud run services describe Agent-transcribe --region=$Region --format="value(status.url)")
-    $AgentTaskGeneratorUrl = (gcloud run services describe Agent-taskgenerator --region=$Region --format="value(status.url)")
+    $AgentAudioExtractUrl = (gcloud run services describe agent-audioextract --region=$Region --format="value(status.url)")
+    $AgentTranscribeUrl = (gcloud run services describe agent-transcribe --region=$Region --format="value(status.url)")
+    $AgentTaskGeneratorUrl = (gcloud run services describe agent-taskgenerator --region=$Region --format="value(status.url)")
 
     Write-Host "Agent-AudioExtract: $AgentAudioExtractUrl"
     Write-Host "Agent-Transcription: $AgentTranscribeUrl"
@@ -247,10 +304,10 @@ if (-not $UIOnly) {
 
 # 6.2 Deploy Executor Service (Internal Ingress, min 1 instance, 900s timeout, Private Network)
 $ExecutorUrl = ""
-if (-not $UIOnly) {
+if ($DeployAgents) {
     Write-Host "Deploying executor-service..." -ForegroundColor Cyan
     gcloud run deploy executor-service `
-        --image="$RegistryUri/executor:latest" `
+        --image="$RegistryUri/executor:$BuildNumber" `
         --region=$Region `
         --ingress=internal `
         --no-allow-unauthenticated `
@@ -270,59 +327,71 @@ if (-not $UIOnly) {
 }
 
 # 6.3 Deploy UI Backend Service (Public Ingress, min 1 instance, Private Network)
-Write-Host "Deploying ui-backend-service..." -ForegroundColor Cyan
-gcloud run deploy ui-backend-service `
-    --image="$RegistryUri/ui-backend:latest" `
-    --region=$Region `
-    --ingress=all `
-    --allow-unauthenticated `
-    --min-instances=1 `
-    --network=$VpcName `
-    --subnet=$SubnetName `
-    --vpc-egress=private-ranges-only `
-    --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --set-env-vars="db_dsn=$DatabaseURL,EXECUTOR_SERVICE_URL=$ExecutorUrl,ENV_MODE=production" `
-    --max-instances=2
+if ($DeployUI) {
+    if (-not $ExecutorUrl) {
+        Write-Host "Retrieving existing executor endpoint for UI configuration..."
+        $ExecutorUrl = (gcloud run services describe executor-service --region=$Region --format="value(status.url)" -ErrorAction SilentlyContinue)
+    }
 
-Start-Sleep -Seconds 5  # Wait for some time
+    Write-Host "Deploying ui-backend-service..." -ForegroundColor Cyan
+    gcloud run deploy ui-backend-service `
+        --image="$RegistryUri/ui-backend:$BuildNumber" `
+        --region=$Region `
+        --ingress=all `
+        --allow-unauthenticated `
+        --min-instances=1 `
+        --network=$VpcName `
+        --subnet=$SubnetName `
+        --vpc-egress=private-ranges-only `
+        --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
+        --set-env-vars="db_dsn=$DatabaseURL,EXECUTOR_SERVICE_URL=$ExecutorUrl,ENV_MODE=production" `
+        --max-instances=2
 
-$UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
-Write-Host "============ UI Backend URL: $UiUrl" -ForegroundColor Green
+    $UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
+    Write-Host "============ UI Backend URL: $UiUrl" -ForegroundColor Green
+}
 
 # -------------------------------------------------------------
 # 7. Configure IAM Security Permissions
 # -------------------------------------------------------------
 Write-Host "`n[7/7] Setting up secure IAM Roles & service-to-service permissions..." -ForegroundColor Yellow
 
-# 7.1 Enable UI service SA to invoke Executor Service
-if (-not $UIOnly) {
-    Write-Host "Allowing ui-service-sa to invoke executor-service..."
-    gcloud run services add-iam-policy-binding executor-service `
-        --region=$Region `
-        --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --role="roles/run.invoker" `
-        --platform=managed
-
-    # 7.2 Enable Executor service SA to invoke Agent Services
-    Write-Host "Allowing executor-service-sa to invoke Agent-audioextract, Agent-transcribe, and Agent-taskgenerator..."
-    gcloud run services add-iam-policy-binding Agent-audioextract `
-        --region=$Region `
-        --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --role="roles/run.invoker" `
-        --platform=managed
-
-    gcloud run services add-iam-policy-binding Agent-transcribe `
-        --region=$Region `
-        --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --role="roles/run.invoker" `
-        --platform=managed
-
-    gcloud run services add-iam-policy-binding Agent-taskgenerator `
-        --region=$Region `
-        --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --role="roles/run.invoker" `
-        --platform=managed
+# Helper to safely add invoker role only if the target service exists
+function Add-InvokerPolicy {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ServiceName,
+        [Parameter(Mandatory = $true)]
+        [string]$ServiceAccount
+    )
+    
+    $exists = gcloud run services list --region=$Region --filter="metadata.name=$ServiceName" --format="value(metadata.name)"
+    if ($exists) {
+        Write-Host "Allowing $ServiceAccount to invoke $ServiceName..."
+        try {
+            gcloud run services add-iam-policy-binding $ServiceName `
+                --region=$Region `
+                --member="serviceAccount:$ServiceAccount" `
+                --role="roles/run.invoker" `
+                --platform=managed `
+                --quiet
+        }
+        catch {
+            Write-Warning "Could not bind IAM policy for ${ServiceName}: $_"
+        }
+    }
+    else {
+        Write-Host "Service $ServiceName does not exist in region $Region, skipping policy binding."
+    }
 }
+
+# 7.1 Enable UI service SA to invoke Executor Service
+Add-InvokerPolicy -ServiceName "executor-service" -ServiceAccount "ui-service-sa@$ProjectID.iam.gserviceaccount.com"
+
+# 7.2 Enable Executor service SA to invoke Agent Services
+Add-InvokerPolicy -ServiceName "agent-audioextract" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
+Add-InvokerPolicy -ServiceName "agent-transcribe" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
+Add-InvokerPolicy -ServiceName "agent-taskgenerator" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
 
 # 7.3 Enable UI Service SA to verify Firebase auth tokens (Option A)
 Write-Host "Granting firebaseauth.admin role to ui-service-sa..."
@@ -349,7 +418,41 @@ gcloud projects add-iam-policy-binding $ProjectID `
     --member="user:$GcpAdminEmail" `
     --role="roles/owner"
 
+# -------------------------------------------------------------
+# 8. Create GCP Storage Bucket and Set CORS
+# -------------------------------------------------------------
+Write-Host "`n[8] Setting up Google Cloud Storage Bucket and CORS..." -ForegroundColor Yellow
+$BucketName = "inspecta-file-bucket"
+
+# Check if bucket exists
+$BucketExists = gcloud storage buckets list --filter="name=gs://$BucketName" --format="value(name)"
+if (-not $BucketExists) {
+    Write-Host "Creating Storage Bucket: gs://$BucketName..."
+    gcloud storage buckets create gs://$BucketName --location=$Region
+}
+else {
+    Write-Host "Storage Bucket gs://$BucketName already exists."
+}
+
+# Create temporary CORS configuration file
+$CorsFilePath = Join-Path $PSScriptRoot "cors-config.json"
+$CorsConfig = ConvertTo-Json -InputObject @(
+    @{
+        origin         = @("https://yourdomain.com", "http://localhost:3000")
+        method         = @("PUT", "GET", "POST", "DELETE", "OPTIONS")
+        responseHeader = @("Content-Type", "Access-Control-Allow-Origin")
+        maxAgeSeconds  = 3600
+    }
+) -Depth 4
+
+Set-Content -Path $CorsFilePath -Value $CorsConfig -Encoding UTF8
+
+Write-Host "Setting CORS policy on gs://$BucketName..."
+gcloud storage buckets update gs://$BucketName --cors-file=$CorsFilePath
+
 Write-Host "`n=================================================================" -ForegroundColor Green
 Write-Host "🎉 Deployment Complete!" -ForegroundColor Green
 Write-Host "UI Backend Public URL: $UiUrl" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Green
+
+

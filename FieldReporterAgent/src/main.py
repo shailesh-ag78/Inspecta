@@ -20,9 +20,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-INSPCTA_FILE_BUCKET = "inspecta-file-bucket"
-UPLOADS_FOLDER = "uploads"
-
 # Set this in your environment or .env file: ENV_MODE=local
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
@@ -37,6 +34,25 @@ LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"G:\code\I
 LOCAL_TEMP_FOLDER = os.path.join(LOCAL_STORAGE_ROOT, "temp")
 if not os.path.exists(LOCAL_TEMP_FOLDER):
     os.makedirs(LOCAL_TEMP_FOLDER)
+
+from typing import Tuple
+from urllib.parse import urlparse
+def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
+    """
+    Splits a gs:// URI into bucket_name and blob_name.
+    """
+    # Parse the URI using standard URL rules
+    parsed = urlparse(gs_uri)
+    
+    # Check if the protocol is correct
+    if parsed.scheme != "gs":
+        raise ValueError("URI scheme must be 'gs'")
+        
+    bucket_name = parsed.netloc
+    # Strip the leading slash from the path to get the exact blob name
+    blob_name = parsed.path.lstrip("/")
+    
+    return bucket_name, blob_name
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -80,6 +96,7 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
     
     logger.info(f"Generating tasks for transcript: {transcript_segments_json_url}...")
     
+    gcp_bucket = ""
     if(ENV_MODE == "local"):
         if not os.path.exists(transcript_segments_json_url):
             raise HTTPException(status_code=400, detail=f"Transcript segments file not found at: {transcript_segments_json_url}")
@@ -95,11 +112,12 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
                 raise HTTPException(status_code=500, detail="GCS client not initialized")
 
         #full_gcp_path = f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/UPLOADS_FOLDER/{filename}"    
-        blob_name = transcript_segments_json_url.replace(f"gs://{INSPCTA_FILE_BUCKET}/", "")
-        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+        bucket_name, blob_name = extract_bucket_and_blob_from_gs(transcript_segments_json_url)
+        bucket = gcs_client.bucket(bucket_name)
         blob = bucket.get_blob(blob_name)   # blob = {company_storage_id}/UPLOADS_FOLDER/{filename}"
         if not blob:
             raise HTTPException(status_code=400, detail=f"Transcript segments file not found at: {transcript_segments_json_url}")
+        gcp_bucket = bucket_name
 
         filename = blob_name.rsplit("/", 1)[-1]
         name_without_ext = filename.rsplit(".", 1)[0]  # Handle multiple dots correctly (e.g., "video.v1_audio.mp3")
@@ -128,10 +146,10 @@ async def generate_tasks_endpoint(request: GenerateTasksRequest):
 
     # 4. Return Result
     if(ENV_MODE != "local"):
-        # Upload Transcript file in GCS storage folder and set transcibe_url
-        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
-        new_transcibe_blob = bucket.blob(tasks_url)
-        new_transcibe_blob.upload_from_filename(tasks_file_path)
+        # Upload Task json file in GCS storage folder and set transcript_url
+        bucket = gcs_client.bucket(gcp_bucket)
+        new_transcipt_blob = bucket.blob(tasks_url)
+        new_transcipt_blob.upload_from_filename(tasks_file_path)
         # Delete temporary files
         os.remove(transcript_url_path)
         os.remove(tasks_file_path)
