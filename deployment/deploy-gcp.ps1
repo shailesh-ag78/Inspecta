@@ -188,7 +188,7 @@ $PolicyJson = @'
 ]
 '@
 $PolicyFilePath = Join-Path $PSScriptRoot "cleanup-policy.json"
-$PolicyJson | Out-File -FilePath $PolicyFilePath -Encoding utf8
+[System.IO.File]::WriteAllText($PolicyFilePath, $PolicyJson)
 
 try {
     gcloud artifacts repositories set-cleanup-policies $RegistryName `
@@ -212,6 +212,14 @@ gcloud auth configure-docker "$Region-docker.pkg.dev" --quiet
 # 5. Build, Tag, and Push Docker Images
 # -------------------------------------------------------------
 Write-Host "`n[5/7] Building and pushing Docker container images..." -ForegroundColor Yellow
+
+# Verify Docker is running
+Write-Host "Checking if Docker daemon is running..." -ForegroundColor Gray
+docker info > $null 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "ERROR: Docker daemon is not running. Please start Docker Desktop and try again."
+    exit 1
+}
 
 # Navigate to the workspace root directory (one folder up from deployment/)
 $OriginalDir = Get-Location

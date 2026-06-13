@@ -2,8 +2,10 @@
  * Backend API client for calling the Python FastAPI backend
  */
 
-//const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080';
-const BACKEND_URL = '/api/backend';
+const isServer = typeof window === 'undefined';
+const BACKEND_URL = isServer
+  ? (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080')
+  : '/api/backend';
 
 interface BackendResponse<T = any> {
   status: string;
@@ -17,6 +19,7 @@ async function callBackend<T = any>(
   options?: RequestInit
 ): Promise<BackendResponse<T>> {
   const url = `${BACKEND_URL}${path}`;
+  console.log("Url: ", url)
   try {
     const response = await fetch(url, {
       ...options,

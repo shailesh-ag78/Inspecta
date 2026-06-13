@@ -12,7 +12,7 @@ from typing import Tuple
 from urllib.parse import urlparse
 import dotenv
 
-from src.groq_service import GroqService
+from .groq_service import GroqService
 
 logging.basicConfig(
     level=logging.INFO,
