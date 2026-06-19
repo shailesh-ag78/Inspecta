@@ -16,10 +16,9 @@ export async function GET(request: NextRequest) {
       zip: combo.zip || null,
       inspection_id: combo.inspection_id ? String(combo.inspection_id) : null,
       inspection_created_at: combo.inspection_created_at || null,
-      // Display label for dropdown
       label: combo.inspection_id
-        ? `Site ${combo.site_id} :: Inspection ${combo.inspection_id?.substring(0, 8)}`
-        : `Site ${combo.site_id} :: No Inspection`
+        ? `${combo.site_name || `Site ${combo.site_id}`} :: Inspection ${combo.inspection_id?.substring(0, 8)}`
+        : `${combo.site_name || `Site ${combo.site_id}`} :: No Inspection`
     }));
 
     return NextResponse.json({ status: 'success', data: formattedCombinations }, { status: 200 });

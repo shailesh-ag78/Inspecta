@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut, Upload, Plus } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 import { auth, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import AddInspectionModal from '@/components/AddInspectionModal';
 
 interface SiteInspection {
   site_id: string;
@@ -89,6 +90,61 @@ export default function ReviewerDashboard() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [companyNameLoading, setCompanyNameLoading] = useState(false);
+
+  // Video Upload States
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [lastUploadedFileName, setLastUploadedFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setLastUploadedFileName(file.name);
+    }
+  };
+
+  const getIncidentVideoFileName = () => {
+    if (selectedFile) {
+      return selectedFile.name;
+    }
+    if (activeTask?.video_url) {
+      return activeTask.video_url.split('/').pop() || '';
+    }
+    return '';
+  };
+
+  // Add Inspection Modal State
+  const [isAddInspectionOpen, setIsAddInspectionOpen] = useState(false);
+
+  const handleAddInspection = () => {
+    setIsAddInspectionOpen(true);
+  };
+
+  // Extract unique sites from site-inspections list for the AddInspectionModal selection
+  const uniqueSites = Array.from(
+    new Map(
+      siteInspections.map((item) => [
+        item.site_id,
+        { id: item.site_id, name: item.site_name, address: item.address }
+      ])
+    ).values()
+  );
+
+  const handleAddInspectionSubmit = (data: {
+    siteId: string | null;
+    newSiteName?: string;
+    newSiteAddress?: string;
+    friendlyName?: string;
+  }) => {
+    if (data.siteId === null) {
+      alert(`Adding new inspection "${data.friendlyName || 'Unnamed'}" for a NEW site: "${data.newSiteName}" located at "${data.newSiteAddress}".`);
+    } else {
+      const selectedSite = siteInspections.find(s => s.site_id === data.siteId);
+      alert(`Adding new inspection "${data.friendlyName || 'Unnamed'}" to existing site: "${selectedSite?.site_name || data.siteId}".`);
+    }
+    setIsAddInspectionOpen(false);
+  };
 
   // Loading and error states
   const [siteInspectionsLoading, setSiteInspectionsLoading] = useState(true);
@@ -344,8 +400,6 @@ export default function ReviewerDashboard() {
       video.currentTime = activeTask.start_time;
     }
 
-    isInitiatingPlayRef.current = true;
-    video.play().catch((err) => console.error('Playback failed:', err));
   };
 
   const currentIsAudio = isAudioFile(activeTask?.video_url);
@@ -365,6 +419,8 @@ export default function ReviewerDashboard() {
     setActiveTask(null);
     setPendingPlayTask(null);
     prevTaskIdRef.current = null;
+    setSelectedFile(null);
+    setLastUploadedFileName(null);
   }, [selectedInspection, selectedIncidentId]);
 
   // Update video position and panel state when activeTask changes
@@ -380,6 +436,8 @@ export default function ReviewerDashboard() {
     }
     prevTaskIdRef.current = activeTask?.id || null;
     isInitiatingPlayRef.current = false; // Reset the flag
+    setSelectedFile(null); // Clear selected file when task changes
+    setLastUploadedFileName(null); // Clear last uploaded file name when task changes
 
     if (activeTask && videoRef.current) {
       // Reset the auto-pause flag for the new task range
@@ -391,7 +449,6 @@ export default function ReviewerDashboard() {
       }
     }
   }, [activeTask?.id]); // Only run when activeTask ID changes
-
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -598,7 +655,7 @@ export default function ReviewerDashboard() {
             <h1 className="text-3xl font-black tracking-tight bg-gradient-to-r from-blue-400 via-orange-400 to-purple-400 text-transparent bg-clip-text">
               INSPECTA
             </h1>
-            <p className="text-slate-400 text-sm mt-2 font-medium">Secure Task Reviewer Portal</p>
+            <p className="text-slate-400 text-sm mt-2 font-medium">Inspection simplified by technology</p>
 
             <div className="h-[1px] w-full bg-white/10 my-6" />
 
@@ -990,7 +1047,7 @@ export default function ReviewerDashboard() {
         {/* Right Pane - Evidence Vault */}
         {!isVideoCollapsed && (
           <aside className="w-2/5 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col shadow-inner relative border-l border-slate-700">
-            <div className="p-5 sticky top-0 overflow-y-auto">
+            <div className="p-5 pb-40 sticky top-0 overflow-y-auto">
               {/* Compact Header Row */}
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-white font-bold flex items-center min-w-0">
@@ -1100,6 +1157,41 @@ export default function ReviewerDashboard() {
                 </div>
               )}
             </div>
+            {/* Action Buttons Column */}
+            <div className="absolute bottom-12 right-5 flex flex-col items-end gap-3 z-30">
+              {/* Add Inspection Button */}
+              <button
+                onClick={handleAddInspection}
+                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+              >
+                <Plus className="w-4 h-4" />
+                Add Inspection
+              </button>
+
+              {/* Upload Incident Video Button Container */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+                >
+                  <Upload className="w-4 h-4" />
+                  Upload incident video
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="video/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
+            {/* Status Bar */}
+            <div className="absolute bottom-0 left-0 right-0 h-9 bg-slate-950/90 border-t border-slate-700/50 flex items-center px-4 z-30">
+              <span className="text-xs text-slate-400 font-medium truncate">
+                Last uploaded video: <span className="text-blue-400 font-semibold">{lastUploadedFileName || 'None'}</span>
+              </span>
+            </div>
           </aside>
         )}
 
@@ -1114,6 +1206,14 @@ export default function ReviewerDashboard() {
           </button>
         )}
       </main>
+
+      {/* Add Inspection Modal */}
+      <AddInspectionModal
+        isOpen={isAddInspectionOpen}
+        onClose={() => setIsAddInspectionOpen(false)}
+        sites={uniqueSites}
+        onSubmit={handleAddInspectionSubmit}
+      />
     </div>
   );
 }
