@@ -36,10 +36,10 @@ ON CONFLICT (id) DO NOTHING;
 
 -- 6. Seed Site
 INSERT INTO sites (company_id, industry_id, site_name, address) VALUES 
-(1, 1, 'Neev Site 1', 'Neev Site 1 Address, Baner'),
-(2, 2, 'Precision Site 1', 'Precision Manufacturing Site 1 Address, Chakan') ,
-(3, 3, 'Magic Site 1', 'Magic Interiors Site 1 Address, Karve Road, Pune') ,
-(4, 4, 'AgroCorp Site 1', 'AgroCorp Site 1 Address, Satara') 
+(1, 1, 'Baner Site', 'Neev Site 1 Address, Baner'),
+(2, 2, 'Chakan Site', 'Precision Manufacturing Site 1 Address, Chakan') ,
+(3, 3, 'Karve Road Site', 'Magic Interiors Site 1 Address, Karve Road, Pune') ,
+(4, 4, 'Satara Site', 'AgroCorp Site 1 Address, Satara') 
 ON CONFLICT (id) DO NOTHING;
 
 -- 7. Seed Inspector

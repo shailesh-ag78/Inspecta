@@ -52,6 +52,7 @@ CREATE TABLE inspections (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id INTEGER REFERENCES companies(id),
     site_id INTEGER REFERENCES sites(id),
+    friendly_name TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

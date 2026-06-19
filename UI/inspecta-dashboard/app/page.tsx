@@ -131,19 +131,83 @@ export default function ReviewerDashboard() {
     ).values()
   );
 
-  const handleAddInspectionSubmit = (data: {
+  const handleAddInspectionSubmit = async (data: {
     siteId: string | null;
     newSiteName?: string;
     newSiteAddress?: string;
     friendlyName?: string;
   }) => {
-    if (data.siteId === null) {
-      alert(`Adding new inspection "${data.friendlyName || 'Unnamed'}" for a NEW site: "${data.newSiteName}" located at "${data.newSiteAddress}".`);
-    } else {
-      const selectedSite = siteInspections.find(s => s.site_id === data.siteId);
-      alert(`Adding new inspection "${data.friendlyName || 'Unnamed'}" to existing site: "${selectedSite?.site_name || data.siteId}".`);
+    try {
+      const executionPromise = (async () => {
+        let targetSiteId = data.siteId;
+
+        // 1. If it's a new site, create the site first
+        if (data.siteId === null) {
+          if (!data.newSiteName || !data.newSiteAddress) {
+            throw new Error("Site Name and Address are required to add a new site.");
+          }
+
+          const siteResponse = await authenticatedFetch('/api/backend/api/sites', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              site_name: data.newSiteName,
+              address: data.newSiteAddress,
+            }),
+          });
+
+          if (!siteResponse.ok) {
+            const errData = await siteResponse.json().catch(() => null);
+            throw new Error(errData?.detail || 'Failed to create new site');
+          }
+
+          const siteResult = await siteResponse.json();
+          targetSiteId = String(siteResult.data?.site_id);
+        }
+
+        if (!targetSiteId) {
+          throw new Error("Invalid Site ID");
+        }
+
+        // 2. Create the inspection
+        const query = data.friendlyName
+          ? `/api/backend/api/inspections?siteId=${targetSiteId}&friendlyName=${encodeURIComponent(data.friendlyName)}`
+          : `/api/backend/api/inspections?siteId=${targetSiteId}`;
+
+        const inspectionResponse = await authenticatedFetch(query, {
+          method: 'POST',
+        });
+
+        if (!inspectionResponse.ok) {
+          const errData = await inspectionResponse.json().catch(() => null);
+          throw new Error(errData?.detail || 'Failed to create new inspection');
+        }
+
+        const inspectionResult = await inspectionResponse.json();
+        const newInspectionId = inspectionResult.data?.inspection_id;
+
+        setIsAddInspectionOpen(false);
+
+        // 3. Refresh the site inspections list and select the new inspection
+        await fetchSiteInspections();
+        if (newInspectionId) {
+          setSelectedInspection(newInspectionId);
+        }
+      })();
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout : Failed to add new Inspection")), 60000)
+      );
+
+      // Race the execution against the 60-second timeout
+      await Promise.race([executionPromise, timeoutPromise]);
+
+    } catch (error) {
+      console.error("Error adding inspection:", error);
+      alert(error instanceof Error ? error.message : 'Unknown error');
     }
-    setIsAddInspectionOpen(false);
   };
 
   // Loading and error states
@@ -216,38 +280,38 @@ export default function ReviewerDashboard() {
     return audioExtensions.some(ext => url.toLowerCase().endsWith(ext));
   }, []);
 
+  const fetchSiteInspections = useCallback(async () => {
+    try {
+      setSiteInspectionsLoading(true);
+      setSiteInspectionsError(null);
+      const response = await authenticatedFetch(`/frontend-api/site-inspections`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch site-inspections: ${response.statusText}`);
+      }
+
+      const apiResponse = await response.json();
+      const combinedData = apiResponse.data || [];
+      setSiteInspections(combinedData);
+
+      // Auto-select first inspection (must have valid inspection_id)
+      if (combinedData.length > 0 && combinedData[0].inspection_id) {
+        setSelectedInspection(combinedData[0].inspection_id);
+      }
+    } catch (error) {
+      console.error('Error fetching site-inspections:', error);
+      setSiteInspectionsError(error instanceof Error ? error.message : 'Failed to fetch site-inspections');
+    } finally {
+      setSiteInspectionsLoading(false);
+    }
+  }, []);
+
   // Fetch site-inspections when user is authenticated
   useEffect(() => {
     if (authLoading || !user) return;
 
-    const fetchSiteInspections = async () => {
-      try {
-        setSiteInspectionsLoading(true);
-        setSiteInspectionsError(null);
-        const response = await authenticatedFetch(`/frontend-api/site-inspections`);
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch site-inspections: ${response.statusText}`);
-        }
-
-        const apiResponse = await response.json();
-        const combinedData = apiResponse.data || [];
-        setSiteInspections(combinedData);
-
-        // Auto-select first inspection (must have valid inspection_id)
-        if (combinedData.length > 0 && combinedData[0].inspection_id) {
-          setSelectedInspection(combinedData[0].inspection_id);
-        }
-      } catch (error) {
-        console.error('Error fetching site-inspections:', error);
-        setSiteInspectionsError(error instanceof Error ? error.message : 'Failed to fetch site-inspections');
-      } finally {
-        setSiteInspectionsLoading(false);
-      }
-    };
-
     fetchSiteInspections();
-  }, [user, authLoading]);
+  }, [user, authLoading, fetchSiteInspections]);
 
   // Fetch incidents when inspection changes
   useEffect(() => {

@@ -228,16 +228,36 @@ export async function getCompanyInfo(
 
 export async function createInspection(
   siteId: number,
+  friendlyName?: string,
   headers?: Record<string, string>
 ): Promise<string> {
+  const query = friendlyName 
+    ? `/api/inspections?siteId=${siteId}&friendlyName=${encodeURIComponent(friendlyName)}`
+    : `/api/inspections?siteId=${siteId}`;
   const response = await callBackend<{ inspection_id: string }>(
-    `/api/inspections?siteId=${siteId}`,
+    query,
     {
       method: 'POST',
       headers,
     }
   );
   return response.data?.inspection_id || '';
+}
+
+export async function createSite(
+  siteName: string,
+  address: string,
+  headers?: Record<string, string>
+): Promise<number> {
+  const response = await callBackend<{ site_id: number }>(
+    `/api/sites`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ site_name: siteName, address }),
+      headers,
+    }
+  );
+  return response.data?.site_id || 0;
 }
 
 export async function verifyInspectionOwnership(

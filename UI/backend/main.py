@@ -161,6 +161,10 @@ class TaskReviewInput(BaseModel):
     comments: str
     status_id: int
 
+class SiteInput(BaseModel):
+    site_name: str
+    address: str
+
 # ============ Health Check ============
 
 @app.get("/health")
@@ -430,6 +434,23 @@ async def get_sites(request: Request):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/sites")
+async def create_site(
+    request: Request,
+    site: SiteInput
+):
+    """Create a new site"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        site_id = await repository.create_site(company_id, site.site_name, site.address)
+        return {"status": "success", "data": {"site_id": site_id}}
+    except Exception as e:
+        print(f"❌ Error creating site: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ============ Site-Inspection Endpoints ============
 
 @app.get("/api/site-inspections")
@@ -450,6 +471,7 @@ async def get_site_inspections(request: Request):
                 "site_name": combo.get('site_name', ''),
                 "address": combo.get('address', ''),
                 "inspection_id": str(combo.get('inspection_id', '')) if combo.get('inspection_id') else None,
+                "inspection_friendly_name": str(combo.get('inspection_friendly_name', '')) if combo.get('inspection_friendly_name') else None,
                 "inspection_created_at": combo.get('inspection_created_at').isoformat() if combo.get('inspection_created_at') else None
             }
             formatted_combinations.append(formatted_combo)
@@ -489,7 +511,8 @@ async def get_company_info(
 @app.post("/api/inspections")
 async def create_inspection(
     request: Request,
-    siteId: int = Query(..., description="Site ID")
+    siteId: int = Query(..., description="Site ID"),
+    friendlyName: Optional[str] = Query(None, description="Friendly Name of the inspection")
 ):
     """Create a new inspection"""
     company_id = getattr(request.state, "company_id", None)
@@ -497,7 +520,8 @@ async def create_inspection(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
-        inspection_id = await repository.create_inspection(company_id, siteId)
+        print(f"Received CREATE /api/inspections request for siteId {siteId}, friendlyName {friendlyName} ")
+        inspection_id = await repository.create_inspection(company_id, siteId, friendlyName)
         
         return {"status": "success", "data": {"inspection_id": inspection_id}}
     except Exception as e:

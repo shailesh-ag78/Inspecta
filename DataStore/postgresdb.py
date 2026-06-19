@@ -194,20 +194,37 @@ class IncidentRepository:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
-    async def create_inspection(self, company_id: int, site_id: int) -> Optional[str]:
+    async def create_inspection(self, company_id: int, site_id: int, friendly_name: Optional[str] = None) -> Optional[str]:
             """Inserts a new inspection record and returns the UUID."""
             async with self.session(company_id) as conn:
                 async with conn.cursor() as cur:
                     await cur.execute(
                         """
-                        INSERT INTO inspections (company_id, site_id) 
-                        VALUES (%s, %s) 
+                        INSERT INTO inspections (company_id, site_id, friendly_name) 
+                        VALUES (%s, %s, %s) 
                         RETURNING id
                         """,
-                        (company_id, site_id)
+                        (company_id, site_id, friendly_name)
                     )
                     result = await cur.fetchone()
                     return str(result['id']) if result else None
+
+    async def create_site(self, company_id: int, site_name: str, address: str, industry_id: int = 1) -> int:
+        """Creates a new site and returns its ID."""
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    INSERT INTO sites (company_id, site_name, address, industry_id) 
+                    VALUES (%s, %s, %s, %s) 
+                    RETURNING id
+                    """,
+                    (company_id, site_name, address, industry_id)
+                )
+                result = await cur.fetchone()
+                if result is None:
+                    raise RuntimeError("Failed to create site: No ID returned.")
+                return int(result['id'])
 
     async def verify_inspection_ownership(self, company_id: int, inspection_id: str) -> bool:
             """
@@ -326,6 +343,7 @@ class IncidentRepository:
                         s.site_name,
                         s.address,
                         insp.id as inspection_id,
+                        insp.friendly_name as inspection_friendly_name,
                         insp.created_at as inspection_created_at
                     FROM sites s
                     LEFT JOIN inspections insp ON s.id = insp.site_id AND insp.company_id = %s
