@@ -96,11 +96,36 @@ export default function ReviewerDashboard() {
   const [lastUploadedFileName, setLastUploadedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setSelectedFile(file);
-      setLastUploadedFileName(file.name);
+
+      if (!selectedInspection) {
+        alert("Please select an inspection before uploading a video.");
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('inspectionId', selectedInspection);
+
+        const response = await fetch('/frontend-api/video', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          throw new Error('Upload failed');
+        }
+
+        const result = await response.json();
+        setLastUploadedFileName(file.name);
+      } catch (error) {
+        console.error("Upload failed:", error);
+        setLastUploadedFileName(`Failed to upload video ${file.name}`);
+      }
     }
   };
 
@@ -1253,7 +1278,13 @@ export default function ReviewerDashboard() {
             {/* Status Bar */}
             <div className="absolute bottom-0 left-0 right-0 h-9 bg-slate-950/90 border-t border-slate-700/50 flex items-center px-4 z-30">
               <span className="text-xs text-slate-400 font-medium truncate">
-                Last uploaded video: <span className="text-blue-400 font-semibold">{lastUploadedFileName || 'None'}</span>
+                {lastUploadedFileName?.startsWith('Failed') ? (
+                  <span className="text-red-400 font-semibold">{lastUploadedFileName}</span>
+                ) : (
+                  <>
+                    Last uploaded video: <span className="text-blue-400 font-semibold">{lastUploadedFileName || 'None'}</span>
+                  </>
+                )}
               </span>
             </div>
           </aside>

@@ -164,7 +164,8 @@ async def verify_firebase_token(request: Request, call_next):
 # Schema for the incoming request
 class InspectionCreateRequest(BaseModel):
     site_id: int = Field(..., gt=0, description="The unique ID of the site being inspected")
-    inspector_id: int = Field(..., gt=0, description="The ID of the person performing the inspection")
+    inspector_id: Optional[int] = Field(None, description="The ID of the person performing the inspection")
+    friendly_name: Optional[str] = Field(None, description="Friendly Name of the inspection")
 
 @app.post("/inspections")
 async def create_inspection_endpoint(
@@ -187,7 +188,8 @@ async def create_inspection_endpoint(
         # 2. Call the Executor to handle validation and creation
         inspection_id = await executor.create_new_inspection(
             company_id=company_id,
-            site_id=data.site_id
+            site_id=data.site_id,
+            friendly_name=data.friendly_name
         )
         
         return {

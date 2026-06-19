@@ -596,14 +596,15 @@ class WorkflowExecutor:
             }
         }
 
-    async def create_new_inspection(self, company_id: int, site_id: int) -> Optional[str]:
+    async def create_new_inspection(self, company_id: int, site_id: int, friendly_name : Optional[str] = None ) -> Optional[str]:
             """
             Creates a master inspection record in the DB.
             The repository uses RLS to ensure the company_id is enforced.
             """
             inspection_id = await self.repo.create_inspection(
                 company_id=company_id,
-                site_id=site_id
+                site_id=site_id,
+                friendly_name=friendly_name
             )
             return inspection_id
         

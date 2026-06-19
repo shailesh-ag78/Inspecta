@@ -335,7 +335,7 @@ if ($DeployAgents) {
         --region=$Region `
         --ingress=internal `
         --no-allow-unauthenticated `
-        --min-instances=1 `
+        --min-instances=0 `
         --timeout=900 `
         --network=$VpcName `
         --subnet=$SubnetName `
@@ -363,7 +363,7 @@ if ($DeployUI) {
         --region=$Region `
         --ingress=all `
         --allow-unauthenticated `
-        --min-instances=1 `
+        --min-instances=0 `
         --network=$VpcName `
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `

@@ -1,7 +1,8 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'node:stream';
+import { writeFile, mkdir } from 'fs/promises';
 
 export async function GET(request: NextRequest) {
   try {
@@ -106,5 +107,41 @@ export async function GET(request: NextRequest) {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData();
+    const file = formData.get('file') as File;
+    const inspectionId = formData.get('inspectionId') as string;
+
+    if (!file || !inspectionId) {
+      return NextResponse.json({ error: 'File and inspectionId are required' }, { status: 400 });
+    }
+    console.log(`Uploading file: ${file.name} for inspectionId: ${inspectionId}`);
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // Create a directory inside the workspace to store uploaded videos
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
+    await mkdir(uploadDir, { recursive: true });
+
+    // Save the file
+    const filePath = path.join(uploadDir, file.name);
+    await writeFile(filePath, buffer);
+
+    console.log(`Successfully saved uploaded video to ${filePath}`);
+
+    return NextResponse.json({
+      status: 'success',
+      filePath: filePath,
+      fileName: file.name
+    }, { status: 201 });
+
+  } catch (error) {
+    console.error('Error saving uploaded video:', error);
+    return NextResponse.json({ error: 'Failed to upload video', details: String(error) }, { status: 500 });
   }
 }

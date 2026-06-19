@@ -31,13 +31,23 @@ from typing import Optional, List, Dict, Any
 import firebase_admin
 from firebase_admin import credentials, auth
 import asyncio
-import os
 import dotenv
 from postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType, Industry
+import shutil
+from google.cloud import storage
 
 # Load environment variables from .env file
-env_path = Path(__file__).parent.parent / ".env"
+env_path = Path(__file__).parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
+
+ENV_MODE = os.getenv("ENV_MODE", "local")
+INSPCTA_FILE_BUCKET = os.getenv("INSPCTA_FILE_BUCKET", "inspecta-file-bucket")
+UPLOADS_FOLDER = os.getenv("UPLOADS_FOLDER", "uploads")
+TIMEOUT= os.getenv("TIMEOUT", "60")
+BASE_EXECUTOR_URL = os.getenv("BASE_EXECUTOR_URL", "http://localhost:8004")
+
+import urllib.request
+import json
 
 app = FastAPI(
     title="Inspecta UI Backend API",
@@ -171,6 +181,44 @@ class SiteInput(BaseModel):
 async def health_check():
     """Health check endpoint"""
     return {"status": "ok", "service": "Inspecta UI Backend"}
+
+
+# ============ Utility Functions ============
+
+def CallExecutorService(executor_service_url, method, headers: dict, payload: Optional[dict]):
+    print(f"Calling Executor at {executor_service_url} with payload {payload}")
+    try:
+        if payload is None:
+            payload = {}
+            
+        req = urllib.request.Request(   
+            executor_service_url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method=method
+        )
+        
+        # Timeout at 60s as expected for the timeboxed submission
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
+            resp_data = json.loads(response.read().decode("utf-8"))
+            if resp_data.get("status") == "success":
+                return resp_data
+            else:
+                raise HTTPException(status_code=500, detail=resp_data.get("message", "Failed to call Executor Service"))
+                
+    except urllib.error.HTTPError as e:
+        error_msg = e.read().decode("utf-8")
+        try:
+            error_json = json.loads(error_msg)
+            detail = error_json.get("detail", error_msg)
+        except Exception:
+            detail = error_msg
+        print(f"Executor HTTP Error ({e.code}): {detail}")
+        raise HTTPException(status_code=e.code, detail=f"Executor error: {detail}")
+    except Exception as e:
+        print(f"Error calling Executor: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
+
 
 # ============ Incidents Endpoints ============
 
@@ -508,6 +556,38 @@ async def get_company_info(
 
 # ============ Inspection Endpoints ============
 
+def fill_auth_headers(request: Request, headers: dict):
+    """Fill auth headers for executor service"""
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        headers["Authorization"] = auth_header
+    
+    company_id = getattr(request.state, "company_id", None)
+    company_storage_id = getattr(request.state, "company_storage_id", None)
+    if company_id is not None:
+        headers["X-Company-Id"] = str(company_id)
+    if company_storage_id is not None:
+        headers["X-Storage-Id"] = str(company_storage_id)
+    
+    headers["Content-Type"] = "application/json"
+    
+    return headers
+
+def upload_file_data(file_path, real_upload_path, blob_name):
+    if(ENV_MODE == "local"):
+        # In a local scenario, the UI would upload the file to 'real_upload_path'.
+        # For this test, we manually copy it to simulate a successful upload.    
+        shutil.copy(file_path, real_upload_path)
+        print("✅ Simulated file upload to local storage.")
+    else:
+        # Upload to GCS
+        gcs_client = storage.Client()
+        bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
+        blob = bucket.blob(blob_name)
+        blob.upload_from_filename(file_path)
+        print(f"✅ Uploaded to GCS: {file_path}")
+
+
 @app.post("/api/inspections")
 async def create_inspection(
     request: Request,
@@ -521,11 +601,24 @@ async def create_inspection(
 
     try:
         print(f"Received CREATE /api/inspections request for siteId {siteId}, friendlyName {friendlyName} ")
-        inspection_id = await repository.create_inspection(company_id, siteId, friendlyName)
+        headers = {}
+        headers = fill_auth_headers(request, headers)
         
+        # Prepare headers to forward auth context (specifically for RLS mappings)        
+        INSPECTOR_ID = 1  #  TBD : Ideally shall take inspector id from Request.state (shall come from Firebase custom claim) 
+        payload = {
+            "site_id": siteId,
+            "inspector_id": INSPECTOR_ID,
+            "friendly_name": friendlyName
+        }
+        executor_service_url = BASE_EXECUTOR_URL + "/inspections"
+        resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
+        inspection_id = resp_data.get("inspection_id")
         return {"status": "success", "data": {"inspection_id": inspection_id}}
+                        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Error calling Executor: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
 
 @app.get("/api/inspections/{inspectionId}/verify")
 async def verify_inspection_ownership(
@@ -543,6 +636,62 @@ async def verify_inspection_ownership(
         return {"status": "success", "data": {"owns": owns}}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/inspections/{inspection_id}/upload-incident")
+async def upload_incident(
+    request: Request,           # Request Object (Mandatory),
+    inspection_id: str          # Path Parameter (Mandatory)
+):
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    
+    company_storage_id = getattr(request.state, "company_storage_id", None)
+    if company_storage_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    try:
+        print(f"Received request for Uploading incident for inspection {inspection_id}")
+        headers = {}
+        headers = fill_auth_headers(request, headers)
+
+        print("\n------------------ [STEP 1] Get Real Upload URL ------------------")
+        request_headers= headers.copy() 
+        request_headers["Content-Type"] = "video/mp4"  # Specific Content type is needed to fetch URL
+        executor_service_url = BASE_EXECUTOR_URL + "/get-upload-url"
+        resp_data = CallExecutorService(executor_service_url, "GET", request_headers, None)
+        real_upload_path = resp_data.get("upload_url")
+        blob_name = resp_data.get("blob_name")
+        print(f"✅ Received Upload Path: {real_upload_path} and  Received Blob Name: {blob_name}")
+        
+        INSPECTOR_ID = 1  #  TBD : Ideally shall take inspector id from Request.state (shall come from Firebase custom claim) 
+        print("\n------------------ [STEP 2] Upload File ------------------")
+        file_path = ""  # To Do: This shall be replaced by the file name on local machine 
+        upload_file_data(file_path, real_upload_path, blob_name)
+
+        executor_service_url =  BASE_EXECUTOR_URL + "/get-upload-url"
+        resp_data = CallExecutorService(executor_service_url, "GET", headers, None)
+
+        print("\n------------------ [STEP 3] Trigger Real Incident Upload & LangGraph ------------------")
+        file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{blob_name}" if ENV_MODE != "local" else real_upload_path
+        incident_payload = {
+            "inspector_id": INSPECTOR_ID,
+            "file_url": file_url_payload
+        }
+        executor_service_url =  BASE_EXECUTOR_URL + f"/inspections/{inspection_id}/upload-incident"
+        resp_data = CallExecutorService(executor_service_url, "POST", headers, incident_payload)
+        incident_id = resp_data.get("incident_id")
+        return {"status": "success", "data": {"incident_id": incident_id}}
+                        
+    except Exception as e:
+        print(f"Error calling Executor: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
+
+# @app.get("/incidents/{incident_id}/status")
+# async def get_status_endpoint(incident_id: str, request: Request):
+
+# @app.get("/get-upload-url")
+# async def get_upload_url(request: Request):
 
 # ============ Enums Endpoints (for frontend reference) ============
 
