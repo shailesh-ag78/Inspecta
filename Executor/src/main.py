@@ -349,7 +349,7 @@ async def get_upload_url(request: Request):
         blob = bucket.blob(blob_name)
         url = blob.generate_signed_url(
             version="v4",
-            expiration=datetime.timedelta(minutes=30),
+            expiration=datetime.timedelta(minutes=15),
             method="PUT",
             content_type=content_type
         )

@@ -526,11 +526,6 @@ class WorkflowExecutor:
             raise
 
     async def get_status(self, company_id: int, incident_id: str):
-        """
-        Interfaced from UI.
-        Provides granular status by checking DB and LangGraph state.
-        Fixed "queued" status bug by checking if any node has actually run.
-        """
         # 1. SECURITY CHECK (Ownership)
         # If this fails, the user gets nothing.
         db_record = await self.repo.get_incident_progress(company_id, incident_id)
@@ -550,8 +545,7 @@ class WorkflowExecutor:
         # 3. STATUS DERIVATION (FIXED)
         # Check if the workflow has produced meaningful output
         has_audio = bool(state.values.get("audio_url"))
-        has_transcript = bool(state.values.get("transcript")) and \
-                        state.values.get("transcript") != "[Transcription Service Placeholder] Real transcript will appear here"
+        has_transcript = bool(state.values.get("transcript"))
         has_tasks = bool(state.values.get("generated_tasks"))
         
         # Determine current status based on execution state

@@ -260,6 +260,28 @@ export async function createSite(
   return response.data?.site_id || 0;
 }
 
+export interface UploadUrlResponse {
+  upload_url: string;
+  blob_name: string;
+  storage_type: string;
+}
+
+export async function getUploadUrl(
+  headers?: Record<string, string>
+): Promise<UploadUrlResponse> {
+  const response = await callBackend<UploadUrlResponse>(
+    `/api/get-upload-url`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+  if (response.status !== 'success' || !response.data) {
+    throw new Error(response.message || 'Failed to get upload URL');
+  }
+  return response.data;
+}
+
 export async function verifyInspectionOwnership(
   inspectionId: string,
   headers?: Record<string, string>

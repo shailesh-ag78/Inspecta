@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getUploadUrl } from '@/lib/backend-client';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'node:stream';
@@ -119,29 +120,55 @@ export async function POST(request: NextRequest) {
     if (!file || !inspectionId) {
       return NextResponse.json({ error: 'File and inspectionId are required' }, { status: 400 });
     }
-    console.log(`Uploading file: ${file.name} for inspectionId: ${inspectionId}`);
+    console.log(`Uploading incident file: ${file.name} for inspectionId: ${inspectionId}`);
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // 1. Fetch signed upload URL, blob name, and storage type from backend client
+    const authHeader = request.headers.get('authorization');
+    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
+    const { upload_url: uploadUrl, blob_name: blobName, storage_type: storageType } = await getUploadUrl(authHeaders);
+    // TODO: Comment following console.log message for security reasons
+    console.log(`Received Upload Path: ${uploadUrl}, Blob Name: ${blobName}, Storage Type: ${storageType}`);
 
-    // Create a directory inside the workspace to store uploaded videos
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadDir, { recursive: true });
+    // 2. Upload file depending on storage_type
+    if (storageType === 'local') {
+      // Local machine file path
+      const bytes = await file.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const dir = path.dirname(uploadUrl);
+      await mkdir(dir, { recursive: true });
+      await writeFile(uploadUrl, buffer);
+      console.log(`Successfully saved uploaded video to local machine at: ${uploadUrl}`);
+    } else if (storageType === 'gcs') {
+      try {
+        const gcsResponse = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'video/mp4',
+          },
+          body: file,
+        });
 
-    // Save the file
-    const filePath = path.join(uploadDir, file.name);
-    await writeFile(filePath, buffer);
+        if (!gcsResponse.ok) {
+          throw new Error(`Failed to upload to GCS: ${gcsResponse.status} ${gcsResponse.statusText}`);
+        }
 
-    console.log(`Successfully saved uploaded video to ${filePath}`);
+        console.log(`Successfully uploaded video to GCS: ${blobName}`);
+      } catch (err) {
+        console.error("GCS Upload failed:", err);
+        throw err; // Re-throw to handle it in your UI component
+      }
+    } else {
+      throw new Error(`Unknown or unsupported storage type: ${storageType}`);
+    }
 
     return NextResponse.json({
       status: 'success',
-      filePath: filePath,
+      filePath: uploadUrl,
       fileName: file.name
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error saving uploaded video:', error);
+    console.error('Error saving/uploading video:', error);
     return NextResponse.json({ error: 'Failed to upload video', details: String(error) }, { status: 500 });
   }
 }
