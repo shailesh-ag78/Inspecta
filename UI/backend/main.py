@@ -684,7 +684,7 @@ async def upload_incident(
         resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
         incident_id = resp_data.get("incident_id")
         print(f"✅ Incident Created: {incident_id}. LangGraph thread started")
-        return {"status": "Success", "data": {"incident_id": incident_id}}
+        return {"status": "success", "data": {"incident_id": incident_id}}
     except Exception as e:
         print(f"Error calling Executor: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
