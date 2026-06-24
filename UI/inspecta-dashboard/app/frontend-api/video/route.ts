@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUploadUrl } from '@/lib/backend-client';
+import { getUploadUrl, uploadIncident } from '@/lib/backend-client';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'node:stream';
@@ -125,7 +125,6 @@ export async function POST(request: NextRequest) {
     // 1. Fetch signed upload URL, blob name, and storage type from backend client
     const authHeader = request.headers.get('authorization');
     const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
-    console.log('Test : Auth Headers:', authHeaders);
     const { upload_url: uploadUrl, blob_name: blobName, storage_type: storageType } = await getUploadUrl(authHeaders);
     // TODO: Comment following console.log message for security reasons
     console.log(`Received Upload Path: ${uploadUrl}, Blob Name: ${blobName}, Storage Type: ${storageType}`);
@@ -162,10 +161,15 @@ export async function POST(request: NextRequest) {
       throw new Error(`Unknown or unsupported storage type: ${storageType}`);
     }
 
+    // Upload incident in the system
+    const inspectorId = 1;  // To Do : This is logged in User specific; ideally this shall come from Firebase token claims
+    const { incident_id: incidentId } = await uploadIncident(inspectorId, uploadUrl, blobName, authHeaders);
+    console.log(`✅ Uploaded Incident successfully with ID : ${incidentId}`);
+
     return NextResponse.json({
+      message: 'Video uploaded successfully',
       status: 'success',
-      filePath: uploadUrl,
-      fileName: file.name
+      incidentId: incidentId,
     }, { status: 201 });
 
   } catch (error) {

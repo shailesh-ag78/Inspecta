@@ -96,7 +96,7 @@ export default function ReviewerDashboard() {
   const [lastUploadedFileName, setLastUploadedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const uploadIncidentVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setSelectedFile(file);
@@ -122,6 +122,7 @@ export default function ReviewerDashboard() {
 
         const result = await response.json();
         setLastUploadedFileName(file.name);
+        console.log("Video file uploaded successfully : ", result);
       } catch (error) {
         console.error("Upload failed:", error);
         setLastUploadedFileName(`Failed to upload video ${file.name}`);
@@ -1270,7 +1271,7 @@ export default function ReviewerDashboard() {
                   type="file"
                   ref={fileInputRef}
                   accept="video/*"
-                  onChange={handleFileChange}
+                  onChange={uploadIncidentVideo}
                   className="hidden"
                 />
               </div>

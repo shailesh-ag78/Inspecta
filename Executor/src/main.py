@@ -56,7 +56,7 @@ ALLOWED_TYPES = {
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
-ENV_MODE = os.getenv("ENV_MODE", "local")
+ENV_MODE = os.getenv("ENV_MODE", "local").lower()
 logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)
@@ -212,8 +212,6 @@ class IncidentUploadRequest(BaseModel):
     # Mandatory fields
     inspector_id: int
     file_url: str = Field(..., description="Full GCS path, e.g., gs://<bucket_name>/f83k-92js/uploads/file.mp4")
-    # Optional fields (defaulting to None)
-    site_id: Optional[int] = None
     gps_coordinates: Optional[Tuple[float, float]] = None # (lat, long)
 
 @app.post("/inspections/{inspection_id}/upload-incident")
@@ -287,7 +285,6 @@ async def upload_incident_endpoint(
         inspector_id=data.inspector_id,
         file_url=data.file_url,
         existing_incident_id = None,
-        site_id=data.site_id,
         gps_coordinates=data.gps_coordinates
     )
 
@@ -343,7 +340,6 @@ async def get_upload_url(request: Request):
     if ENV_MODE == "local":
         # 2. Local Logic: Return the absolute path on your hard drive
         full_path = os.path.join(LOCAL_STORAGE_ROOT, blob_name)
-        print("in executor class /get-upload-url full_path",full_path)
         
         # Ensure the directory exists so the "Executor" or UI doesn't fail
         os.makedirs(os.path.dirname(full_path), exist_ok=True)

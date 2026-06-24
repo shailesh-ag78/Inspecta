@@ -118,8 +118,7 @@ def test_full_workflow_integration():
             file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{blob_name}" if ENV_MODE != "local" else real_upload_path
             incident_payload = {
                 "inspector_id": INSPECTOR_ID,
-                "file_url": file_url_payload,
-                "site_id": SITE_ID
+                "file_url": file_url_payload
             }
             resp_inc = client.post(
                 f"/inspections/{inspection_id}/upload-incident", 

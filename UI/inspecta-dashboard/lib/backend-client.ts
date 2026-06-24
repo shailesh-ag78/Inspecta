@@ -254,7 +254,7 @@ export async function createSite(
     `/api/sites`,
     {
       method: 'POST',
-      body: JSON.stringify({ site_name: siteName, address }),
+      body: JSON.stringify({ site_name: siteName, address: address }),
       headers,
     }
   );
@@ -279,6 +279,29 @@ export async function getUploadUrl(
   );
   if (response.status !== 'success' || !response.data) {
     throw new Error(response.message || 'Failed to get upload URL');
+  }
+  return response.data;
+}
+
+export interface UploadIncidentResponse {
+  incident_id: string;
+}
+export async function uploadIncident(
+  inspector_id: number,
+  file_url: string,
+  blob_name: string,
+  headers?: Record<string, string>
+): Promise<UploadIncidentResponse> {
+  const response = await callBackend<UploadIncidentResponse>(
+    `/api/upload-incident`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ inspector_id: inspector_id, file_url: file_url, blob_name: blob_name }),
+      headers,
+    }
+  );
+  if (response.status !== 'success' || !response.data) {
+    throw new Error(response.message || 'Failed to upload incident');
   }
   return response.data;
 }

@@ -40,9 +40,9 @@ from google.cloud import storage
 env_path = Path(__file__).parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
 
-ENV_MODE = os.getenv("ENV_MODE", "local")
-INSPCTA_FILE_BUCKET = os.getenv("INSPCTA_FILE_BUCKET", "inspecta-file-bucket")
-UPLOADS_FOLDER = os.getenv("UPLOADS_FOLDER", "uploads")
+ENV_MODE = os.getenv("ENV_MODE", "local").lower()
+INSPCTA_FILE_BUCKET = os.getenv("INSPCTA_FILE_BUCKET", "inspecta-file-bucket").lower()
+UPLOADS_FOLDER = os.getenv("UPLOADS_FOLDER", "uploads").lower()
 TIMEOUT= int(os.getenv("TIMEOUT", "60"))
 BASE_EXECUTOR_URL = os.getenv("BASE_EXECUTOR_URL", "http://localhost:8004")
 
@@ -531,6 +531,25 @@ async def get_site_inspections(request: Request):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/api/upload-incident")
+async def upload_incident(
+    request: Request,
+    inspection_id: int,
+    inspector_id: int,
+    file_url: str
+):
+    """Upload an incident"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        site_id = await repository.create_site(company_id, site.site_name, site.address)
+        return {"status": "success", "data": {"site_id": site_id}}
+    except Exception as e:
+        print(f"❌ Error creating site: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ============ Company Endpoints ============
 
 @app.get("/api/companyinfo")
@@ -639,6 +658,37 @@ async def get_upload_url(request: Request):
     except Exception as e:
         print(f"Error calling Executor: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
+
+@app.post("/api/inspections/{inspection_id}/upload-incident")
+async def upload_incident(
+    request: Request,           # Request Object (Mandatory),
+    inspection_id: str,         # Path Parameter (Mandatory)
+    inspector_id: str,          # Body Parameter (Mandatory)
+    file_url : str,              # Body Parameter (Mandatory)
+    blob_name : str              # Body Parameter (Mandatory) -- applicable only when storage_type is gcs
+):
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        headers = {}
+        headers = fill_auth_headers(request, headers)
+        executor_service_url = BASE_EXECUTOR_URL + f"/inspections/{inspection_id}/upload-incident"
+        file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{blob_name}" if ENV_MODE != "local" else file_url
+        payload = {
+            "inspector_id": inspector_id,
+            "file_url": file_url_payload
+        }
+        resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
+        incident_id = resp_data.get("incident_id")
+        print(f"✅ Incident Created: {incident_id}. LangGraph thread started")
+        return {"status": "success", "data": {"incident_id": incident_id}}
+    except Exception as e:
+        print(f"Error calling Executor: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
+
+
 
 # @app.post("/api/inspections/{inspection_id}/upload-incident")
 # async def upload_incident(

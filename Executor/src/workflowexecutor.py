@@ -225,7 +225,6 @@ class WorkflowExecutor:
         inspector_id: int, 
         file_url: str,
         existing_incident_id: str | None, # Optional: if re-uploading for an ID
-        site_id: Optional[int] = None,
         gps_coordinates: Optional[tuple] = None,  # (lat, long)
     ) -> str:
         # 1. VERIFY OWNERSHIP FIRST
