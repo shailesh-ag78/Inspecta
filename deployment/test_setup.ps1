@@ -90,7 +90,7 @@ $ExecutorScript = {
     Set-Location "G:\code\Inspecta\Executor"
     $Host.UI.RawUI.WindowTitle = Split-Path (Get-Location).Path -Leaf
     .\.venv\Scripts\Activate.ps1
-    & '.\.venv\Scripts\python.exe' -m src.main
+    & '.\.venv\Scripts\python.exe' -m src.main --host 0.0.0.0 --port 8004 --loop asyncio --reload
 }
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $ExecutorScript 
 #================================================================================

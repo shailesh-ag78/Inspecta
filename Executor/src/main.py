@@ -100,7 +100,10 @@ async def lifespan(app: FastAPI):
 
     # Initialize the Executor as a Singleton
     # It will stay in memory to handle parallel requests
-    executor = await WorkflowExecutor.create()
+    #db_dsn = "postgresql://postgres:passwd@localhost:5432/inspecta_db"
+    #db_dsn = "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    db_dsn = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
+    executor = await WorkflowExecutor.create(db_dsn)
     
     # Attach to app state so routes can access it
     app.state.executor = executor
@@ -177,6 +180,10 @@ async def create_inspection_endpoint(
     The company_id is pulled from the authenticated session/state.
     """
     # Extract company_id (Grab the Token from the 'Authorization' Header)
+    print("Creating inspection")
+    print("data", data)
+    print(f"Company ID: {getattr(request.state, 'company_id', 'N/A')}")
+    print(f"Company Storage ID: {getattr(request.state, 'company_storage_id', 'N/A')}")
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -195,7 +202,7 @@ async def create_inspection_endpoint(
         return {
             "status": "success",
             "inspection_id": inspection_id,
-            "message": "New inspection initialized"
+            "message": "New inspection created"
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -311,11 +318,13 @@ async def get_status_endpoint(incident_id: str, request: Request):
 # UI calls this method to create a new place where to upload the file
 @app.get("/get-upload-url")
 async def get_upload_url(request: Request):
+    print("in executor class /get-upload-url ")
     # Extract company_storage_id (Grab the Token from the 'Authorization' Header)
     company_storage_id = getattr(request.state, "company_storage_id", None)
     if company_storage_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
     content_type = request.headers.get("Content-Type")
+    print("in executor class /get-upload-url content_type",content_type)
     if content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Unsupported file type")
     """
@@ -329,15 +338,19 @@ async def get_upload_url(request: Request):
     # This is the "relative" path inside the bucket or root folder
     blob_name = f"{company_storage_id}/{UPLOADS_FOLDER}/{unique_name}"
 
+    print("in executor class /get-upload-url blob_name",blob_name)
+
     if ENV_MODE == "local":
         # 2. Local Logic: Return the absolute path on your hard drive
         full_path = os.path.join(LOCAL_STORAGE_ROOT, blob_name)
+        print("in executor class /get-upload-url full_path",full_path)
         
         # Ensure the directory exists so the "Executor" or UI doesn't fail
         os.makedirs(os.path.dirname(full_path), exist_ok=True)
         
         # We return the path as the "url" so the UI/Executor knows where to look
         return {
+            "status": "Success",
             "upload_url": full_path, 
             "blob_name": blob_name,
             "storage_type": "local"
@@ -354,6 +367,7 @@ async def get_upload_url(request: Request):
             content_type=content_type
         )
         return {
+            "status": "Success",
             "upload_url": url, 
             "blob_name": blob_name,
             "storage_type": "gcs"

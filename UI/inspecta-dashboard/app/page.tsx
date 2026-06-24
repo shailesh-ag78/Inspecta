@@ -111,7 +111,7 @@ export default function ReviewerDashboard() {
         formData.append('file', file);
         formData.append('inspectionId', selectedInspection);
 
-        const response = await fetch('/frontend-api/video', {
+        const response = await authenticatedFetch('/frontend-api/video', {
           method: 'POST',
           body: formData,
         });

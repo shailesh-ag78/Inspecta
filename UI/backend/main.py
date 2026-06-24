@@ -43,7 +43,7 @@ dotenv.load_dotenv(dotenv_path=env_path)
 ENV_MODE = os.getenv("ENV_MODE", "local")
 INSPCTA_FILE_BUCKET = os.getenv("INSPCTA_FILE_BUCKET", "inspecta-file-bucket")
 UPLOADS_FOLDER = os.getenv("UPLOADS_FOLDER", "uploads")
-TIMEOUT= os.getenv("TIMEOUT", "60")
+TIMEOUT= int(os.getenv("TIMEOUT", "60"))
 BASE_EXECUTOR_URL = os.getenv("BASE_EXECUTOR_URL", "http://localhost:8004")
 
 import urllib.request
@@ -186,7 +186,6 @@ async def health_check():
 # ============ Utility Functions ============
 
 def CallExecutorService(executor_service_url, method, headers: dict, payload: Optional[dict]):
-    print(f"Calling Executor at {executor_service_url} with payload {payload}")
     try:
         if payload is None:
             payload = {}
@@ -197,11 +196,11 @@ def CallExecutorService(executor_service_url, method, headers: dict, payload: Op
             headers=headers,
             method=method
         )
-        
-        # Timeout at 60s as expected for the timeboxed submission
         with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
             resp_data = json.loads(response.read().decode("utf-8"))
-            if resp_data.get("status") == "success":
+            # print("Executor Response = ", resp_data)
+            # return resp_data
+            if resp_data.get("status") and resp_data.get("status").lower() == "success":
                 return resp_data
             else:
                 raise HTTPException(status_code=500, detail=resp_data.get("message", "Failed to call Executor Service"))
@@ -625,8 +624,6 @@ async def get_upload_url(request: Request):
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
-
-    print(f"Received request for Uploading vidoe file")
 
     try:
         headers = {}
