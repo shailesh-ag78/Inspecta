@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
 
-ENV_MODE = os.getenv("ENV_MODE", "local")
+ENV_MODE = os.getenv("ENV_MODE", "local").lower()
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 logger.info(f"🚀 Starting Executor with {env_path} ENV_MODE={ENV_MODE}   {MODEL} (temp={MODEL_TEMPERATURE})")

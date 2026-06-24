@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 # Load environment variables from .env file if it exists
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
-ENV_MODE = os.getenv("ENV_MODE", "local")
+ENV_MODE = os.getenv("ENV_MODE", "local").lower()
 MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")

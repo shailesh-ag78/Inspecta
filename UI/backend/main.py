@@ -175,6 +175,11 @@ class SiteInput(BaseModel):
     site_name: str
     address: str
 
+class UIUploadIncidentRequest(BaseModel):
+    inspector_id: int
+    file_url: str
+    blob_name: Optional[str] = None
+
 # ============ Health Check ============
 
 @app.get("/health")
@@ -198,8 +203,6 @@ def CallExecutorService(executor_service_url, method, headers: dict, payload: Op
         )
         with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
             resp_data = json.loads(response.read().decode("utf-8"))
-            # print("Executor Response = ", resp_data)
-            # return resp_data
             if resp_data.get("status") and resp_data.get("status").lower() == "success":
                 return resp_data
             else:
@@ -661,11 +664,9 @@ async def get_upload_url(request: Request):
 
 @app.post("/api/inspections/{inspection_id}/upload-incident")
 async def upload_incident(
-    request: Request,           # Request Object (Mandatory),
+    request: Request,           # Request Object (Mandatory)
     inspection_id: str,         # Path Parameter (Mandatory)
-    inspector_id: str,          # Body Parameter (Mandatory)
-    file_url : str,              # Body Parameter (Mandatory)
-    blob_name : str              # Body Parameter (Mandatory) -- applicable only when storage_type is gcs
+    data: UIUploadIncidentRequest
 ):
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
@@ -675,15 +676,15 @@ async def upload_incident(
         headers = {}
         headers = fill_auth_headers(request, headers)
         executor_service_url = BASE_EXECUTOR_URL + f"/inspections/{inspection_id}/upload-incident"
-        file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{blob_name}" if ENV_MODE != "local" else file_url
+        file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{data.blob_name}" if ENV_MODE != "local" and data.blob_name else data.file_url
         payload = {
-            "inspector_id": inspector_id,
+            "inspector_id": data.inspector_id,
             "file_url": file_url_payload
         }
         resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
         incident_id = resp_data.get("incident_id")
         print(f"✅ Incident Created: {incident_id}. LangGraph thread started")
-        return {"status": "success", "data": {"incident_id": incident_id}}
+        return {"status": "Success", "data": {"incident_id": incident_id}}
     except Exception as e:
         print(f"Error calling Executor: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")

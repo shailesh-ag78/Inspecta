@@ -220,6 +220,7 @@ async def upload_incident_endpoint(
     request: Request,          # Request Object (Mandatory)
     data: IncidentUploadRequest # JSON Body (Mandatory)
 ):
+    print("In upload_incident_endpoint")
     # Extract company_id (Grab the Token from the 'Authorization' Header)
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
@@ -289,7 +290,7 @@ async def upload_incident_endpoint(
     )
 
     return {
-        "status": "Accepted",
+        "status": "Success",
         "message": "Audio / Video received and processing started.",
         "incident_id": incident_id,
         "monitoring_url": f"/incidents/{incident_id}/status"

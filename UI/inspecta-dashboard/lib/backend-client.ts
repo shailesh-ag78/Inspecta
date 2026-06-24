@@ -287,13 +287,14 @@ export interface UploadIncidentResponse {
   incident_id: string;
 }
 export async function uploadIncident(
+  inspection_id: string,
   inspector_id: number,
   file_url: string,
   blob_name: string,
   headers?: Record<string, string>
 ): Promise<UploadIncidentResponse> {
   const response = await callBackend<UploadIncidentResponse>(
-    `/api/upload-incident`,
+    `/api/inspections/${inspection_id}/upload-incident`,
     {
       method: 'POST',
       body: JSON.stringify({ inspector_id: inspector_id, file_url: file_url, blob_name: blob_name }),

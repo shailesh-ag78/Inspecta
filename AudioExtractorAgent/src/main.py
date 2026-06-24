@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
 
-ENV_MODE = os.getenv("ENV_MODE", "local")
+ENV_MODE = os.getenv("ENV_MODE", "local").lower()
 logger.info(f"🚀 Starting AudioExtractorAgent with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)

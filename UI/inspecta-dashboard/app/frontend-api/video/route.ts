@@ -162,8 +162,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Upload incident in the system
-    const inspectorId = 1;  // To Do : This is logged in User specific; ideally this shall come from Firebase token claims
-    const { incident_id: incidentId } = await uploadIncident(inspectorId, uploadUrl, blobName, authHeaders);
+    let inspectorId = 1;  // To Do : This is logged in User specific; ideally this shall come from Firebase token claims
+    const { incident_id: incidentId } = await uploadIncident(inspectionId, inspectorId, uploadUrl, blobName, authHeaders);
     console.log(`✅ Uploaded Incident successfully with ID : ${incidentId}`);
 
     return NextResponse.json({
