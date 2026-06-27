@@ -45,10 +45,18 @@ param(
     [switch]$DeployAgents,
 
     [Parameter(Mandatory = $false)]
-    [string]$BuildNumber
+    [string]$BuildNumber,
+
+    [Parameter(Mandatory = $false)]
+    [string]$ENV_MODE = "production",
+
+    [Parameter(Mandatory = $false)]
+    [string]$BucketName = "inspecta-file-bucket",
+
+    [Parameter(Mandatory = $false)]
+    [string]$UPLOADS_FOLDER = "uploads"
 )
 
-$ENV_MODE = "production"
 $OPENAI_MODEL = "gpt-4o"
 $MODEL_TEMPERATURE = "0.2"
 
@@ -125,6 +133,7 @@ Write-Host "`n[3/7] Setting up Service Accounts..." -ForegroundColor Yellow
 
 $SAs = @(
     @{ Name = "ui-service-sa"; Display = "UI Service Backend SA" },
+    @{ Name = "audio-extractor-service-sa"; Display = "Audio Extractor Agent Service SA" },
     @{ Name = "executor-service-sa"; Display = "LangChain Executor Service SA" },
     @{ Name = "transcribe-service-sa"; Display = "Transcription Agent Service SA" },
     @{ Name = "taskgen-service-sa"; Display = "Field Reporter Agent Service SA" }
@@ -280,9 +289,9 @@ if ($DeployAgents) {
         --network=$VpcName `
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
+        --service-account="audio-extractor-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --max-instances=2 `
         --set-env-vars="ENV_MODE=$ENV_MODE"
-
 
     Write-Host "Deploying agent-transcribe (Transcription)..." -ForegroundColor Cyan
     gcloud run deploy agent-transcribe `
@@ -342,7 +351,7 @@ if ($DeployAgents) {
         --vpc-egress=private-ranges-only `
         --service-account="executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --max-instances=2 `
-        --set-env-vars="db_dsn=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,ENV_MODE=$ENV_MODE"
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl"
         
     # Fetch Executor URL
     Write-Host "Retrieving executor endpoint..."
@@ -368,7 +377,7 @@ if ($DeployUI) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-env-vars="db_dsn=$DatabaseURL,EXECUTOR_SERVICE_URL=$ExecutorUrl,ENV_MODE=production" `
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl" `
         --max-instances=2
 
     $UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
@@ -431,10 +440,10 @@ gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
     --quiet
 
 # 7.3 Enable UI Service SA to verify Firebase auth tokens (Option A)
-Write-Host "Granting firebaseauth.admin role to ui-service-sa..."
-gcloud projects add-iam-policy-binding $ProjectID `
-    --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --role="roles/firebaseauth.admin"
+# Write-Host "Granting firebaseauth.admin role to ui-service-sa..."
+# gcloud projects add-iam-policy-binding $ProjectID `
+#     --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
+#     --role="roles/firebaseauth.admin"
 
 # 7.4 Configure Developer / DevOps Access Control
 Write-Host "Assigning limited debug and monitoring roles to DevOps user (inspectaGCPViewer): $GcpViewerEmail..."
@@ -455,11 +464,33 @@ gcloud projects add-iam-policy-binding $ProjectID `
     --member="user:$GcpAdminEmail" `
     --role="roles/owner"
 
+Write-Host "Granting GCS Bucket permissions to service accounts..."
+# Grant Executor SA permissions on the bucket
+gcloud storage buckets add-iam-policy-binding gs://$BucketName `
+    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/storage.serviceAccountTokenCreator"   # Permission for creating pre-signed URLs
+
+gcloud storage buckets add-iam-policy-binding gs://$BucketName `
+    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/storage.objectUser"
+
+# Grant Transcribe Agent SA permissions on the bucket
+gcloud storage buckets add-iam-policy-binding gs://$BucketName `
+    --member="serviceAccount:audio-extractor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/storage.objectUser"
+
+gcloud storage buckets add-iam-policy-binding gs://$BucketName `
+    --member="serviceAccount:transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/storage.objectUser"
+
+# Grant Task Generator Agent SA permissions on the bucket
+gcloud storage buckets add-iam-policy-binding gs://$BucketName `
+    --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/storage.objectUser"
 # -------------------------------------------------------------
 # 8. Create GCP Storage Bucket and Set CORS
 # -------------------------------------------------------------
 Write-Host "`n[8] Setting up Google Cloud Storage Bucket and CORS..." -ForegroundColor Yellow
-$BucketName = "inspecta-file-bucket"
 
 # Check if bucket exists
 $BucketExists = gcloud storage buckets list --filter="name=gs://$BucketName" --format="value(name)"
@@ -491,5 +522,9 @@ Write-Host "`n================================================================="
 Write-Host "🎉 Deployment Complete!" -ForegroundColor Green
 Write-Host "UI Backend Public URL: $UiUrl" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Green
+gcloud storage buckets update gs://$BucketName --cors-file=$CorsFilePath
 
-
+Write-Host "`n=================================================================" -ForegroundColor Green
+Write-Host "🎉 Deployment Complete!" -ForegroundColor Green
+Write-Host "UI Backend Public URL: $UiUrl" -ForegroundColor Green
+Write-Host "=================================================================" -ForegroundColor Green

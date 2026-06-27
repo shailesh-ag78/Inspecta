@@ -8,3 +8,4 @@ __pycache__
 *.pyd
 inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json
 cors-config.json
+gcp-key.json

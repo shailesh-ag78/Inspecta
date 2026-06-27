@@ -610,8 +610,10 @@ def get_tasklist_from_url(tasks_json_url: str, video_url : str, env_mode: str = 
     
     if(env_mode != "local"):
         logger.info(f"Fetching tasks JSON from {tasks_json_url} in {env_mode} environment...")
-        #TO DO: Fetch from GCS
-        gcs_client = storage.Client()
+        global gcs_client
+        gcs_client = storage.Client(   )
+        #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
+        
         if not gcs_client:
             raise RuntimeError("GCS client not initialized")
 

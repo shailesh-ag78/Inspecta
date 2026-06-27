@@ -95,7 +95,16 @@ async def lifespan(app: FastAPI):
         # 1. Initialize GCS Client once (Singleton)
         # This handles auth and connection pooling globally
         global gcs_client
-        gcs_client = storage.Client()
+        gcs_client = storage.Client(   )
+        #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
+        # # Read the key file
+        # key_file_path = r"G:\code\Inspecta\deployment\gcp-key.json"
+        # with open(key_file_path, "r") as f:
+        #     key_data = f.read()
+
+        # # Create the client
+        # gcs_client = storage.Client.from_service_account_info(key_data)
+
         logger.info("✅ GCS Client initialized")
 
     # Initialize the Executor as a Singleton
@@ -316,13 +325,11 @@ async def get_status_endpoint(incident_id: str, request: Request):
 # UI calls this method to create a new place where to upload the file
 @app.get("/get-upload-url")
 async def get_upload_url(request: Request):
-    print("in executor class /get-upload-url ")
     # Extract company_storage_id (Grab the Token from the 'Authorization' Header)
     company_storage_id = getattr(request.state, "company_storage_id", None)
     if company_storage_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
     content_type = request.headers.get("Content-Type")
-    print("in executor class /get-upload-url content_type",content_type)
     if content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Unsupported file type")
     """
@@ -354,7 +361,8 @@ async def get_upload_url(request: Request):
         }
     else:
         # 3. GCP Logic
-        gcs_client = storage.Client()
+        #gcs_client = storage.Client()
+        global gcs_client
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
         blob = bucket.blob(blob_name)
         url = blob.generate_signed_url(

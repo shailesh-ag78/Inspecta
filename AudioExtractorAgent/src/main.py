@@ -57,7 +57,9 @@ async def lifespan(app: FastAPI):
     if ENV_MODE != "local":
         try:
             global gcs_client
-            gcs_client = storage.Client()
+            gcs_client = storage.Client(   )
+            #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
+            
             logger.info("✅ GCS client initialized successfully.")
         except Exception as e:
             logger.error(f"❌ Failed to initialize GCS client: {e}")

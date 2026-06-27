@@ -1,7 +1,7 @@
 # =======================  To Debug in VSCODE interactively : move to G:\code\Inspecta\Executor\src and Press F5   =======================
 # =======================  If you want to use GCP then execute command : gcloud auth application-default login   =======================
 # $env:GOOGLE_APPLICATION_CREDENTIALS="G:\code\Inspecta\deployment\inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
-# gcloud storage buckets add-iam-policy-binding gs://inspecta-file-bucket --member="serviceAccount:firebase-adminsdk-fbsvc@inspecta-360.iam.gserviceaccount.com" --role="roles/storage.objectAdmin"
+# gcloud storage buckets add-iam-policy-binding gs://inspecta-file-bucket --member="serviceAccount:firebase-adminsdk-fbsvc@inspecta-360.iam.gserviceaccount.com" --role="roles/storage.objectUser"
 # ====================================================
 
 

@@ -111,8 +111,9 @@ async def startup_event():
     """Initialize connection pool and repository on application startup"""
     global repository
     
-    dsn  = os.getenv("db_dsn", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
-    #dsn  = os.getenv("db_dsn", "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require")
+    #db_dsn = "postgresql://postgres:passwd@localhost:5432/inspecta_db"
+    #db_dsn = "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require"
+    db_dsn = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
 
     # Initialize Firebase Admin SDK
     try:
@@ -125,7 +126,7 @@ async def startup_event():
         print(f"❌ Firebase initialization error: {e}")
 
     # Initialize repository with connection pool
-    repository = IncidentRepository(dsn=dsn)
+    repository = IncidentRepository(dsn=db_dsn)
     #await repository.open()
     
     print("✅ Connection pool initialized and ready")
@@ -602,7 +603,10 @@ def upload_file_data(file_path, real_upload_path, blob_name):
         print("✅ Simulated file upload to local storage.")
     else:
         # Upload to GCS
-        gcs_client = storage.Client()
+        global gcs_client
+        #gcs_client = storage.Client()
+        gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
+
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
         blob = bucket.blob(blob_name)
         blob.upload_from_filename(file_path)
