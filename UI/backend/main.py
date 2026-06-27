@@ -645,6 +645,50 @@ async def create_inspection(
         print(f"Error calling Executor: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
 
+@app.get("/api/get-video-url")
+async def get_video_url(request: Request, path: str = Query(..., description="GCS path or local path")):
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if path.startswith("gs://"):
+        try:
+            # Parse bucket and blob name
+            gcs_path = path[5:]
+            parts = gcs_path.split("/", 1)
+            if len(parts) < 2:
+                raise HTTPException(status_code=400, detail="Invalid GCS path")
+            
+            bucket_name, blob_name = parts[0], parts[1]
+            
+            # Initialize storage client
+            if ENV_MODE == "local":
+                key_path = r"G:\code\Inspecta\deployment\gcp-key.json"
+                if os.path.exists(key_path):
+                    gcs_client = storage.Client.from_service_account_json(key_path)
+                else:
+                    gcs_client = storage.Client()
+            else:
+                gcs_client = storage.Client()
+                
+            bucket = gcs_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            
+            import datetime
+            url = blob.generate_signed_url(
+                version="v4",
+                expiration=datetime.timedelta(minutes=30),
+                method="GET"
+            )
+            return {"status": "success", "data": {"url": url}}
+        except Exception as e:
+            print(f"Error generating signed URL: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Local paths are returned directly
+        return {"status": "success", "data": {"url": path}}
+
+
 @app.get("/api/get-upload-url")
 async def get_upload_url(request: Request):
     company_id = getattr(request.state, "company_id", None)

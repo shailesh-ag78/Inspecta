@@ -283,6 +283,24 @@ export async function getUploadUrl(
   return response.data;
 }
 
+export async function getInspectionUploadUrl(
+  headers?: Record<string, string>,
+  filePath?: string
+): Promise<{ url: string }> {
+  const response = await callBackend<{ url: string }>(
+    `/api/get-video-url?path=${encodeURIComponent(filePath || '')}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  );
+  if (response.status !== 'success' || !response.data) {
+    throw new Error(response.message || 'Failed to get video URL');
+  }
+  return response.data;
+}
+
+
 export interface UploadIncidentResponse {
   incident_id: string;
 }

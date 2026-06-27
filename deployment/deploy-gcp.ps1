@@ -87,7 +87,8 @@ $APIs = @(
     "vpcaccess.googleapis.com",
     "compute.googleapis.com",
     "iam.googleapis.com",
-    "secretmanager.googleapis.com"
+    "secretmanager.googleapis.com",
+    "iamcredentials.googleapis.com"
 )
 
 foreach ($API in $APIs) {
@@ -326,9 +327,13 @@ if ($DeployAgents) {
 
     # Fetch Agent URLs
     Write-Host "Retrieving agent endpoints..."
-    $AgentAudioExtractUrl = (gcloud run services describe agent-audioextract --region=$Region --format="value(status.url)")
-    $AgentTranscribeUrl = (gcloud run services describe agent-transcribe --region=$Region --format="value(status.url)")
-    $AgentTaskGeneratorUrl = (gcloud run services describe agent-taskgenerator --region=$Region --format="value(status.url)")
+    # $AgentAudioExtractUrl = (gcloud run services describe agent-audioextract --region=$Region --format="value(status.url)")
+    # $AgentTranscribeUrl = (gcloud run services describe agent-transcribe --region=$Region --format="value(status.url)")
+    # $AgentTaskGeneratorUrl = (gcloud run services describe agent-taskgenerator --region=$Region --format="value(status.url)")
+
+    $AgentAudioExtractUrl = (gcloud run services list --filter="metadata.name=agent-audioextract" --format="value(URL)")
+    $AgentTranscribeUrl = (gcloud run services list --filter="metadata.name=agent-transcribe" --format="value(URL)")
+    $AgentTaskGeneratorUrl = (gcloud run services list --filter="metadata.name=agent-taskgenerator" --format="value(URL)")
 
     Write-Host "Agent-AudioExtract: $AgentAudioExtractUrl"
     Write-Host "Agent-Transcription: $AgentTranscribeUrl"
@@ -355,7 +360,7 @@ if ($DeployAgents) {
         
     # Fetch Executor URL
     Write-Host "Retrieving executor endpoint..."
-    $ExecutorUrl = (gcloud run services describe executor-service --region=$Region --format="value(status.url)")
+    $ExecutorUrl = (gcloud run services list --filter="metadata.name=executor-service" --format="value(URL)")
     Write-Host "Executor URL: $ExecutorUrl"
 }
 
@@ -363,7 +368,7 @@ if ($DeployAgents) {
 if ($DeployUI) {
     if (-not $ExecutorUrl) {
         Write-Host "Retrieving existing executor endpoint for UI configuration..."
-        $ExecutorUrl = (gcloud run services describe executor-service --region=$Region --format="value(status.url)" -ErrorAction SilentlyContinue)
+        $ExecutorUrl = (gcloud run services list --filter="metadata.name=executor-service" --format="value(URL)")
     }
 
     Write-Host "Deploying ui-backend-service..." -ForegroundColor Cyan
@@ -465,10 +470,10 @@ gcloud projects add-iam-policy-binding $ProjectID `
     --role="roles/owner"
 
 Write-Host "Granting GCS Bucket permissions to service accounts..."
-# Grant Executor SA permissions on the bucket
-gcloud storage buckets add-iam-policy-binding gs://$BucketName `
+# Grant Token Creator permission to Executor SA at the project level for creating pre-signed URLs
+gcloud projects add-iam-policy-binding $ProjectID `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --role="roles/storage.serviceAccountTokenCreator"   # Permission for creating pre-signed URLs
+    --role="roles/iam.serviceAccountTokenCreator"
 
 gcloud storage buckets add-iam-policy-binding gs://$BucketName `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
@@ -516,12 +521,6 @@ $CorsConfig = ConvertTo-Json -InputObject @(
 Set-Content -Path $CorsFilePath -Value $CorsConfig -Encoding UTF8
 
 Write-Host "Setting CORS policy on gs://$BucketName..."
-gcloud storage buckets update gs://$BucketName --cors-file=$CorsFilePath
-
-Write-Host "`n=================================================================" -ForegroundColor Green
-Write-Host "🎉 Deployment Complete!" -ForegroundColor Green
-Write-Host "UI Backend Public URL: $UiUrl" -ForegroundColor Green
-Write-Host "=================================================================" -ForegroundColor Green
 gcloud storage buckets update gs://$BucketName --cors-file=$CorsFilePath
 
 Write-Host "`n=================================================================" -ForegroundColor Green

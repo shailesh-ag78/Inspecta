@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUploadUrl, uploadIncident } from '@/lib/backend-client';
+import { getUploadUrl, getInspectionUploadUrl, uploadIncident } from '@/lib/backend-client';
 import fs from 'fs';
 import path from 'path';
 import { Readable } from 'node:stream';
@@ -18,29 +18,22 @@ export async function GET(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
       });
     }
+    // Fetch signed URL or original local path from backend
+    const authHeader = request.headers.get('authorization');
+    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
+    const { url: videoUrl } = await getInspectionUploadUrl(authHeaders, filePath);
 
-    // Security check: ensure the file path is within allowed directories
-    // const allowedBasePaths = [
-    //   'g:\\code\\Inspecta\\DataStore', // Adjust based on your actual data directory
-    //   'G:\\code\\Inspecta\\DataStore',
-    //   'C:\\code\\Inspecta\\DataStore',
-    //   // Add other allowed paths
-    // ];
+    if (videoUrl && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
+      console.log('Redirecting GCS video request to signed URL:', videoUrl);
+      return NextResponse.redirect(videoUrl, { status: 307 });
+    }
 
-    // const isAllowed = allowedBasePaths.some(basePath =>
-    //   filePath.startsWith(basePath)
-    // );
-
-    // if (!isAllowed) {
-    //   return new Response(JSON.stringify({ error: 'Access denied' }), {
-    //     status: 403,
-    //     headers: { 'Content-Type': 'application/json' },
-    //   });
-    // }
+    // Update filePath to use resolved path if local
+    const finalFilePath = videoUrl || filePath;
 
     // Check if file exists
-    if (!fs.existsSync(filePath)) {
-      console.error('File not found:', filePath);
+    if (!fs.existsSync(finalFilePath)) {
+      console.error('File not found:', finalFilePath);
       return new Response(JSON.stringify({ error: 'File not found' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json' },
@@ -48,10 +41,10 @@ export async function GET(request: NextRequest) {
     }
 
     // Get file stats
-    const stat = fs.statSync(filePath);
+    const stat = fs.statSync(finalFilePath);
     const fileSize = stat.size;
     const range = request.headers.get('range');
-    //const contentType = getMimeType(filePath); // ✅ Dynamic MIME type
+    //const contentType = getMimeType(finalFilePath); // ✅ Dynamic MIME type
 
     if (range) {
       // Handle range requests for video streaming
@@ -59,7 +52,7 @@ export async function GET(request: NextRequest) {
       const start = parseInt(parts[0], 10);
       const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
       const chunksize = (end - start) + 1;
-      const file = fs.createReadStream(filePath, { start, end });
+      const file = fs.createReadStream(finalFilePath, { start, end });
 
       const stream = new ReadableStream({
         start(controller) {
@@ -83,7 +76,7 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // Serve entire file
-      const file = fs.createReadStream(filePath);
+      const file = fs.createReadStream(finalFilePath);
       const stream = new ReadableStream({
         start(controller) {
           file.on('data', (chunk) => controller.enqueue(chunk));
