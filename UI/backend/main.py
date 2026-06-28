@@ -93,13 +93,11 @@ async def verify_firebase_token(request: Request, call_next):
     try:
         # Verify with Firebase
         decoded_token = auth.verify_id_token(id_token)
-        print("Verified firebase id token ", decoded_token)
         
         request.state.company_id = decoded_token.get("company_id")
         request.state.company_storage_id = decoded_token.get("company_storage_id")
         print(f"✅ Authenticated: Company {request.state.company_id}")
         token_ctx = firebase_token_var.set(id_token)
-        print('Set firebase token after decoding ', id_token)
         
     except Exception as e:
         print(f"❌ Token verification failed: {e}")
@@ -107,8 +105,6 @@ async def verify_firebase_token(request: Request, call_next):
         request.state.company_storage_id = None
         
     return await call_next(request)
-    # finally:
-    #     firebase_token_var.reset(token_ctx)
 
 # ============ Global repository ============
 repository: Optional[IncidentRepository] = None
@@ -138,7 +134,6 @@ async def startup_event():
 
     # Initialize repository with connection pool
     repository = IncidentRepository(dsn=db_dsn)
-    #await repository.open()
     
     print("✅ Connection pool initialized and ready")
 
@@ -620,7 +615,6 @@ def fill_auth_headers(request: Request, headers: dict):
     """Fill auth headers for executor service"""
     fb = firebase_token_var.get()
     if fb:
-        print("Setting Firebase token : ", fb)
         headers["X-Firebase-Token"] = fb
     else:
         print("Could not set firebase token")
@@ -643,7 +637,6 @@ def upload_file_data(file_path, real_upload_path, blob_name):
             gcs_client = storage.Client.from_service_account_json(gcp_key_file)
         else:
             gcs_client = storage.Client()
-        #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
 
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
         blob = bucket.blob(blob_name)
@@ -663,7 +656,6 @@ async def create_inspection(
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
-        print(f"Received CREATE /api/inspections request for siteId {siteId}, friendlyName {friendlyName} ")
         headers = {}
         headers = fill_auth_headers(request, headers)
         
@@ -685,9 +677,14 @@ async def create_inspection(
 
 @app.get("/api/get-video-url")
 async def get_video_url(request: Request, path: str = Query(..., description="GCS path or local path")):
-    company_id = getattr(request.state, "company_id", None)
-    if company_id is None:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    """Create pre-signed URL of the video for display"""
+    # Video control in UI does not send Auth header while calling this method. Hence Firebase authentication is skipped.
+    # I production enviornment, only GCP service based authentication is considered
+
+    # Avoid checking company_id since it will be None.
+    # company_id = getattr(request.state, "company_id", None)
+    # if company_id is None:
+    #     raise HTTPException(status_code=401, detail="Unauthorized")
 
     if path.startswith("gs://"):
         try:
@@ -698,17 +695,15 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
                 raise HTTPException(status_code=400, detail="Invalid GCS path")
             
             bucket_name, blob_name = parts[0], parts[1]
-            
-            # Initialize storage client
-            if ENV_MODE == "local":
-                key_path = r"G:\code\Inspecta\deployment\gcp-key.json"
-                if os.path.exists(key_path):
-                    gcs_client = storage.Client.from_service_account_json(key_path)
-                else:
-                    gcs_client = storage.Client()
+        
+            global gcs_client                
+            if ENV_MODE.startswith("local"):
+                datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+                gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+                gcs_client = storage.Client.from_service_account_json(gcp_key_file)
             else:
                 gcs_client = storage.Client()
-                
+
             bucket = gcs_client.bucket(bucket_name)
             blob = bucket.blob(blob_name)
             

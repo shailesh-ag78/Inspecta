@@ -288,7 +288,7 @@ export async function getInspectionUploadUrl(
   filePath?: string
 ): Promise<{ url: string }> {
   const response = await callBackend<{ url: string }>(
-    `/api/get-video-url?path=${encodeURIComponent(filePath || '')}`,
+    `/api/get-video-url?path=${filePath}`,
     {
       method: 'GET',
       headers,

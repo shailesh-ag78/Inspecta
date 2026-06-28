@@ -10,8 +10,6 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const filePath = searchParams.get('path');
 
-    console.log('Received request for video with path:', filePath);
-
     if (!filePath) {
       return new Response(JSON.stringify({ error: 'File path is required' }), {
         status: 400,
@@ -21,12 +19,12 @@ export async function GET(request: NextRequest) {
     let finalFilePath = filePath;
     if (filePath.startsWith('gs:')) {
       // Fetch signed URL or original local path from backend
-      const authHeader = request.headers.get('authorization');
+      const token = searchParams.get('token');
+      const authHeader = request.headers.get('authorization') || (token ? `Bearer ${token}` : null);
       const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
       const { url: videoUrl } = await getInspectionUploadUrl(authHeaders, filePath);
 
       if (videoUrl && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
-        console.log('Redirecting GCS video request to signed URL:', videoUrl);
         return NextResponse.redirect(videoUrl, { status: 307 });
       }
 

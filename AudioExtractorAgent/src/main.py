@@ -95,8 +95,8 @@ async def extract_audio_endpoint(request: AudioExtractionRequest):
         raise HTTPException(status_code=400, detail="video_url is required")
 
     logger.info(f"Video URL: {video_url}")
-    logger.info(f"Metadata: {metadata}")
-    logger.info(f"ENV_MODE: {ENV_MODE}")
+    logger.info(f"Test :Metadata: {metadata}")
+    logger.info(f"Test : ENV_MODE: {ENV_MODE}")
 
     gcp_bucket = ""
     

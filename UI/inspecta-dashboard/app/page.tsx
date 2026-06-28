@@ -62,6 +62,7 @@ async function authenticatedFetch(url: string, options: RequestInit = {}): Promi
 export default function ReviewerDashboard() {
   // Auth state management
   const [user, setUser] = useState<any>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
 
   // State management
@@ -246,8 +247,19 @@ export default function ReviewerDashboard() {
 
   // Listen for Firebase auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (usr) => {
+    const unsubscribe = onAuthStateChanged(auth, async (usr) => {
       setUser(usr);
+      if (usr) {
+        try {
+          const idToken = await usr.getIdToken();
+          setToken(idToken);
+        } catch (e) {
+          console.error("Error getting ID token on auth change:", e);
+          setToken(null);
+        }
+      } else {
+        setToken(null);
+      }
       setAuthLoading(false);
     });
     return () => unsubscribe();
@@ -435,8 +447,8 @@ export default function ReviewerDashboard() {
       return videoUrl;
     }
 
-    return `/frontend-api/video?path=${encodeURIComponent(videoUrl)}`;
-  }, []);
+    return `/frontend-api/video?path=${encodeURIComponent(videoUrl)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
+  }, [token]);
 
   const isInitiatingPlayRef = useRef(false);
 
