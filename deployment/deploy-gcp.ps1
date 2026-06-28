@@ -292,6 +292,7 @@ if ($DeployAgents) {
         --vpc-egress=private-ranges-only `
         --service-account="audio-extractor-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --max-instances=2 `
+        --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE"
 
     Write-Host "Deploying agent-transcribe (Transcription)..." -ForegroundColor Cyan
@@ -307,6 +308,7 @@ if ($DeployAgents) {
         --service-account="transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest" `
         --max-instances=2 `
+        --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE"
 
     Write-Host "Deploying agent-taskgenerator (FieldReporter)..." -ForegroundColor Cyan
@@ -322,6 +324,7 @@ if ($DeployAgents) {
         --service-account="taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest" `
         --max-instances=2 `
+        --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE,OPENAI_MODEL=$OPENAI_MODEL,MODEL_TEMPERATURE=$MODEL_TEMPERATURE"
 
 
@@ -356,6 +359,7 @@ if ($DeployAgents) {
         --vpc-egress=private-ranges-only `
         --service-account="executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --max-instances=2 `
+        --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl"
         
     # Fetch Executor URL
@@ -382,8 +386,9 @@ if ($DeployUI) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl" `
-        --max-instances=2
+        --max-instances=2 `
+        --cpu-boost `
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl"
 
     $UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
     Write-Host "============ UI Backend URL: $UiUrl" -ForegroundColor Green

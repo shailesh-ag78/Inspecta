@@ -73,6 +73,28 @@ transcribe_agent_url = get_agent_endpoint("AGENT_TRANSCRIBE_URL", "http://localh
 task_generator_agent_url = get_agent_endpoint("AGENT_TASKGENERATOR_URL", "http://localhost:8003", "/generate_tasks")
 
 
+import contextvars
+firebase_token_var = contextvars.ContextVar("firebase_token_var", default=None)
+
+def get_google_oidc_token(audience: str) -> Optional[str]:
+    """Fetch a Google OIDC ID token for service-to-service authentication in GCP"""
+    if os.getenv("ENV_MODE", "local").lower() in ["local", "local_test"]:
+        return None
+    try:
+        import google.auth
+        import google.auth.transport.requests
+        from google.oauth2 import id_token
+        from urllib.parse import urlparse
+        
+        auth_req = google.auth.transport.requests.Request()
+        parsed = urlparse(audience)
+        base_audience = f"{parsed.scheme}://{parsed.netloc}"
+        token = id_token.fetch_id_token(auth_req, audience=base_audience)
+        return token
+    except Exception as e:
+        logger.warning(f"Could not fetch GCP OIDC token: {e}")
+        return None
+
 # Define your external agents
 class ExternalAgentProxy:
     def __init__(self, name: str, url: str):
@@ -85,10 +107,22 @@ class ExternalAgentProxy:
         Post to external agent with error handling and LangSmith tracing.
         """
         start_time = time.time()
+        headers = {}
+        
+        # Retrieve Firebase token from context variable and inject it in the header
+        token = firebase_token_var.get()
+        if token:
+            headers["X-Firebase-Token"] = token
+            
+        # Get Google OIDC token for secure service-to-service IAM auth in production
+        oidc_token = get_google_oidc_token(self.url)
+        if oidc_token:
+            headers["Authorization"] = f"Bearer {oidc_token}"
+
         try:
             # We use a long timeout because agents might take time to think
             async with httpx.AsyncClient(timeout=300.0) as client:
-                resp = await client.post(self.url, json=payload)
+                resp = await client.post(self.url, json=payload, headers=headers)
                 resp.raise_for_status()  # Ensure we don't proceed on 500 errors
                 result = resp.json()
                 
@@ -610,9 +644,12 @@ def get_tasklist_from_url(tasks_json_url: str, video_url : str, env_mode: str = 
     
     if(env_mode != "local"):
         logger.info(f"Fetching tasks JSON from {tasks_json_url} in {env_mode} environment...")
-        global gcs_client
-        gcs_client = storage.Client(   )
-        #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
+        if env_mode == "local":
+            datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+            gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+            gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+        else:
+            gcs_client = storage.Client()
         
         if not gcs_client:
             raise RuntimeError("GCS client not initialized")

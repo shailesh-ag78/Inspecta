@@ -1,3 +1,4 @@
+from os import path
 import sys
 import os
 from pathlib import Path
@@ -69,6 +70,9 @@ print("✅ CORS Middleware configured for local and Firebase hosting")
 
 # ============ Authentication ============
 
+import contextvars
+firebase_token_var = contextvars.ContextVar("firebase_token_var", default=None)
+
 @app.middleware("http")
 async def verify_firebase_token(request: Request, call_next):
     # 1. Skip verification for OPTIONS requests (CORS preflight)
@@ -76,32 +80,35 @@ async def verify_firebase_token(request: Request, call_next):
     if request.method == "OPTIONS" or request.url.path == "/health":
         return await call_next(request)
 
+    # Extract the Firebase token from the standard Bearer authorization header
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        request.state.company_id = None
+        request.state.company_storage_id = None
+        return await call_next(request)
+
+    id_token = auth_header.replace("Bearer ", "")
+    #token_ctx = firebase_token_var.set(id_token)
+
     try:
-        # 2. Grab the Token from the 'Authorization' Header
-        auth_header = request.headers.get("Authorization", "")
-        
-        if not auth_header:
-            print(f"⚠️ No Authorization header sent from client for {request.url.path}")
-
-        if not auth_header.startswith("Bearer "):
-            print(f"⚠️ No Bearer token found for {request.method} {request.url.path}")
-            request.state.company_id = None
-            return await call_next(request)
-
-        id_token = auth_header.replace("Bearer ", "")
-        
-        # 3. Verify with Firebase
+        # Verify with Firebase
         decoded_token = auth.verify_id_token(id_token)
+        print("Verified firebase id token ", decoded_token)
         
         request.state.company_id = decoded_token.get("company_id")
         request.state.company_storage_id = decoded_token.get("company_storage_id")
         print(f"✅ Authenticated: Company {request.state.company_id}")
+        token_ctx = firebase_token_var.set(id_token)
+        print('Set firebase token after decoding ', id_token)
+        
     except Exception as e:
         print(f"❌ Token verification failed: {e}")
         request.state.company_id = None
         request.state.company_storage_id = None
         
     return await call_next(request)
+    # finally:
+    #     firebase_token_var.reset(token_ctx)
 
 # ============ Global repository ============
 repository: Optional[IncidentRepository] = None
@@ -117,11 +124,15 @@ async def startup_event():
 
     # Initialize Firebase Admin SDK
     try:
-        cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
         if not firebase_admin._apps:
-            cred = credentials.Certificate(str(cert_path))
-            firebase_admin.initialize_app(cred)
-        print("✅ Firebase Admin initialized")
+            cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
+            if cert_path.exists():
+                cred = credentials.Certificate(str(cert_path))
+                firebase_admin.initialize_app(cred)
+                print("✅ Firebase Admin initialized with local credentials in UI Backend")
+            else:
+                firebase_admin.initialize_app()
+                print("✅ Firebase Admin initialized with Default Credentials in UI Backend")
     except Exception as e:
         print(f"❌ Firebase initialization error: {e}")
 
@@ -191,10 +202,37 @@ async def health_check():
 
 # ============ Utility Functions ============
 
+def get_google_oidc_token(audience: str) -> Optional[str]:
+    """Fetch a Google OIDC ID token for service-to-service authentication in GCP"""
+    if ENV_MODE == "local":
+        return None
+    try:
+        import google.auth
+        import google.auth.transport.requests
+        from google.oauth2 import id_token
+        from urllib.parse import urlparse
+        
+        auth_req = google.auth.transport.requests.Request()
+        # Extract base audience URL to avoid path/query mismatch issues
+        parsed = urlparse(audience)
+        base_audience = f"{parsed.scheme}://{parsed.netloc}"
+        token = id_token.fetch_id_token(auth_req, audience=base_audience)
+        print("OIDC token fetched successfully", token)   
+        return token
+    except Exception as e:
+        print(f"Warning: Could not fetch GCP OIDC token: {e}")
+        return None
+
 def CallExecutorService(executor_service_url, method, headers: dict, payload: Optional[dict]):
     try:
         if payload is None:
             payload = {}
+
+        # Dynamically generate Google OIDC token for the target executor service URL
+        oidc_token = get_google_oidc_token(executor_service_url)
+        if oidc_token:
+            headers = headers.copy()
+            headers["Authorization"] = f"Bearer {oidc_token}"
             
         req = urllib.request.Request(   
             executor_service_url,
@@ -580,19 +618,14 @@ async def get_company_info(
 
 def fill_auth_headers(request: Request, headers: dict):
     """Fill auth headers for executor service"""
-    auth_header = request.headers.get("Authorization")
-    if auth_header:
-        headers["Authorization"] = auth_header
-    
-    company_id = getattr(request.state, "company_id", None)
-    company_storage_id = getattr(request.state, "company_storage_id", None)
-    if company_id is not None:
-        headers["X-Company-Id"] = str(company_id)
-    if company_storage_id is not None:
-        headers["X-Storage-Id"] = str(company_storage_id)
-    
+    fb = firebase_token_var.get()
+    if fb:
+        print("Setting Firebase token : ", fb)
+        headers["X-Firebase-Token"] = fb
+    else:
+        print("Could not set firebase token")
+        
     headers["Content-Type"] = "application/json"
-    
     return headers
 
 def upload_file_data(file_path, real_upload_path, blob_name):
@@ -604,8 +637,13 @@ def upload_file_data(file_path, real_upload_path, blob_name):
     else:
         # Upload to GCS
         global gcs_client
-        #gcs_client = storage.Client()
-        gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
+        if ENV_MODE.startswith("local"):
+            datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+            gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+            gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+        else:
+            gcs_client = storage.Client()
+        #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
 
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
         blob = bucket.blob(blob_name)

@@ -18,18 +18,21 @@ export async function GET(request: NextRequest) {
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    // Fetch signed URL or original local path from backend
-    const authHeader = request.headers.get('authorization');
-    const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
-    const { url: videoUrl } = await getInspectionUploadUrl(authHeaders, filePath);
+    let finalFilePath = filePath;
+    if (filePath.startsWith('gs:')) {
+      // Fetch signed URL or original local path from backend
+      const authHeader = request.headers.get('authorization');
+      const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
+      const { url: videoUrl } = await getInspectionUploadUrl(authHeaders, filePath);
 
-    if (videoUrl && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
-      console.log('Redirecting GCS video request to signed URL:', videoUrl);
-      return NextResponse.redirect(videoUrl, { status: 307 });
+      if (videoUrl && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
+        console.log('Redirecting GCS video request to signed URL:', videoUrl);
+        return NextResponse.redirect(videoUrl, { status: 307 });
+      }
+
+      // Update filePath to use resolved path if local
+      finalFilePath = videoUrl || filePath;
     }
-
-    // Update filePath to use resolved path if local
-    const finalFilePath = videoUrl || filePath;
 
     // Check if file exists
     if (!fs.existsSync(finalFilePath)) {

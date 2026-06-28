@@ -52,6 +52,7 @@ def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
     
     return bucket_name, blob_name
 
+gcs_client = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup code
@@ -59,16 +60,18 @@ async def lifespan(app: FastAPI):
     
     # Initialize GCS client if in non-local mode
     print(f"ENV_MODE: {ENV_MODE}")
-    if ENV_MODE != "local":
-        try:
-            global gcs_client
-            gcs_client = storage.Client(   )
-            #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
-            
-            logger.info("✅ GCS client initialized successfully.")
-        except Exception as e:
-            logger.error(f"❌ Failed to initialize GCS client: {e}")
-            raise RuntimeError("Failed to initialize GCS client") from e
+    # Initialize GCS client if in non-local mode
+    global gcs_client
+    if ENV_MODE.startswith("local"):
+        datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+        gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+        gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+    else:
+        gcs_client = storage.Client()
+    if not gcs_client:
+            logger.error(f"❌ Failed to initialize GCS client")
+            raise RuntimeError("GCS client not initialized")
+    logger.info("✅ GCS Client initialized")
     
     yield  # Run the application
     

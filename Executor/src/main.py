@@ -26,7 +26,7 @@ import dotenv
 import uvicorn
 from pathlib import Path
 
-from .workflowexecutor import WorkflowExecutor
+from .workflowexecutor import WorkflowExecutor, firebase_token_var
 from langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
 from google.cloud import storage
@@ -62,6 +62,8 @@ logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 # Define your local root (where files actually live on your PC)
 LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"G:\code\Inspecta\Data"))
 
+gcs_client = None
+
 def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
     """
     Splits a gs:// URI into bucket_name and blob_name.
@@ -90,22 +92,16 @@ async def lifespan(app: FastAPI):
     langsmith_config = get_langsmith_config()
     logger.info("✅ LangSmith configured")
     
-    # This runs ONCE when the server starts
-    if ENV_MODE != "local":
-        # 1. Initialize GCS Client once (Singleton)
-        # This handles auth and connection pooling globally
-        global gcs_client
-        gcs_client = storage.Client(   )
-        #gcs_client = storage.Client.from_service_account_json(r"G:\code\Inspecta\deployment\gcp-key.json")
-        # # Read the key file
-        # key_file_path = r"G:\code\Inspecta\deployment\gcp-key.json"
-        # with open(key_file_path, "r") as f:
-        #     key_data = f.read()
+    # 1. Initialize GCS Client once (Singleton)
+    global gcs_client
+    if ENV_MODE.startswith("local"):
+        datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+        gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+        gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+    else:
+        gcs_client = storage.Client()
 
-        # # Create the client
-        # gcs_client = storage.Client.from_service_account_info(key_data)
-
-        logger.info("✅ GCS Client initialized")
+    logger.info("✅ GCS Client initialized")
 
     # Initialize the Executor as a Singleton
     # It will stay in memory to handle parallel requests
@@ -143,34 +139,52 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-from firebase_admin import auth
+import firebase_admin
+from firebase_admin import credentials, auth
+
+# Initialize Firebase Admin SDK
+try:
+    if not firebase_admin._apps:
+        datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+        cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
+        if cert_path.exists():
+            cred = credentials.Certificate(str(cert_path))
+            firebase_admin.initialize_app(cred)
+            logger.info("✅ Firebase Admin initialized with local credentials in Executor")
+        else:
+            firebase_admin.initialize_app()
+            logger.info("✅ Firebase Admin initialized with Default Credentials in Executor")
+except Exception as e:
+    logger.error(f"❌ Firebase initialization error in Executor: {e}")
 
 @app.middleware("http")
 async def verify_firebase_token(request: Request, call_next):
+    # Extract Firebase Token strictly from X-Firebase-Token header
+    firebase_token = request.headers.get("X-Firebase-Token")
+    token_ctx_token = firebase_token_var.set(firebase_token)
+    print("firebase_token", firebase_token) 
+
     try:
-        # 1. Check if we are in local testing mode
-        if ENV_MODE.lower() in ["local", "local_test"]:
-            # Bypass Firebase and read IDs directly from headers for testing
-            request.state.company_id = request.headers.get("X-Company-Id")
-            request.state.company_storage_id = request.headers.get("X-Storage-Id")
-            return await call_next(request)
-        else:
-            # 1. Grab the Token from the 'Authorization' Header
-            id_token = request.headers.get("Authorization", "").replace("Bearer ", "")
+        try:
+            # Verify with Firebase
+            print("Verify with Firebase")
+            decoded_token = auth.verify_id_token(firebase_token)
+            print("decoded_token", decoded_token)
             
-            # 2. Verify with Firebase
-            decoded_token = auth.verify_id_token(id_token)
-            
-            # 3. Extract the SECURE company_id from the token claims
-            # This CANNOT be faked by the UI
+            # Extract the SECURE company_id and company_storage_id from token claims
             request.state.company_id = decoded_token.get("company_id")
+            print("company_id", request.state.company_id)
             request.state.company_storage_id = decoded_token.get("company_storage_id")
-    except Exception:
-        # If token is fake or expired, we don't set the company_id
-        request.state.company_id = None
-        request.state.company_storage_id = None
-        
-    return await call_next(request)
+            print("company_storage_id", request.state.company_storage_id)
+        except Exception as e:
+            # If token is fake or expired, we don't set the company_id
+            request.state.company_id = None
+            request.state.company_storage_id = None
+            print(f"❌ Token verification failed: {e}")
+            
+        return await call_next(request)
+    finally:
+        firebase_token_var.reset(token_ctx_token)
 
 # --- The UI Endpoints ---
 # Schema for the incoming request
