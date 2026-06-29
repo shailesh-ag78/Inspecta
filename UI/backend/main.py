@@ -36,6 +36,20 @@ import dotenv
 from postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType, Industry
 import shutil
 from google.cloud import storage
+import datetime
+import google.auth.transport.requests
+from google.cloud import storage
+from pathlib import Path
+import urllib.request
+import json
+import contextvars
+import google.auth
+import google.auth.transport.requests
+from google.oauth2 import id_token
+from urllib.parse import urlparse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import traceback
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent / ".env"
@@ -47,8 +61,13 @@ UPLOADS_FOLDER = os.getenv("UPLOADS_FOLDER", "uploads").lower()
 TIMEOUT= int(os.getenv("TIMEOUT", "60"))
 BASE_EXECUTOR_URL = os.getenv("BASE_EXECUTOR_URL", "http://localhost:8004")
 
-import urllib.request
-import json
+ALLOWED_TYPES = {
+    "video/mp4": ".mp4",
+    "video/quicktime": ".mov",
+    "audio/mpeg": ".mp3",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav"
+}
 
 app = FastAPI(
     title="Inspecta UI Backend API",
@@ -70,7 +89,6 @@ print("✅ CORS Middleware configured for local and Firebase hosting")
 
 # ============ Authentication ============
 
-import contextvars
 firebase_token_var = contextvars.ContextVar("firebase_token_var", default=None)
 
 @app.middleware("http")
@@ -201,40 +219,38 @@ def get_google_oidc_token(audience: str) -> Optional[str]:
     """Fetch a Google OIDC ID token for service-to-service authentication in GCP"""
     if ENV_MODE == "local":
         return None
-    try:
-        import google.auth
-        import google.auth.transport.requests
-        from google.oauth2 import id_token
-        from urllib.parse import urlparse
-        
+    try:       
         auth_req = google.auth.transport.requests.Request()
         # Extract base audience URL to avoid path/query mismatch issues
         parsed = urlparse(audience)
         base_audience = f"{parsed.scheme}://{parsed.netloc}"
         token = id_token.fetch_id_token(auth_req, audience=base_audience)
-        print("OIDC token fetched successfully", token)   
-        return token
+        oidc_token = token.strip() 
+        print("OIDC token fetched successfully")   
+        return oidc_token
     except Exception as e:
         print(f"Warning: Could not fetch GCP OIDC token: {e}")
         return None
 
 def CallExecutorService(executor_service_url, method, headers: dict, payload: Optional[dict]):
     try:
-        if payload is None:
-            payload = {}
-
         # Dynamically generate Google OIDC token for the target executor service URL
         oidc_token = get_google_oidc_token(executor_service_url)
         if oidc_token:
             headers = headers.copy()
             headers["Authorization"] = f"Bearer {oidc_token}"
-            
+
+        data = None
+        if(payload != None):
+            data = json.dumps(payload).encode("utf-8")
+
         req = urllib.request.Request(   
             executor_service_url,
-            data=json.dumps(payload).encode("utf-8"),
+            data=data,
             headers=headers,
             method=method
         )
+        print(f"Executor Service Request: {executor_service_url}, Headers: {headers}, Payload: {payload}")
         with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
             resp_data = json.loads(response.read().decode("utf-8"))
             if resp_data.get("status") and resp_data.get("status").lower() == "success":
@@ -255,7 +271,14 @@ def CallExecutorService(executor_service_url, method, headers: dict, payload: Op
         print(f"Error calling Executor: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
 
-
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # This will print the exact field, location, and reason for the 400/422 error to your logs
+    print(f"FastAPI Validation Failed for {request.url}. Errors: {exc.errors()}")
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
 # ============ Incidents Endpoints ============
 
 @app.get("/api/incidents")
@@ -514,7 +537,6 @@ async def get_sites(request: Request):
         return {"status": "success", "data": formatted_sites}
     except Exception as e:
         print(f"❌ Error fetching sites: {e}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -564,7 +586,6 @@ async def get_site_inspections(request: Request):
         return {"status": "success", "data": formatted_combinations}
     except Exception as e:
         print(f"❌ Error fetching site-inspections: {e}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -611,15 +632,16 @@ async def get_company_info(
 
 # ============ Inspection Endpoints ============
 
-def fill_auth_headers(request: Request, headers: dict):
+def fill_auth_headers(request: Request, headers: dict, content_type: str = "application/json"):
     """Fill auth headers for executor service"""
     fb = firebase_token_var.get()
     if fb:
         headers["X-Firebase-Token"] = fb
     else:
         print("Could not set firebase token")
-        
-    headers["Content-Type"] = "application/json"
+
+    if(content_type != ""):
+        headers["Content-Type"] = content_type
     return headers
 
 def upload_file_data(file_path, real_upload_path, blob_name):
@@ -678,8 +700,8 @@ async def create_inspection(
 @app.get("/api/get-video-url")
 async def get_video_url(request: Request, path: str = Query(..., description="GCS path or local path")):
     """Create pre-signed URL of the video for display"""
-    # Video control in UI does not send Auth header while calling this method. Hence Firebase authentication is skipped.
-    # I production enviornment, only GCP service based authentication is considered
+    # ##### Note #####  :Video control in UI does not send Auth header while calling this method. Hence Firebase authentication is skipped.
+    # In production enviornment, only GCP service based authentication is considered
 
     # Avoid checking company_id since it will be None.
     # company_id = getattr(request.state, "company_id", None)
@@ -706,13 +728,37 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
 
             bucket = gcs_client.bucket(bucket_name)
             blob = bucket.blob(blob_name)
-            
-            import datetime
-            url = blob.generate_signed_url(
-                version="v4",
-                expiration=datetime.timedelta(minutes=30),
-                method="GET"
-            )
+        
+            _, file_ext = os.path.splitext(blob_name)
+            file_ext = file_ext.lower()
+            fileType = next((mime for mime, ext in ALLOWED_TYPES.items() if ext == file_ext), "video/mp4")
+
+            # 2. Extract the credentials that the client is actively using
+            creds = gcs_client._credentials
+            # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
+            # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
+            if hasattr(creds, 'private_key') and creds.private_key:
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(minutes=30),
+                    method="GET",
+                    content_type=fileType
+                )
+            # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
+            # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
+            else:
+                auth_req = google.auth.transport.requests.Request()
+                creds.refresh(auth_req)
+                
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(minutes=30),
+                    method="GET",
+                    content_type=fileType,
+                    service_account_email=creds.service_account_email,
+                    access_token=creds.token
+                )
+
             return {"status": "success", "data": {"url": url}}
         except Exception as e:
             print(f"Error generating signed URL: {e}")
@@ -723,16 +769,20 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
 
 
 @app.get("/api/get-upload-url")
-async def get_upload_url(request: Request):
+async def get_upload_url(request: Request, fileName: str = Query(..., description="Name of the file")):
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
         headers = {}
-        headers = fill_auth_headers(request, headers)
-        headers["Content-Type"] = "video/mp4"  # Specific Content type is needed to fetch URL
-        executor_service_url = BASE_EXECUTOR_URL + "/get-upload-url"
+        headers = fill_auth_headers(request, headers, content_type="")
+        
+        _, file_ext = os.path.splitext(fileName)
+        file_ext = file_ext.lower()
+        fileType = next((mime for mime, ext in ALLOWED_TYPES.items() if ext == file_ext), "video/mp4")
+
+        executor_service_url = BASE_EXECUTOR_URL + "/get-upload-url"+ "?fileType="+fileType
         resp_data = CallExecutorService(executor_service_url, "GET", headers, None)
         upload_url = resp_data.get("upload_url")
         blob_name = resp_data.get("blob_name")

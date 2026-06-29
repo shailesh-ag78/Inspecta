@@ -119,11 +119,12 @@ export async function POST(request: NextRequest) {
     // 1. Fetch signed upload URL, blob name, and storage type from backend client
     const authHeader = request.headers.get('authorization');
     const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
-    const { upload_url: uploadUrl, blob_name: blobName, storage_type: storageType } = await getUploadUrl(authHeaders);
+    const { upload_url: uploadUrl, blob_name: blobName, storage_type: storageType } = await getUploadUrl(authHeaders, file.name);
     // TODO: Comment following console.log message for security reasons
     console.log(`Received Upload Path: ${uploadUrl}, Blob Name: ${blobName}, Storage Type: ${storageType}`);
 
     // 2. Upload file depending on storage_type
+    // ToDO: Have a file size check 
     if (storageType === 'local') {
       // Local machine file path
       const bytes = await file.arrayBuffer();

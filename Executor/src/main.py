@@ -21,7 +21,7 @@ if sys.platform == "win32":
         pass
 
 import uuid
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Query
 import dotenv
 import uvicorn
 from pathlib import Path
@@ -35,6 +35,15 @@ from urllib.parse import urlparse
 
 from contextlib import asynccontextmanager
 
+import datetime
+import google.auth.transport.requests
+from google.cloud import storage
+import firebase_admin
+from firebase_admin import credentials, auth
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -42,7 +51,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTENSIONS = {'.mp4', '.mov'}
 INSPCTA_FILE_BUCKET = "inspecta-file-bucket"
 UPLOADS_FOLDER = "uploads"
 ALLOWED_TYPES = {
@@ -139,9 +147,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-import firebase_admin
-from firebase_admin import credentials, auth
-
 # Initialize Firebase Admin SDK
 try:
     if not firebase_admin._apps:
@@ -185,6 +190,15 @@ async def verify_firebase_token(request: Request, call_next):
         return await call_next(request)
     finally:
         firebase_token_var.reset(token_ctx_token)
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # This will print the exact field, location, and reason for the 400/422 error to your logs
+    print(f"FastAPI Validation Failed for {request.url}. Errors: {exc.errors()}")
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.errors(), "body": exc.body},
+    )
 
 # --- The UI Endpoints ---
 # Schema for the incoming request
@@ -338,20 +352,22 @@ async def get_status_endpoint(incident_id: str, request: Request):
 
 # UI calls this method to create a new place where to upload the file
 @app.get("/get-upload-url")
-async def get_upload_url(request: Request):
+async def get_upload_url(request: Request, fileType: Optional[str] = Query(None)):
     # Extract company_storage_id (Grab the Token from the 'Authorization' Header)
     company_storage_id = getattr(request.state, "company_storage_id", None)
     if company_storage_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
-    content_type = request.headers.get("Content-Type")
-    if content_type not in ALLOWED_TYPES:
+        
+    if not fileType:
+        raise HTTPException(status_code=400, detail="Missing fileType")
+    if fileType not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Unsupported file type")
     """
     Server-side generation of the destination.
     The UI never decides the path.
     """
     # 1. Standard Logic (Same for both)
-    ext = ALLOWED_TYPES.get(content_type, ".mp4")
+    ext = ALLOWED_TYPES.get(fileType, ".mp4")
     unique_name = f"{uuid.uuid4()}{ext}"
     
     # This is the "relative" path inside the bucket or root folder
@@ -375,16 +391,37 @@ async def get_upload_url(request: Request):
         }
     else:
         # 3. GCP Logic
-        #gcs_client = storage.Client()
         global gcs_client
+        gcs_client = storage.Client()
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
         blob = bucket.blob(blob_name)
-        url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(minutes=15),
-            method="PUT",
-            content_type=content_type
-        )
+
+        # 2. Extract the credentials that the client is actively using
+        creds = gcs_client._credentials
+        # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
+        # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
+        if hasattr(creds, 'private_key') and creds.private_key:
+            url = blob.generate_signed_url(
+                version="v4",
+                expiration=datetime.timedelta(minutes=15),
+                method="PUT",
+                content_type=fileType
+            )
+        # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
+        # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
+        else:
+            auth_req = google.auth.transport.requests.Request()
+            creds.refresh(auth_req)
+            
+            url = blob.generate_signed_url(
+                version="v4",
+                expiration=datetime.timedelta(minutes=15),
+                method="PUT",
+                content_type=fileType,
+                service_account_email=creds.service_account_email,
+                access_token=creds.token
+            )
+
         return {
             "status": "Success",
             "upload_url": url, 

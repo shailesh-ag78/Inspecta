@@ -4,7 +4,7 @@
 
 const isServer = typeof window === 'undefined';
 const BACKEND_URL = isServer
-  ? (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080')
+  ? (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080')
   : '/api/backend';
 
 interface BackendResponse<T = any> {
@@ -268,10 +268,11 @@ export interface UploadUrlResponse {
 }
 
 export async function getUploadUrl(
-  headers?: Record<string, string>
+  headers?: Record<string, string>,
+  fileName?: string
 ): Promise<UploadUrlResponse> {
   const response = await callBackend<UploadUrlResponse>(
-    `/api/get-upload-url`,
+    `/api/get-upload-url?fileName=${fileName}`,
     {
       method: 'GET',
       headers,

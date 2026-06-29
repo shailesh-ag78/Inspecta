@@ -284,7 +284,7 @@ if ($DeployAgents) {
     gcloud run deploy agent-audioextract `
         --image="$RegistryUri/agent-audioextract:$BuildNumber" `
         --region=$Region `
-        --ingress=internal `
+        --ingress=all `
         --no-allow-unauthenticated `
         --min-instances=0 `
         --network=$VpcName `
@@ -299,7 +299,7 @@ if ($DeployAgents) {
     gcloud run deploy agent-transcribe `
         --image="$RegistryUri/agent-transcribe:$BuildNumber" `
         --region=$Region `
-        --ingress=internal `
+        --ingress=all `
         --no-allow-unauthenticated `
         --min-instances=0 `
         --network=$VpcName `
@@ -315,7 +315,7 @@ if ($DeployAgents) {
     gcloud run deploy agent-taskgenerator `
         --image="$RegistryUri/agent-taskgenerator:$BuildNumber" `
         --region=$Region `
-        --ingress=internal `
+        --ingress=all `
         --no-allow-unauthenticated `
         --min-instances=0 `
         --network=$VpcName `
@@ -350,7 +350,7 @@ if ($DeployAgents) {
     gcloud run deploy executor-service `
         --image="$RegistryUri/executor:$BuildNumber" `
         --region=$Region `
-        --ingress=internal `
+        --ingress=all `
         --no-allow-unauthenticated `
         --min-instances=0 `
         --timeout=900 `
@@ -390,7 +390,9 @@ if ($DeployUI) {
         --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl"
 
-    $UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
+
+    #$UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
+    $UiUrl = (gcloud run services list --filter="metadata.name=ui-backend-service" --format="value(URL)")
     Write-Host "============ UI Backend URL: $UiUrl" -ForegroundColor Green
 }
 

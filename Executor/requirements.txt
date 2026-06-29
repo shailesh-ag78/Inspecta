@@ -8,9 +8,11 @@ langchain-openai>=0.1.0  # For LLM instrumentation
 requests
 python-multipart
 pydantic
-psycopg[binary]>=3.2.0  # Required for LangGraph Postgres Checkpointer
+# Required for LangGraph Postgres Checkpointer
+psycopg[binary]>=3.2.0
 httpx
 google-cloud-storage
 firebase-admin
-python-dotenv>=1.0.0  # Environment variable management
+python-dotenv>=1.0.0
 pytest
+google-auth
