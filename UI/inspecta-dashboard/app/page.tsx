@@ -928,12 +928,12 @@ export default function ReviewerDashboard() {
       )}
 
       {/* Main Content */}
-      <main className="flex flex-1 overflow-hidden">
+      <main className="flex flex-1 overflow-hidden max-w-[1600px] mx-auto w-full">
         {/* Left Pane - Task Feed */}
-        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto px-6 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
+        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto px-3 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
           {/* Filters */}
-          <div className="sticky top-0 z-20 -mx-6 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-6 shadow-md">
-            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200/70 bg-slate-200/80">
+          <div className="sticky top-0 z-20 -mx-3 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-6 shadow-md">
+            <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200/70 bg-slate-200/80">
               <h3 className="text-base font-semibold text-slate-900 flex items-center gap-3">
                 <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
                 Task Filters
@@ -948,7 +948,7 @@ export default function ReviewerDashboard() {
               </div>
             </div>
             {!isFiltersCollapsed && (
-              <div className="px-6 py-4">
+              <div className="px-3 py-4">
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <select
@@ -969,8 +969,8 @@ export default function ReviewerDashboard() {
                       className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all" className="text-xs">All Types</option>
-                      <option value="install" className="text-xs">🔧 Install</option>
-                      <option value="repair" className="text-xs">🔨 Repair</option>
+                      <option value="install" className="text-xs">🛠️ Install</option>
+                      <option value="repair" className="text-xs">🔧 Repair</option>
                       <option value="verify" className="text-xs">📋 Verify</option>
                       <option value="clear" className="text-xs">🧹 Clear</option>
                     </select>
@@ -982,11 +982,11 @@ export default function ReviewerDashboard() {
                       className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
                     >
                       <option value="all" className="text-xs">All Statuses</option>
-                      <option value="pending" className="text-xs">● Pending</option>
-                      <option value="in_progress" className="text-xs">⟳ In Progress</option>
-                      <option value="review" className="text-xs">🔍 Review</option>
-                      <option value="completed" className="text-xs">✓ Completed</option>
-                      <option value="failed" className="text-xs">✗ Failed</option>
+                      <option value="pending" className="text-xs">🕒 Pending</option>
+                      <option value="in_progress" className="text-xs">🔄 In Progress</option>
+                      <option value="review" className="text-xs">👁️ Review</option>
+                      <option value="completed" className="text-xs">✅ Completed</option>
+                      <option value="failed" className="text-xs">❌ Failed</option>
                     </select>
                   </div>
                 </div>
@@ -1152,7 +1152,7 @@ export default function ReviewerDashboard() {
         {/* Right Pane - Evidence Vault */}
         {!isVideoCollapsed && (
           <aside className="w-2/5 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col shadow-inner relative border-l border-slate-700">
-            <div className="p-5 pb-40 sticky top-0 overflow-y-auto">
+            <div className="p-5 pb-40 flex-1 overflow-y-auto">
               {/* Compact Header Row */}
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-white font-bold flex items-center min-w-0">
@@ -1216,9 +1216,9 @@ export default function ReviewerDashboard() {
 
                       <button
                         onClick={handleActiveVideoPlay}
-                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-full transition-all active:scale-95"
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full transition-all active:scale-95"
                       >
-                        <Play className={`w-4 h-4 fill-current ${isPlaying ? 'animate-pulse' : ''}`} />
+                        <Play className={`w-3.5 h-3.5 fill-current ${isPlaying ? 'animate-pulse' : ''}`} />
                         {isPlaying ? 'Playing Segment' : `Sync : ${activeTask ? `${formatTime(activeTask.start_time)} -- ${formatTime(activeTask.end_time)}` : '00:00'}`}
                       </button>
 
@@ -1241,9 +1241,9 @@ export default function ReviewerDashboard() {
                 {/* Add Inspection Button */}
                 <button
                   onClick={handleAddInspection}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+                  className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-3.5 h-3.5" />
                   Add Inspection
                 </button>
 
@@ -1251,9 +1251,9 @@ export default function ReviewerDashboard() {
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+                    className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
                   >
-                    <Upload className="w-4 h-4" />
+                    <Upload className="w-3.5 h-3.5" />
                     Upload incident video
                   </button>
                   <input
