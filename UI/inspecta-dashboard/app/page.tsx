@@ -1199,7 +1199,7 @@ export default function ReviewerDashboard() {
                   </div>
                 )}
 
-              {/* Playback HUD Controls */}
+                {/* Playback HUD Controls */}
                 {!currentIsAudio && (
                   <div className="mt-4 flex items-center justify-center gap-4">
                     <div className="flex items-center gap-1 bg-slate-800/80 p-1.5 rounded-full border border-slate-700 shadow-xl">

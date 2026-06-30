@@ -525,7 +525,7 @@ $CorsFilePath = Join-Path $PSScriptRoot "cors-config.json"
 $CorsConfig = ConvertTo-Json -InputObject @(
     @{
         origin         = @("https://yourdomain.com", "http://localhost:3000")
-        method         = @("PUT", "GET", "POST", "DELETE", "OPTIONS")
+        method         = @("PUT", "GET", "POST", "OPTIONS")
         responseHeader = @("Content-Type", "Access-Control-Allow-Origin")
         maxAgeSeconds  = 3600
     }

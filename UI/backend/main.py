@@ -226,7 +226,6 @@ def get_google_oidc_token(audience: str) -> Optional[str]:
         base_audience = f"{parsed.scheme}://{parsed.netloc}"
         token = id_token.fetch_id_token(auth_req, audience=base_audience)
         oidc_token = token.strip() 
-        print("OIDC token fetched successfully")   
         return oidc_token
     except Exception as e:
         print(f"Warning: Could not fetch GCP OIDC token: {e}")
@@ -250,7 +249,6 @@ def CallExecutorService(executor_service_url, method, headers: dict, payload: Op
             headers=headers,
             method=method
         )
-        print(f"Executor Service Request: {executor_service_url}, Headers: {headers}, Payload: {payload}")
         with urllib.request.urlopen(req, timeout=TIMEOUT) as response:
             resp_data = json.loads(response.read().decode("utf-8"))
             if resp_data.get("status") and resp_data.get("status").lower() == "success":
@@ -733,58 +731,38 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
             file_ext = file_ext.lower()
             fileType = next((mime for mime, ext in ALLOWED_TYPES.items() if ext == file_ext), "video/mp4")
 
-            # # 2. Extract the credentials that the client is actively using
-            # creds = gcs_client._credentials
-            # # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
-            # # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
-            # if hasattr(creds, 'private_key') and creds.private_key:
-            #     url = blob.generate_signed_url(
-            #         version="v4",
-            #         expiration=datetime.timedelta(minutes=30),
-            #         method="GET",
-            #         content_type=fileType
-            #     )
-            # # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
-            # # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
-            # else:
-            #     # 1. Define the explicit scope required for IAM infrastructure interactions
-            #     #CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/iam'] # Set this preferably
-            #     CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/cloud-platform']
-
-            #     # 2. Force the credentials object to request the required scope footprint
-            #     credentials, project = google.auth.default(scopes=CLOUD_PLATFORM_SCOPE)
-
-            #     auth_req = google.auth.transport.requests.Request()
-            #     credentials.refresh(auth_req)
-                
-            #     url = blob.generate_signed_url(
-            #         version="v4",
-            #         expiration=datetime.timedelta(minutes=30),
-            #         method="GET",
-            #         content_type=fileType,
-            #         service_account_email=credentials.service_account_email,
-            #         access_token=credentials.token
-            #     )
-
+            # 2. Extract the credentials that the client is actively using
             creds = gcs_client._credentials
+            # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
+            # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
+            if hasattr(creds, 'private_key') and creds.private_key:
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(minutes=30),
+                    method="GET",
+                    content_type=fileType
+                )
+            # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
+            # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
+            else:
+                # 1. Define the explicit scope required for IAM infrastructure interactions
+                CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/iam'] # Set this preferably
+                #CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/cloud-platform']
 
-            # 1. Standard configuration parameters (Omitting content_type completely!)
-            signing_kwargs = {
-                "version": "v4",
-                "expiration": datetime.timedelta(minutes=30),
-                "method": "GET"
-            }
+                # 2. Force the credentials object to request the required scope footprint
+                credentials, project = google.auth.default(scopes=CLOUD_PLATFORM_SCOPE)
 
-            # 2. Handle Cloud Run vs. Local Key Signing environment
-            if not hasattr(creds, 'private_key') or not creds.private_key:
-                import google.auth.transport.requests
                 auth_req = google.auth.transport.requests.Request()
-                creds.refresh(auth_req)
-                signing_kwargs["service_account_email"] = creds.service_account_email
-                signing_kwargs["access_token"] = creds.token
-
-            # 3. Generate URL WITHOUT content_type
-            url = blob.generate_signed_url(**signing_kwargs)
+                credentials.refresh(auth_req)
+                
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(minutes=30),
+                    method="GET",
+                    content_type=None,
+                    service_account_email=credentials.service_account_email,
+                    access_token=credentials.token
+                )
 
             return {"status": "success", "data": {"url": url}}
         except Exception as e:
@@ -794,6 +772,77 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
         # Local paths are returned directly
         return {"status": "success", "data": {"url": path}}
 
+# ============================================================
+@app.get("/api/get-video-url1")
+async def get_video_url1(request: Request, path: str = Query(..., description="GCS path or local path")):
+    """Create pre-signed URL of the video for display"""
+    if path.startswith("gs://"):
+        try:
+            # Parse bucket and blob name
+            gcs_path = path[5:]
+            parts = gcs_path.split("/", 1)
+            if len(parts) < 2:
+                raise HTTPException(status_code=400, detail="Invalid GCS path")
+            
+            bucket_name, blob_name = parts[0], parts[1]
+        
+            global gcs_client                
+            if ENV_MODE.startswith("local"):
+                datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+                gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+                gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+            else:
+                gcs_client = storage.Client()
+
+            bucket = gcs_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+        
+            _, file_ext = os.path.splitext(blob_name)
+            file_ext = file_ext.lower()
+            fileType = next((mime for mime, ext in ALLOWED_TYPES.items() if ext == file_ext), "video/mp4")
+
+            # 2. Extract the credentials that the client is actively using
+            creds = gcs_client._credentials
+            # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
+            # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
+            if hasattr(creds, 'private_key') and creds.private_key:
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(minutes=30),
+                    method="GET",
+                    content_type=fileType
+                )
+            # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
+            # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
+            else:
+                # 1. Define the explicit scope required for IAM infrastructure interactions
+                #CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/iam'] # Set this preferably
+                CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/cloud-platform']
+
+                # 2. Force the credentials object to request the required scope footprint
+                credentials, project = google.auth.default(scopes=CLOUD_PLATFORM_SCOPE)
+
+                auth_req = google.auth.transport.requests.Request()
+                credentials.refresh(auth_req)
+                
+                url = blob.generate_signed_url(
+                    version="v4",
+                    expiration=datetime.timedelta(minutes=30),
+                    method="GET",
+                    content_type=None,
+                    headers={"Range": "bytes=0-"},
+                    service_account_email=credentials.service_account_email,
+                    access_token=credentials.token
+                )
+            return {"status": "success", "data": {"url": url}}
+        except Exception as e:
+            print(f"Error generating signed URL: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        # Local paths are returned directly
+        return {"status": "success", "data": {"url": path}}
+
+# ============================================================
 
 @app.get("/api/get-upload-url")
 async def get_upload_url(request: Request, fileName: str = Query(..., description="Name of the file")):

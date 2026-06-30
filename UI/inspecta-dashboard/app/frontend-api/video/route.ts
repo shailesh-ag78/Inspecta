@@ -5,65 +5,94 @@ import path from 'path';
 import { Readable } from 'node:stream';
 import { writeFile, mkdir } from 'fs/promises';
 
+const getMimeType = (filePath: string): string => {
+  const ext = path.extname(filePath).toLowerCase();
+  switch (ext) {
+    case '.mp4': return 'video/mp4';
+    case '.mov': return 'video/quicktime';
+    case '.mp3': return 'audio/mpeg';
+    case '.wav': return 'audio/wav';
+    default: return 'application/octet-stream';
+  }
+};
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const filePath = searchParams.get('path');
+    const token = searchParams.get('token');
 
+    console.log("Test : Inside Video route: " + filePath)
     if (!filePath) {
       return new Response(JSON.stringify({ error: 'File path is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
-    let finalFilePath = filePath;
-    if (filePath.startsWith('gs:')) {
-      // Fetch signed URL or original local path from backend
-      const token = searchParams.get('token');
-      const authHeader = request.headers.get('authorization') || (token ? `Bearer ${token}` : null);
-      const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
-      const { url: videoUrl } = await getInspectionUploadUrl(authHeaders, filePath);
-      console.log("Video URL : ", videoUrl)
 
-      if (videoUrl && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
-        // Instead of redirecting, proxy the GCS signed URL from the server side.
-        // This avoids CORS issues on the client browser.
+    // --- GCS File Proxy Logic ---
+    if (filePath.startsWith('gs:')) {
+      try {
+        // 1. Get the secure, pre-signed URL from your backend UI service
+        const authHeader = request.headers.get('authorization') || (token ? `Bearer ${token}` : null);
+        const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
+        const { url: videoUrl } = await getInspectionUploadUrl(authHeaders, filePath);
+
+        console.log("Proxying GCS Signed URL: ", videoUrl);
+
+        // 2. Fetch the video from GCS on behalf of the client, passing through range headers for streaming
         const range = request.headers.get('range');
-        const proxyHeaders: HeadersInit = {};
+        let gcsResponse: Response;
         if (range) {
+          console.log("Testing: Range header found: " + range);
+          const proxyHeaders: HeadersInit = {};
           proxyHeaders['Range'] = range;
+          gcsResponse = await fetch(videoUrl, { headers: proxyHeaders });
+        } else {
+          console.log("Testing : Range header not found, fetching full video");
+          gcsResponse = await fetch(videoUrl);
+        }
+        console.log("Testing GCS Response Status: " + gcsResponse.status);
+
+        // If GCS returned an error (e.g., 403 Forbidden), forward that error to the browser
+        if (!gcsResponse.ok) {
+          console.log("Testing GCS Response Body: " + gcsResponse.body);
+          return new Response(gcsResponse.body, {
+            status: gcsResponse.status,
+            statusText: gcsResponse.statusText,
+          });
         }
 
-        const response = await fetch(videoUrl, {
-          headers: proxyHeaders,
+        // 3. Stream the GCS response back to the browser.
+        const responseHeaders = new Headers();
+        const headersToForward = ['content-type', 'content-length', 'content-range', 'accept-ranges'];
+
+        gcsResponse.headers.forEach((value, key) => {
+          if (headersToForward.includes(key.toLowerCase())) {
+            responseHeaders.set(key, value);
+          }
         });
 
-        const responseHeaders = new Headers();
-        // Forward key headers back to the client
-        const headersToForward = [
-          'content-type',
-          'content-length',
-          'content-range',
-          'accept-ranges',
-          'content-disposition',
-          'cache-control',
-        ];
-        for (const header of headersToForward) {
-          const val = response.headers.get(header);
-          if (val) {
-            responseHeaders.set(header, val);
-          }
-        }
+        // Ensure the browser tries to play the video inline instead of downloading it
+        responseHeaders.set('Content-Disposition', 'inline');
 
-        return new Response(response.body, {
-          status: response.status,
+        return new Response(gcsResponse.body, {
+          status: gcsResponse.status,
           headers: responseHeaders,
         });
-      }
 
-      // Update filePath to use resolved path if local
-      finalFilePath = videoUrl || filePath;
+      } catch (error) {
+        console.error('Error proxying GCS file:', error);
+        return new Response(JSON.stringify({ error: 'Failed to proxy GCS file', details: String(error) }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
     }
+    console.log("Testing : Local file")
+
+    // --- Local File Streaming Logic ---
+    const finalFilePath = filePath;
 
     // Check if file exists
     if (!fs.existsSync(finalFilePath)) {
@@ -78,9 +107,10 @@ export async function GET(request: NextRequest) {
     const stat = fs.statSync(finalFilePath);
     const fileSize = stat.size;
     const range = request.headers.get('range');
-    //const contentType = getMimeType(finalFilePath); // ✅ Dynamic MIME type
+    const contentType = getMimeType(finalFilePath);
 
     if (range) {
+      console.log("Testing : Local Range header found: " + range);
       // Handle range requests for video streaming
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
@@ -95,37 +125,36 @@ export async function GET(request: NextRequest) {
           file.on('error', (err) => controller.error(err));
         },
       });
-      console.log(`Serving video range: ${start}-${end} of ${fileSize} bytes`);
 
       return new Response(stream, {
-        status: 206,
+        status: 206, // Partial Content
         headers: {
           'Content-Range': `bytes ${start}-${end}/${fileSize}`,
           'Accept-Ranges': 'bytes',
           'Content-Length': chunksize.toString(),
-          'Content-Type': 'video/mp4', // Adjust based on actual file type
+          'Content-Type': contentType,
           'Cache-Control': 'no-cache',
-          'Content-Disposition': 'inline',   // ✅ Forces browser to display, not download
+          'Content-Disposition': 'inline',
         },
       });
     } else {
-      // Serve entire file
-      const file = fs.createReadStream(finalFilePath);
+      // Serve entire file if no range is requested
+      console.log("Testing : Local file range header not found, fetching full video");
+      const fileStream = fs.createReadStream(finalFilePath);
       const stream = new ReadableStream({
         start(controller) {
-          file.on('data', (chunk) => controller.enqueue(chunk));
-          file.on('end', () => controller.close());
-          file.on('error', (err) => controller.error(err));
+          fileStream.on('data', (chunk) => controller.enqueue(chunk));
+          fileStream.on('end', () => controller.close());
+          fileStream.on('error', (err) => controller.error(err));
         },
       });
-
       return new Response(stream, {
         headers: {
           'Content-Length': fileSize.toString(),
-          'Content-Type': 'video/mp4', // Adjust based on actual file type
-          'Accept-Ranges': 'bytes',          // ✅ Critical fix — was missing!
+          'Content-Type': contentType,
+          'Accept-Ranges': 'bytes',
           'Cache-Control': 'no-cache',
-          'Content-Disposition': 'inline',   // ✅ Forces browser to display, not download
+          'Content-Disposition': 'inline',
         },
       });
     }
