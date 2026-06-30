@@ -22,7 +22,6 @@ export async function GET(request: NextRequest) {
     const filePath = searchParams.get('path');
     const token = searchParams.get('token');
 
-    console.log("Test : Inside Video route: " + filePath)
     if (!filePath) {
       return new Response(JSON.stringify({ error: 'File path is required' }), {
         status: 400,
@@ -44,19 +43,15 @@ export async function GET(request: NextRequest) {
         const range = request.headers.get('range');
         let gcsResponse: Response;
         if (range) {
-          console.log("Testing: Range header found: " + range);
           const proxyHeaders: HeadersInit = {};
           proxyHeaders['Range'] = range;
           gcsResponse = await fetch(videoUrl, { headers: proxyHeaders });
         } else {
-          console.log("Testing : Range header not found, fetching full video");
           gcsResponse = await fetch(videoUrl);
         }
-        console.log("Testing GCS Response Status: " + gcsResponse.status);
 
         // If GCS returned an error (e.g., 403 Forbidden), forward that error to the browser
         if (!gcsResponse.ok) {
-          console.log("Testing GCS Response Body: " + gcsResponse.body);
           return new Response(gcsResponse.body, {
             status: gcsResponse.status,
             statusText: gcsResponse.statusText,
@@ -89,7 +84,6 @@ export async function GET(request: NextRequest) {
         });
       }
     }
-    console.log("Testing : Local file")
 
     // --- Local File Streaming Logic ---
     const finalFilePath = filePath;
@@ -110,7 +104,6 @@ export async function GET(request: NextRequest) {
     const contentType = getMimeType(finalFilePath);
 
     if (range) {
-      console.log("Testing : Local Range header found: " + range);
       // Handle range requests for video streaming
       const parts = range.replace(/bytes=/, '').split('-');
       const start = parseInt(parts[0], 10);
@@ -139,7 +132,6 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // Serve entire file if no range is requested
-      console.log("Testing : Local file range header not found, fetching full video");
       const fileStream = fs.createReadStream(finalFilePath);
       const stream = new ReadableStream({
         start(controller) {
@@ -182,8 +174,8 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('authorization');
     const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
     const { upload_url: uploadUrl, blob_name: blobName, storage_type: storageType } = await getUploadUrl(authHeaders, file.name);
-    // TODO: Comment following console.log message for security reasons
-    console.log(`Received Upload Path: ${uploadUrl}, Blob Name: ${blobName}, Storage Type: ${storageType}`);
+    // Comment following console.log message for security reasons
+    //console.log(`Received Upload Path: ${uploadUrl}, Blob Name: ${blobName}, Storage Type: ${storageType}`);
 
     // 2. Upload file depending on storage_type
     // ToDO: Have a file size check 
@@ -194,7 +186,6 @@ export async function POST(request: NextRequest) {
       const dir = path.dirname(uploadUrl);
       await mkdir(dir, { recursive: true });
       await writeFile(uploadUrl, buffer);
-      console.log(`Successfully saved uploaded video to local machine at: ${uploadUrl}`);
     } else if (storageType === 'gcs') {
       try {
         const gcsResponse = await fetch(uploadUrl, {

@@ -31,7 +31,6 @@ async function callBackend<T = any>(
 
     if (!response.ok) {
       const error = await response.json();
-      console.log("In error handling error = ", error)
       throw new Error(error.detail || error.message || `HTTP ${response.status}`);
     }
 
