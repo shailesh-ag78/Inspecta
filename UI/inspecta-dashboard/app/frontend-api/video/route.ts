@@ -23,9 +23,42 @@ export async function GET(request: NextRequest) {
       const authHeader = request.headers.get('authorization') || (token ? `Bearer ${token}` : null);
       const authHeaders = authHeader ? { Authorization: authHeader } : undefined;
       const { url: videoUrl } = await getInspectionUploadUrl(authHeaders, filePath);
+      console.log("Video URL : ", videoUrl)
 
       if (videoUrl && (videoUrl.startsWith('http://') || videoUrl.startsWith('https://'))) {
-        return NextResponse.redirect(videoUrl, { status: 307 });
+        // Instead of redirecting, proxy the GCS signed URL from the server side.
+        // This avoids CORS issues on the client browser.
+        const range = request.headers.get('range');
+        const proxyHeaders: HeadersInit = {};
+        if (range) {
+          proxyHeaders['Range'] = range;
+        }
+
+        const response = await fetch(videoUrl, {
+          headers: proxyHeaders,
+        });
+
+        const responseHeaders = new Headers();
+        // Forward key headers back to the client
+        const headersToForward = [
+          'content-type',
+          'content-length',
+          'content-range',
+          'accept-ranges',
+          'content-disposition',
+          'cache-control',
+        ];
+        for (const header of headersToForward) {
+          const val = response.headers.get(header);
+          if (val) {
+            responseHeaders.set(header, val);
+          }
+        }
+
+        return new Response(response.body, {
+          status: response.status,
+          headers: responseHeaders,
+        });
       }
 
       // Update filePath to use resolved path if local

@@ -5,6 +5,7 @@ import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut, Uplo
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 import { auth, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import VideoPlayer from './VideoPlayer';
 import AddInspectionModal from '@/components/AddInspectionModal';
 
 interface SiteInspection {
@@ -309,7 +310,7 @@ export default function ReviewerDashboard() {
 
   const [hasAutoPaused, setHasAutoPaused] = useState(false);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const playerRef = useRef<any>(null);
 
   // Helper to detect if the current asset is an audio file
   const isAudioFile = useCallback((url?: string) => {
@@ -461,29 +462,32 @@ export default function ReviewerDashboard() {
       // Request playback once the media is ready (handled by effects and event listeners)
       setPendingPlayTask({ id: task.id, start: task.start_time, end: task.end_time });
 
-      if (videoRef.current) {
-        const video = videoRef.current;
+      if (playerRef.current) {
+        const player = playerRef.current;
         const newSrc = getVideoSrc(task.video_url) || '';
         let isSameSrc = false;
         try {
           // Compare full resolved URLs
-          isSameSrc = video.src === new URL(newSrc, window.location.href).href;
+          isSameSrc = player.src === new URL(newSrc, window.location.href).href;
         } catch (e) {
-          isSameSrc = video.src === newSrc;
+          isSameSrc = player.src === newSrc;
         }
 
-        // If source is same and ready, play immediately to preserve user gesture context
-        if (isSameSrc && video.readyState >= 2) {
-          video.currentTime = task.start_time;
-          video.play()
-            .then(() => {
-              setPendingPlayTask(null);
-              isInitiatingPlayRef.current = false;
-            })
-            .catch(err => {
-              console.error('Immediate task play failed:', err);
-              // Leave ref true so metadata/effects can try to recover playback
-            });
+        // If source is same and ready, play immediately
+        if (isSameSrc) {
+          const internalPlayer = player;
+          if (internalPlayer && internalPlayer.readyState >= 2) {
+            internalPlayer.currentTime = task.start_time;
+            internalPlayer.play?.()
+              .then(() => {
+                setPendingPlayTask(null);
+                isInitiatingPlayRef.current = false;
+              })
+              .catch((err: unknown) => {
+                console.error('Immediate task play failed:', err);
+                // Leave ref true so metadata/effects can try to recover playback
+              });
+          }
         }
       }
     } else {
@@ -493,15 +497,15 @@ export default function ReviewerDashboard() {
   };
 
   const handleActiveVideoPlay = () => {
-    if (!activeTask || !videoRef.current) return;
-    const video = videoRef.current;
+    if (!activeTask || !playerRef.current) return;
+    const player = playerRef.current;
+    const internalPlayer = player;
     setHasAutoPaused(false);
 
     // If current position is outside the task range or playback is stopped, reset to start
-    if (video.currentTime < activeTask.start_time - 0.1 || video.currentTime >= activeTask.end_time - 0.1) {
-      video.currentTime = activeTask.start_time;
+    if (internalPlayer && (internalPlayer.currentTime < activeTask.start_time - 0.1 || internalPlayer.currentTime >= activeTask.end_time - 0.1)) {
+      internalPlayer.currentTime = activeTask.start_time;
     }
-
   };
 
   const currentIsAudio = isAudioFile(activeTask?.video_url);
@@ -510,11 +514,11 @@ export default function ReviewerDashboard() {
 
   // Pause playback and clear active task when inspection or incident changes
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.pause();
+    if (playerRef.current) {
+      playerRef.current.pause();
       // Force clear the source to stop background downloading
-      videoRef.current.src = "";
-      videoRef.current.load();
+      // With ReactPlayer, just changing the URL prop to '' is enough
+      // This is handled by setActiveTask(null) which clears the filePath
     }
     isInitiatingPlayRef.current = false;
     setIsPlaying(false);
@@ -528,10 +532,10 @@ export default function ReviewerDashboard() {
   // Update video position and panel state when activeTask changes
   useEffect(() => {
     // Stop playback immediately when switching tasks or clearing selection
-    if (videoRef.current) {
+    if (playerRef.current) {
       if (activeTask?.id !== prevTaskIdRef.current) {
         if (!isInitiatingPlayRef.current) {
-          videoRef.current.pause();
+          playerRef.current.pause();
           setIsPlaying(false);
         }
       }
@@ -541,13 +545,14 @@ export default function ReviewerDashboard() {
     setSelectedFile(null); // Clear selected file when task changes
     setLastUploadedFileName(null); // Clear last uploaded file name when task changes
 
-    if (activeTask && videoRef.current) {
+    if (activeTask && playerRef.current) {
       // Reset the auto-pause flag for the new task range
       setHasAutoPaused(false);
 
       // Only seek synchronously here if the media is already loaded (same video source scenario)
-      if (videoRef.current.readyState >= 2) {
-        videoRef.current.currentTime = activeTask.start_time;
+      const internalPlayer = playerRef.current;
+      if (internalPlayer?.readyState >= 2) {
+        internalPlayer.currentTime = activeTask.start_time;
       }
     }
   }, [activeTask?.id]); // Only run when activeTask ID changes
@@ -678,44 +683,42 @@ export default function ReviewerDashboard() {
 
   // Otherwise, handleVideoLoadedMetadata is the single source of truth for seeking.
   useEffect(() => {
-    if (!pendingPlayTask || !videoRef.current) return;
-    const video = videoRef.current;
-    if (video.readyState >= 2) {
-      video.currentTime = pendingPlayTask.start;
-      video.play().catch((err) => console.error('Video play failed:', err));
+    if (!pendingPlayTask || !playerRef.current) return;
+    const player = playerRef.current;
+    const internalPlayer = player;
+    if (internalPlayer && internalPlayer.readyState >= 2) { // HAVE_CURRENT_DATA or more
+      player.currentTime = pendingPlayTask.start;
+      // `playing` prop will handle play command
       setPendingPlayTask(null);
     }
     // Otherwise wait for onLoadedMetadata to fire.
   }, [pendingPlayTask]);
 
-  const handleVideoLoadedMetadata = () => {
-    if (!videoRef.current) return;
+  const handlePlayerReady = (player: any) => {
+    if (!player) return;
 
     if (activeTask) {
-      videoRef.current.currentTime = activeTask.start_time;
+      player.currentTime = activeTask.start_time;
       if (pendingPlayTask && pendingPlayTask.id === activeTask.id) {
-        videoRef.current.play()
-          .then(() => {
-            isInitiatingPlayRef.current = false;
-          })
-          .catch((error) => {
-            console.error('Video play failed on metadata load:', error);
-          });
+        // The `playing` prop will be true, so it will auto-play
+        isInitiatingPlayRef.current = false;
       }
     }
     setPendingPlayTask(null);
   };
 
-  const handleVideoTimeUpdate = () => {
-    if (!activeTask || !videoRef.current || hasAutoPaused) return;
+  const handlePlayerProgress = ({ playedSeconds }: { playedSeconds: number }) => {
+    if (!activeTask || !playerRef.current || hasAutoPaused) return;
+
+    const currentTime = playedSeconds;
 
     // Reset auto-pause flag if the user seeks back manually
-    if (videoRef.current.currentTime < activeTask.end_time - 1) {
+    if (currentTime < activeTask.end_time - 1) {
       setHasAutoPaused(false);
     }
 
-    if (videoRef.current.currentTime >= activeTask.end_time) {
-      videoRef.current.pause();
+    if (currentTime >= activeTask.end_time) {
+      setIsPlaying(false); // This will pause the player via the `playing` prop
       setHasAutoPaused(true); // "Unlock" the video so subsequent plays work
       console.log(`Auto-paused at evidence end: ${activeTask.end_time}s`);
     }
@@ -1167,138 +1170,113 @@ export default function ReviewerDashboard() {
               </div>
 
               {/* Evidence Container with Severity-based Glow */}
-              {currentIsAudio ? (
-                /* Audio Player UI - Hides the video widget */
-                <div className={`relative w-full p-8 bg-slate-800 rounded-2xl border transition-all duration-500 shadow-2xl flex flex-col items-center justify-center gap-4 ${activeTask?.severity_id === 1 ? 'border-red-500/50 shadow-red-500/10' :
-                  activeTask?.severity_id === 2 ? 'border-yellow-500/50 shadow-yellow-500/10' :
-                    activeTask?.severity_id === 3 ? 'border-green-500/50 shadow-green-500/10' :
-                      'border-slate-700'
-                  }`}>
-                  <div className="w-16 h-16 rounded-full bg-blue-500/20 flex items-center justify-center mb-2">
-                    <i className="fa-solid fa-waveform-lines text-blue-400 text-2xl animate-pulse"></i>
-                  </div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-400/70">Audio Evidence Stream</p>
-                  <audio
-                    ref={videoRef as any}
-                    controls
-                    onLoadedMetadata={handleVideoLoadedMetadata}
-                    onTimeUpdate={handleVideoTimeUpdate}
+              <div className={`relative w-full bg-black rounded-2xl overflow-hidden border transition-all duration-500 shadow-2xl ${activeTask?.severity_id === 1 ? 'border-red-500/50 shadow-red-500/10' :
+                activeTask?.severity_id === 2 ? 'border-yellow-500/50 shadow-yellow-500/10' :
+                  activeTask?.severity_id === 3 ? 'border-green-500/50 shadow-green-500/10' :
+                    'border-slate-700'
+                }`}>
+                {activeTask?.video_url ? (
+                  <VideoPlayer
+                    ref={playerRef}
+                    filePath={activeTask.video_url}
+                    token={token || undefined}
+                    isAudio={currentIsAudio}
+                    playing={isPlaying}
+                    onReady={handlePlayerReady}
+                    onProgress={handlePlayerProgress}
                     onPlay={() => setIsPlaying(true)}
                     onPause={() => setIsPlaying(false)}
                     onEnded={() => setIsPlaying(false)}
-                    className="w-full"
-                    src={getVideoSrc(activeTask?.video_url)}
                   />
-                </div>
-              ) : (
-                /* Video Player UI */
-                <div className={`relative w-full aspect-video bg-black rounded-2xl overflow-hidden border transition-all duration-500 shadow-2xl ${activeTask?.severity_id === 1 ? 'border-red-500/50 shadow-red-500/10' :
-                  activeTask?.severity_id === 2 ? 'border-yellow-500/50 shadow-yellow-500/10' :
-                    activeTask?.severity_id === 3 ? 'border-green-500/50 shadow-green-500/10' :
-                      'border-slate-700'
-                  }`}>
-                  {getVideoSrc(activeTask?.video_url) ? (
-                    <video
-                      ref={videoRef}
-                      controls
-                      onLoadedMetadata={handleVideoLoadedMetadata}
-                      onTimeUpdate={handleVideoTimeUpdate}
-                      onPlay={() => setIsPlaying(true)}
-                      onPause={() => setIsPlaying(false)}
-                      onEnded={() => setIsPlaying(false)}
-                      className="w-full h-full object-cover"
-                      src={getVideoSrc(activeTask?.video_url)}
-                    >
-                      Your browser does not support the video tag.
-                    </video>
-                  ) : (
+                ) : (
+                  <div className="aspect-video w-full flex flex-col items-center justify-center text-slate-500 gap-3">
                     <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-3">
                       <AlertCircle className="w-8 h-8 opacity-20" />
                       <p className="text-xs font-medium uppercase tracking-widest opacity-40">
                         {activeTask ? 'Evidence Unavailable' : 'Awaiting Task Selection'}
                       </p>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
 
               {/* Playback HUD Controls */}
-              {!currentIsAudio && (
-                <div className="mt-4 flex items-center justify-center gap-4">
-                  <div className="flex items-center gap-1 bg-slate-800/80 p-1.5 rounded-full border border-slate-700 shadow-xl">
-                    <button
-                      onClick={() => {
-                        const currentIndex = filteredTasks.findIndex(t => t.id === activeTask?.id);
-                        if (currentIndex > 0) handleTaskClick(filteredTasks[currentIndex - 1], true);
-                      }}
-                      disabled={!activeTask || filteredTasks.findIndex(t => t.id === activeTask?.id) === 0}
-                      className="p-2 text-slate-400 hover:text-white disabled:opacity-20 transition-colors"
-                    >
-                      <ChevronLeft className="w-5 h-5" />
-                    </button>
+                {!currentIsAudio && (
+                  <div className="mt-4 flex items-center justify-center gap-4">
+                    <div className="flex items-center gap-1 bg-slate-800/80 p-1.5 rounded-full border border-slate-700 shadow-xl">
+                      <button
+                        onClick={() => {
+                          const currentIndex = filteredTasks.findIndex(t => t.id === activeTask?.id);
+                          if (currentIndex > 0) handleTaskClick(filteredTasks[currentIndex - 1], true);
+                        }}
+                        disabled={!activeTask || filteredTasks.findIndex(t => t.id === activeTask?.id) === 0}
+                        className="p-2 text-slate-400 hover:text-white disabled:opacity-20 transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5" />
+                      </button>
 
-                    <button
-                      onClick={handleActiveVideoPlay}
-                      className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-full transition-all active:scale-95"
-                    >
-                      <Play className={`w-4 h-4 fill-current ${isPlaying ? 'animate-pulse' : ''}`} />
-                      {isPlaying ? 'Playing Segment' : `Sync : ${activeTask ? `${formatTime(activeTask.start_time)} -- ${formatTime(activeTask.end_time)}` : '00:00'}`}
-                    </button>
+                      <button
+                        onClick={handleActiveVideoPlay}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-full transition-all active:scale-95"
+                      >
+                        <Play className={`w-4 h-4 fill-current ${isPlaying ? 'animate-pulse' : ''}`} />
+                        {isPlaying ? 'Playing Segment' : `Sync : ${activeTask ? `${formatTime(activeTask.start_time)} -- ${formatTime(activeTask.end_time)}` : '00:00'}`}
+                      </button>
 
-                    <button
-                      onClick={() => {
-                        const currentIndex = filteredTasks.findIndex(t => t.id === activeTask?.id);
-                        if (currentIndex < filteredTasks.length - 1) handleTaskClick(filteredTasks[currentIndex + 1], true);
-                      }}
-                      disabled={!activeTask || filteredTasks.findIndex(t => t.id === activeTask?.id) === filteredTasks.length - 1}
-                      className="p-2 text-slate-400 hover:text-white disabled:opacity-20 transition-colors"
-                    >
-                      <ChevronLeft className="w-5 h-5 rotate-180" />
-                    </button>
+                      <button
+                        onClick={() => {
+                          const currentIndex = filteredTasks.findIndex(t => t.id === activeTask?.id);
+                          if (currentIndex < filteredTasks.length - 1) handleTaskClick(filteredTasks[currentIndex + 1], true);
+                        }}
+                        disabled={!activeTask || filteredTasks.findIndex(t => t.id === activeTask?.id) === filteredTasks.length - 1}
+                        className="p-2 text-slate-400 hover:text-white disabled:opacity-20 transition-colors"
+                      >
+                        <ChevronLeft className="w-5 h-5 rotate-180" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-            {/* Action Buttons Column */}
-            <div className="absolute bottom-12 right-5 flex flex-col items-end gap-3 z-30">
-              {/* Add Inspection Button */}
-              <button
-                onClick={handleAddInspection}
-                className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
-              >
-                <Plus className="w-4 h-4" />
-                Add Inspection
-              </button>
-
-              {/* Upload Incident Video Button Container */}
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
-                >
-                  <Upload className="w-4 h-4" />
-                  Upload incident video
-                </button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="video/*"
-                  onChange={uploadIncidentVideo}
-                  className="hidden"
-                />
-              </div>
-            </div>
-            {/* Status Bar */}
-            <div className="absolute bottom-0 left-0 right-0 h-9 bg-slate-950/90 border-t border-slate-700/50 flex items-center px-4 z-30">
-              <span className="text-xs text-slate-400 font-medium truncate">
-                {lastUploadedFileName?.startsWith('Failed') ? (
-                  <span className="text-red-400 font-semibold">{lastUploadedFileName}</span>
-                ) : (
-                  <>
-                    Last uploaded video: <span className="text-blue-400 font-semibold">{lastUploadedFileName || 'None'}</span>
-                  </>
                 )}
-              </span>
+              </div>
+              {/* Action Buttons Column */}
+              <div className="absolute bottom-12 right-5 flex flex-col items-end gap-3 z-30">
+                {/* Add Inspection Button */}
+                <button
+                  onClick={handleAddInspection}
+                  className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Inspection
+                </button>
+
+                {/* Upload Incident Video Button Container */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-sm font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.4)]"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Upload incident video
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="video/*"
+                    onChange={uploadIncidentVideo}
+                    className="hidden"
+                  />
+                </div>
+              </div>
+              {/* Status Bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-9 bg-slate-950/90 border-t border-slate-700/50 flex items-center px-4 z-30">
+                <span className="text-xs text-slate-400 font-medium truncate">
+                  {lastUploadedFileName?.startsWith('Failed') ? (
+                    <span className="text-red-400 font-semibold">{lastUploadedFileName}</span>
+                  ) : (
+                    <>
+                      Last uploaded video: <span className="text-blue-400 font-semibold">{lastUploadedFileName || 'None'}</span>
+                    </>
+                  )}
+                </span>
+              </div>
             </div>
           </aside>
         )}

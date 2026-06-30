@@ -477,20 +477,26 @@ gcloud projects add-iam-policy-binding $ProjectID `
     --role="roles/owner"
 
 Write-Host "Granting GCS Bucket permissions to service accounts..."
-# Grant Token Creator permission to Executor SA at the project level for creating pre-signed URLs
+# Grant Token Creator permission to UI SA and Executor SA at the project level for creating pre-signed URLs
+gcloud projects add-iam-policy-binding $ProjectID `
+    --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/iam.serviceAccountTokenCreator"
+
 gcloud projects add-iam-policy-binding $ProjectID `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/iam.serviceAccountTokenCreator"
 
+# Grant Executor SA permissions on the bucket
 gcloud storage buckets add-iam-policy-binding gs://$BucketName `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/storage.objectUser"
 
-# Grant Transcribe Agent SA permissions on the bucket
+# Grant Audio Agent SA permissions on the bucket
 gcloud storage buckets add-iam-policy-binding gs://$BucketName `
     --member="serviceAccount:audio-extractor-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/storage.objectUser"
 
+# Grant Transcribe Agent SA permissions on the bucket
 gcloud storage buckets add-iam-policy-binding gs://$BucketName `
     --member="serviceAccount:transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/storage.objectUser"

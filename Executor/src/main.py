@@ -410,16 +410,23 @@ async def get_upload_url(request: Request, fileType: Optional[str] = Query(None)
         # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
         # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
         else:
+            # 1. Define the explicit scope required for IAM infrastructure interactions
+            #CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/iam'] # Set this preferably
+            CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/cloud-platform']
+
+            # 2. Force the credentials object to request the required scope footprint
+            credentials, project = google.auth.default(scopes=CLOUD_PLATFORM_SCOPE)
+
             auth_req = google.auth.transport.requests.Request()
-            creds.refresh(auth_req)
+            credentials.refresh(auth_req)
             
             url = blob.generate_signed_url(
                 version="v4",
                 expiration=datetime.timedelta(minutes=15),
                 method="PUT",
                 content_type=fileType,
-                service_account_email=creds.service_account_email,
-                access_token=creds.token
+                service_account_email=credentials.service_account_email,
+                access_token=credentials.token
             )
 
         return {

@@ -733,31 +733,58 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
             file_ext = file_ext.lower()
             fileType = next((mime for mime, ext in ALLOWED_TYPES.items() if ext == file_ext), "video/mp4")
 
-            # 2. Extract the credentials that the client is actively using
+            # # 2. Extract the credentials that the client is actively using
+            # creds = gcs_client._credentials
+            # # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
+            # # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
+            # if hasattr(creds, 'private_key') and creds.private_key:
+            #     url = blob.generate_signed_url(
+            #         version="v4",
+            #         expiration=datetime.timedelta(minutes=30),
+            #         method="GET",
+            #         content_type=fileType
+            #     )
+            # # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
+            # # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
+            # else:
+            #     # 1. Define the explicit scope required for IAM infrastructure interactions
+            #     #CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/iam'] # Set this preferably
+            #     CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/cloud-platform']
+
+            #     # 2. Force the credentials object to request the required scope footprint
+            #     credentials, project = google.auth.default(scopes=CLOUD_PLATFORM_SCOPE)
+
+            #     auth_req = google.auth.transport.requests.Request()
+            #     credentials.refresh(auth_req)
+                
+            #     url = blob.generate_signed_url(
+            #         version="v4",
+            #         expiration=datetime.timedelta(minutes=30),
+            #         method="GET",
+            #         content_type=fileType,
+            #         service_account_email=credentials.service_account_email,
+            #         access_token=credentials.token
+            #     )
+
             creds = gcs_client._credentials
-            # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
-            # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
-            if hasattr(creds, 'private_key') and creds.private_key:
-                url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=datetime.timedelta(minutes=30),
-                    method="GET",
-                    content_type=fileType
-                )
-            # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
-            # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
-            else:
+
+            # 1. Standard configuration parameters (Omitting content_type completely!)
+            signing_kwargs = {
+                "version": "v4",
+                "expiration": datetime.timedelta(minutes=30),
+                "method": "GET"
+            }
+
+            # 2. Handle Cloud Run vs. Local Key Signing environment
+            if not hasattr(creds, 'private_key') or not creds.private_key:
+                import google.auth.transport.requests
                 auth_req = google.auth.transport.requests.Request()
                 creds.refresh(auth_req)
-                
-                url = blob.generate_signed_url(
-                    version="v4",
-                    expiration=datetime.timedelta(minutes=30),
-                    method="GET",
-                    content_type=fileType,
-                    service_account_email=creds.service_account_email,
-                    access_token=creds.token
-                )
+                signing_kwargs["service_account_email"] = creds.service_account_email
+                signing_kwargs["access_token"] = creds.token
+
+            # 3. Generate URL WITHOUT content_type
+            url = blob.generate_signed_url(**signing_kwargs)
 
             return {"status": "success", "data": {"url": url}}
         except Exception as e:
