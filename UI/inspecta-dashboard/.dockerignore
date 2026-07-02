@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+
+# Firebase build cache & logs
+.firebase/
+firebase-debug.log*
+
+# Git and OS metadata
+.git
+.gitignore
+.DS_Store

@@ -524,9 +524,9 @@ else {
 $CorsFilePath = Join-Path $PSScriptRoot "cors-config.json"
 $CorsConfig = ConvertTo-Json -InputObject @(
     @{
-        origin         = @("https://yourdomain.com", "http://localhost:3000")
+        origin         = @("https://inspecta-360.web.app", "https://inspecta-360.firebaseapp.com", "http://localhost:3000", "http://localhost:3001")
         method         = @("PUT", "GET", "POST", "OPTIONS")
-        responseHeader = @("Content-Type", "Access-Control-Allow-Origin")
+        responseHeader = @("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag")
         maxAgeSeconds  = 3600
     }
 ) -Depth 4
