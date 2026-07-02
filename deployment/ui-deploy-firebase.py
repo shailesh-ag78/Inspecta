@@ -8,8 +8,8 @@ import shutil
 # -------------------------------------------------------------
 # 1. CONSTANTS AND PATH RESOLUTION
 # -------------------------------------------------------------
-DEFAULT_PROJECT_ID = "inspecta-495004"
-DEFAULT_KEY_FILE = "gcp-key.json"
+DEFAULT_PROJECT_ID = "inspecta-360"
+DEFAULT_KEY_FILE = "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
 DEFAULT_UI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "UI", "inspecta-dashboard"))
 
 # -------------------------------------------------------------

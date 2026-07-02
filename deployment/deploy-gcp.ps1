@@ -76,10 +76,23 @@ Write-Host "Region:     $Region"
 Write-Host "=================================================================" -ForegroundColor Cyan
 
 # -------------------------------------------------------------
-# 1. Set current project and enable GCP APIs
+# 1. Setup gcloud Configuration Profile and Enable GCP APIs
 # -------------------------------------------------------------
-Write-Host "`n[1/7] Setting GCP Project and enabling APIs..." -ForegroundColor Yellow
-gcloud config set project $ProjectID
+Write-Host "`n[1/7] Configuring gcloud profile and enabling APIs..." -ForegroundColor Yellow
+
+# Capture current active configuration to restore it at the end
+$PreviousConfig = & gcloud config configurations list --filter="is_active=true" --format="value(name)"
+
+# Ensure backend profile is created and configured
+Write-Host "[*] Activating and configuring gcloud profile 'inspecta-backend'..." -ForegroundColor Yellow
+$ExistingConfigs = & gcloud config configurations list --format="value(name)"
+if ($ExistingConfigs -notcontains "inspecta-backend") {
+    & gcloud config configurations create inspecta-backend --quiet
+}
+& gcloud config configurations activate inspecta-backend --quiet
+& gcloud config set account $GcpAdminEmail --quiet
+& gcloud config set project $ProjectID --quiet
+& gcloud config set compute/region $Region --quiet
 
 $APIs = @(
     "run.googleapis.com",
@@ -540,3 +553,9 @@ Write-Host "`n================================================================="
 Write-Host "🎉 Deployment Complete!" -ForegroundColor Green
 Write-Host "UI Backend Public URL: $UiUrl" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Green
+
+# Restore the previous active gcloud configuration
+if (![string]::IsNullOrEmpty($PreviousConfig)) {
+    Write-Host "[*] Restoring previous gcloud configuration: $PreviousConfig..." -ForegroundColor Yellow
+    & gcloud config configurations activate $PreviousConfig --quiet
+}

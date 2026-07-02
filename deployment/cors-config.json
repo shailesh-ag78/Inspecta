@@ -1,24 +1,24 @@
-[
+﻿[
     {
-        "maxAgeSeconds": 3600,
-        "method": [
-            "PUT",
-            "GET",
-            "POST",
-            "OPTIONS"
-        ],
-        "responseHeader": [
-            "Content-Type",
-            "Content-Length",
-            "Content-Range",
-            "Accept-Ranges",
-            "ETag"
-        ],
-        "origin": [
-            "https://inspecta-360.web.app",
-            "https://inspecta-360.firebaseapp.com",
-            "http://localhost:3000",
-            "http://localhost:3001"
-        ]
+        "maxAgeSeconds":  3600,
+        "method":  [
+                       "PUT",
+                       "GET",
+                       "POST",
+                       "OPTIONS"
+                   ],
+        "responseHeader":  [
+                               "Content-Type",
+                               "Content-Length",
+                               "Content-Range",
+                               "Accept-Ranges",
+                               "ETag"
+                           ],
+        "origin":  [
+                       "https://inspecta-360.web.app",
+                       "https://inspecta-360.firebaseapp.com",
+                       "http://localhost:3000",
+                       "http://localhost:3001"
+                   ]
     }
 ]
