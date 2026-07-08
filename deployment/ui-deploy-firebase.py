@@ -4,6 +4,7 @@ import json
 import argparse
 import subprocess
 import shutil
+from typing import Optional
 
 # -------------------------------------------------------------
 # 1. CONSTANTS AND PATH RESOLUTION
@@ -11,6 +12,7 @@ import shutil
 DEFAULT_PROJECT_ID = "inspecta-360"
 DEFAULT_KEY_FILE = "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
 DEFAULT_UI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "UI", "inspecta-dashboard"))
+DEFAULT_REGION = "us-central1"
 
 # -------------------------------------------------------------
 # 2. UTILITY FUNCTIONS
@@ -24,6 +26,9 @@ def log_success(msg):
 def log_warning(msg):
     print(f"[!] Warning: {msg}")
 
+def log_step(msg):
+    print(f"\n{'='*20}\n[STEP] {msg}\n{'='*20}")
+
 def log_error(msg):
     print(f"[!] Error: {msg}", file=sys.stderr)
 
@@ -31,35 +36,66 @@ def check_command(cmd):
     """Checks if a command-line tool is available in the system path."""
     return shutil.which(cmd) is not None
 
+def run_command(cmd_args, cwd, capture_output=False):
+    """Executes a command and handles errors."""
+    log_info(f"Executing: {' '.join(cmd_args)}")
+    try:
+        # Use shell=True on Windows to correctly resolve commands like 'npm'
+        use_shell = sys.platform == "win32"
+        result = subprocess.run(
+            cmd_args, cwd=cwd, check=True, shell=use_shell,
+            capture_output=capture_output, text=True, encoding='utf-8'
+        )
+        if capture_output:
+            return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        log_error(f"Command failed: {' '.join(cmd_args)}")
+        if e.stdout:
+            log_error(f"STDOUT: {e.stdout}")
+        if e.stderr:
+            log_error(f"STDERR: {e.stderr}")
+        raise
+
 # -------------------------------------------------------------
 # 3. CORE DEPLOYMENT LOGIC
 # -------------------------------------------------------------
-def deploy_nextjs_app(project_id, key_file, ui_dir):
+def configure_auth(key_file: Optional[str]) -> Optional[str]:
     """
-    Builds the Next.js UI dashboard and deploys it to Firebase Hosting
-    using the provided service account credentials.
+    Configures authentication for the Firebase CLI.
+    If a service account key is provided, it sets the GOOGLE_APPLICATION_CREDENTIALS
+    environment variable, which the CLI uses for programmatic authentication.
+    If no key is provided, it verifies an active 'firebase login' session.
     """
-    log_info(f"Starting Firebase deployment pipeline for Next.js UI...")
-    log_info(f"Target Project: {project_id}")
-    log_info(f"Service Account Key: {key_file}")
-    log_info(f"Next.js Root Directory: {ui_dir}")
-
-    # Validate paths
+    # If a key_file is provided, validate its path.
+    if key_file and not os.path.exists(key_file):
+        # If not found, check if it exists relative to the script's directory.
+        script_relative_key = os.path.join(os.path.dirname(__file__), key_file)
+        if os.path.exists(script_relative_key):
+            key_file = script_relative_key
+        else:
+            log_error(f"Service account key file not found at path: {key_file}")
+            sys.exit(1)
+            
     if key_file:
-        if not os.path.exists(key_file):
-            # Check if key file is relative to script folder
-            script_relative_key = os.path.join(os.path.dirname(__file__), key_file)
-            if os.path.exists(script_relative_key):
-                key_file = script_relative_key
-            else:
-                log_warning(f"Service account key file not found: {key_file}. Proceeding with active CLI session instead.")
-                key_file = None
+        abs_key_path = os.path.abspath(key_file)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = abs_key_path
+        log_success(f"Configured GOOGLE_APPLICATION_CREDENTIALS to: {abs_key_path}")
+        log_info("Firebase CLI will now use this service account for authentication.")
+    else:
+        log_warning("No service account key provided. Falling back to check for an active 'firebase login' session.")
+        try:
+            run_command(["firebase", "projects:list"], cwd=".", capture_output=True)
+            log_success("Firebase CLI session is active.")
+        except subprocess.CalledProcessError:
+            log_error("Firebase login required. Please run 'firebase login' and try again.")
+            sys.exit(1)
+    return key_file
 
+def configure_firebase_files(ui_dir: str, project_id: str, region: str):
+    """Generates the .firebaserc and firebase.json files required for deployment."""
     if not os.path.exists(ui_dir):
         log_error(f"Next.js UI directory not found: {ui_dir}")
         sys.exit(1)
-
-    # Check dependencies
     if not check_command("npm"):
         log_error("npm command-line tool not found. Please install Node.js and npm.")
         sys.exit(1)
@@ -68,15 +104,8 @@ def deploy_nextjs_app(project_id, key_file, ui_dir):
         log_error("firebase-tools CLI not found. Please install it using: npm install -g firebase-tools")
         sys.exit(1)
 
-    # Set authentication environment variable if key is provided
-    if key_file:
-        abs_key_path = os.path.abspath(key_file)
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = abs_key_path
-        log_success(f"Configured GOOGLE_APPLICATION_CREDENTIALS to: {abs_key_path}")
-    else:
-        log_info("No service account key configured/found. Using current Firebase CLI session.")
+    log_step("Configuring Firebase project files...")
 
-    # Write Firebase config files if they don't exist
     firebase_json_path = os.path.join(ui_dir, "firebase.json")
     firebaserc_path = os.path.join(ui_dir, ".firebaserc")
 
@@ -88,9 +117,10 @@ def deploy_nextjs_app(project_id, key_file, ui_dir):
     }
     with open(firebaserc_path, "w", encoding="utf-8") as f:
         json.dump(firebaserc_content, f, indent=2)
-    log_success(f"Generated/Updated .firebaserc pointing to project {project_id}")
+    log_success(f"Wrote .firebaserc to point to project '{project_id}'")
 
-    # Create firebase.json hosting configuration for Next.js
+    # This firebase.json is specifically for a Next.js app using the
+    # "web frameworks" feature, which creates a Cloud Run backend for SSR.
     firebase_json_content = {
         "hosting": {
             "source": ".",
@@ -98,32 +128,50 @@ def deploy_nextjs_app(project_id, key_file, ui_dir):
                 "firebase.json",
                 "**/.*",
                 "**/node_modules/**"
-            ]
+            ],
+            "frameworksBackend": {
+                "region": region
+            }
         }
     }
     with open(firebase_json_path, "w", encoding="utf-8") as f:
         json.dump(firebase_json_content, f, indent=2)
-    log_success("Generated/Updated firebase.json with Next.js Hosting configuration.")
+    log_success("Wrote firebase.json with Next.js 'frameworksBackend' configuration.")
+
+def deploy_nextjs_app(project_id: str, region: str, key_file: Optional[str], ui_dir: str):
+    """
+    Builds the Next.js UI dashboard and deploys it to Firebase Hosting.
+    """
+    log_info(f"Starting Firebase deployment for project '{project_id}'...")
+    log_info(f"Next.js Root Directory: {ui_dir}")
+
+    # Phase 1: Authentication and Configuration
+    configure_auth(key_file)
+    configure_firebase_files(ui_dir, project_id, region)
 
     try:
-        # Step 1: Run production build of the Next.js application
-        log_info("Compiling Next.js application (npm run build)...")
-        # Run npm install first to make sure dependencies are synchronized
-        log_info("Installing NPM dependencies (npm install)...")
-        subprocess.run(["npm", "install"], cwd=ui_dir, check=True, shell=True)
+        # Phase 2: Install dependencies
+        log_step("Installing NPM dependencies (npm install)...")
+        run_command(["npm", "install"], cwd=ui_dir)
         
-        # Compile build assets
-        subprocess.run(["npm", "run", "build"], cwd=ui_dir, check=True, shell=True)
+        # Phase 3: Compile the Next.js application for production
+        log_step("Compiling Next.js application (npm run build)...")
+        run_command(["npm", "run", "build"], cwd=ui_dir)
         log_success("Next.js build compilation finished successfully.")
 
-        # Step 2: Deploy to Firebase Hosting using service account credentials
-        log_info("Enabling Firebase Web Frameworks experiment...")
-        subprocess.run(["firebase", "experiments:enable", "webframeworks"], cwd=ui_dir, check=True, shell=True)
+        # Phase 4: Deploy to Firebase Hosting
+        # The "webframeworks" experiment is now the default, but enabling it ensures compatibility.
+        log_step("Enabling Firebase Web Frameworks feature...")
+        run_command(["firebase", "experiments:enable", "webframeworks"], cwd=ui_dir)
 
-        log_info("Deploying web assets to Firebase Hosting...")
-        deploy_cmd = ["firebase", "deploy", "--only", "hosting", "--project", project_id, "--non-interactive"]
+        log_step("Deploying to Firebase Hosting...")
+        deploy_cmd = [
+            "firebase", "deploy", "--only", "hosting",
+            "--project", project_id, "--non-interactive"
+        ]
         
-        subprocess.run(deploy_cmd, cwd=ui_dir, check=True, shell=True)
+        # The deployment itself can take several minutes
+        run_command(deploy_cmd, cwd=ui_dir)
         
         log_success("Deployment completed successfully!")
         print("-" * 60)
@@ -150,9 +198,14 @@ def main():
         help=f"Target Firebase Project ID (default: {DEFAULT_PROJECT_ID})"
     )
     parser.add_argument(
+        "--region",
+        default=DEFAULT_REGION,
+        help=f"The GCP region for the server-side backend (default: {DEFAULT_REGION})"
+    )
+    parser.add_argument(
         "--key",
         default=DEFAULT_KEY_FILE,
-        help=f"Path to GCP Service Account JSON Key file (default: {DEFAULT_KEY_FILE})"
+        help=f"Path to GCP Service Account JSON Key file. If not provided, attempts to use active 'firebase login' session. (default: {DEFAULT_KEY_FILE})"
     )
     parser.add_argument(
         "--dir",
@@ -161,8 +214,7 @@ def main():
     )
 
     args = parser.parse_args()
-    key = None if args.key.lower() in ('none', '') else args.key
-    deploy_nextjs_app(args.project, key, args.dir)
+    deploy_nextjs_app(args.project, args.region, args.key, args.dir)
 
 if __name__ == "__main__":
     main()
