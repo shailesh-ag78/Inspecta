@@ -6,13 +6,14 @@ from firebase_admin import credentials, auth
 # -------------------------------------------------------------
 # 1. INITIALIZE THE FIREBASE ADMIN SDK
 # -------------------------------------------------------------
-# Replace 'service-account-key.json' with your exact downloaded filename
-try:
-    cred = credentials.Certificate("inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json")
-    firebase_admin.initialize_app(cred)
-except Exception as e:
-    print(f"[!] Error loading service account key: {e}")
-    sys.exit(1)
+def initialize_firebase(key_path):
+    try:
+        cred = credentials.Certificate(key_path)
+        firebase_admin.initialize_app(cred)
+    except Exception as e:
+        print(f"[!] Error loading service account key: {e}")
+        sys.exit(1)
+
 
 
 # -------------------------------------------------------------
@@ -76,6 +77,9 @@ def main():
         description="Firebase Multi-Tenant Account & Custom Claims CLI Utility Tool"
     )
     
+    # Global/Main arguments
+    parser.add_argument("--key", help="Path to Firebase Admin JSON key file")
+    
     # Subcommands
     subparsers = parser.add_subparsers(dest="command", required=True, help="Available Actions")
 
@@ -90,6 +94,13 @@ def main():
     remove_parser.add_argument("--email", required=True, help="Target email address to destroy")
 
     args = parser.parse_args()
+
+    # Manually check for key presence so --help on subcommands still works without it
+    if not args.key:
+        parser.error("the following arguments are required: --key")
+
+    # Initialize Firebase SDK
+    initialize_firebase(args.key)
 
     # Route request to business logic handlers
     if args.command == "add":

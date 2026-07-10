@@ -120,19 +120,24 @@ def configure_firebase_files(ui_dir: str, project_id: str, region: str):
     log_success(f"Wrote .firebaserc to point to project '{project_id}'")
 
     # This firebase.json is specifically for a Next.js app using the
-    # "web frameworks" feature, which creates a Cloud Run backend for SSR.
+    # "web frameworks" feature. It creates a Cloud Run backend for SSR.
+    # The "site" key targets a specific hosting site within the project.
+    # The "source" must be the root of the Next.js project itself.
     firebase_json_content = {
-        "hosting": {
-            "source": ".",
+        "hosting": [
+            {
+            "site": "inspecta-app",
+            "source": ".", # This tells firebase to look in the current directory for the Next.js app
             "ignore": [
                 "firebase.json",
                 "**/.*",
                 "**/node_modules/**"
             ],
+            "cleanUrls": True,
             "frameworksBackend": {
                 "region": region
             }
-        }
+        }]
     }
     with open(firebase_json_path, "w", encoding="utf-8") as f:
         json.dump(firebase_json_content, f, indent=2)
@@ -166,7 +171,7 @@ def deploy_nextjs_app(project_id: str, region: str, key_file: Optional[str], ui_
 
         log_step("Deploying to Firebase Hosting...")
         deploy_cmd = [
-            "firebase", "deploy", "--only", "hosting",
+            "firebase", "deploy", "--only", "hosting:inspecta-app",
             "--project", project_id, "--non-interactive"
         ]
         
@@ -175,7 +180,7 @@ def deploy_nextjs_app(project_id: str, region: str, key_file: Optional[str], ui_
         
         log_success("Deployment completed successfully!")
         print("-" * 60)
-        print(f"Your application is now live at: https://{project_id}.web.app")
+        print(f"Your application is now live at: https://inspecta-app.web.app")
         print("-" * 60)
 
     except subprocess.CalledProcessError as e:

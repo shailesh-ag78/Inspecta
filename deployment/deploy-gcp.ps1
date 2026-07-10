@@ -519,6 +519,37 @@ gcloud storage buckets add-iam-policy-binding gs://$BucketName `
     --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/storage.objectUser"
 # -------------------------------------------------------------
+# 7.5 Grant Firebase Deployment Service Account necessary roles for Deploying UI
+# This is critical for deploying Next.js apps with frameworksBackend
+# -------------------------------------------------------------
+Write-Host "Granting deployment roles to Firebase Admin SDK service account..."
+$FirebaseProjectId = "inspecta-360"
+$FirebaseSaEmail = "firebase-adminsdk-fbsvc@inspecta-360.iam.gserviceaccount.com"
+
+# Grant Cloud Run and Cloud Functions Admin to manage the backend services
+gcloud projects add-iam-policy-binding $FirebaseProjectId `
+    --member="serviceAccount:$FirebaseSaEmail" `
+    --role="roles/run.admin" `
+    --quiet
+
+gcloud projects add-iam-policy-binding $FirebaseProjectId `
+    --member="serviceAccount:$FirebaseSaEmail" `
+    --role="roles/cloudfunctions.admin" `
+    --quiet
+
+# CRITICAL: Grant permission to act as other service accounts (needed for Cloud Run deployment)
+gcloud projects add-iam-policy-binding $ProjectID `
+    --member="serviceAccount:$FirebaseSaEmail" `
+    --role="roles/iam.serviceAccountUser" `
+    --quiet
+
+# Grant broad Firebase permissions to coordinate the deployment
+gcloud projects add-iam-policy-binding $ProjectID `
+    --member="serviceAccount:$FirebaseSaEmail" `
+    --role="roles/firebase.admin" `
+    --quiet
+
+# -------------------------------------------------------------
 # 8. Create GCP Storage Bucket and Set CORS
 # -------------------------------------------------------------
 Write-Host "`n[8] Setting up Google Cloud Storage Bucket and CORS..." -ForegroundColor Yellow

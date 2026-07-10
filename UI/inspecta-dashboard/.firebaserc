@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "inspecta-360"
-  }
+    "default": "inspecta-ai"
+  },
+  "targets": {},
+  "etags": {}
 }
