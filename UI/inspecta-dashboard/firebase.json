@@ -16,7 +16,16 @@
                         "cleanUrls":  true,
                         "frameworksBackend":  {
                                                   "region":  "us-central1"
-                                              }
+                                              },
+                        "rewrites":  [
+                                         {
+                                             "source":  "**",
+                                             "run":  {
+                                                         "serviceId":  "ssrinspectaai",
+                                                         "region":  "us-central1"
+                                                     }
+                                         }
+                                     ]
                     }
                 ]
 }

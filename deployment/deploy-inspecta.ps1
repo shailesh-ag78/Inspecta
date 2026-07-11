@@ -35,4 +35,5 @@ Write-Host "Starting deployment via deploy-gcp.ps1..." -ForegroundColor Cyan
     -DeployAgents:$true `
     -ENV_MODE "production" `
     -BucketName "inspecta-file-bucket" `
-    -UPLOADS_FOLDER "uploads"
+    -UPLOADS_FOLDER "uploads" `
+    -UiProjectId "inspecta-ai"

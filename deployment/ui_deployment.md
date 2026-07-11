@@ -20,5 +20,14 @@ gcloud projects add-iam-policy-binding inspecta-ai `
   --member="serviceAccount:firebase-adminsdk-fbsvc@inspecta-ai.iam.gserviceaccount.com" `
   --role="roles/resourcemanager.projectIamAdmin"
 
-6. Ensure you are in ...\UI\inspecta_dashboard\ folder.  Execute Script
+6. Add following entries in  ..\deployment\cors-config.json under "origin" tag
+ "https://inspecta-ai.web.app",
+ "https://inspecta-ai.firebaseapp.com",
+ 
+7. Ensure you are in ...\UI\inspecta_dashboard\ folder.  Execute Script
   G:\code\Inspecta\deployment\deploy-ui.ps1 -firebaseprojectid "inspecta-ai" -jsonkeyfile "G:\code\Inspecta\deployment\inspecta-ai-firebase-adminsdk-fbsvc-895e11e210.json"
+
+8. npx firebase-tools deploy --only hosting --project inspecta-ai
+
+9. Login to Firebase Console, add a new app manually inspecta-ai
+![alt text](image-1.png)

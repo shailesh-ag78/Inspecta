@@ -148,17 +148,23 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Initialize Firebase Admin SDK
+target_ui_project = os.getenv("UI_PROJECT_ID", "inspecta-360")
+print(f"🎯 Initializing UI Firebase for project: {target_ui_project}")
 try:
     if not firebase_admin._apps:
-        datastore_path = Path(__file__).parent.parent.parent / "DataStore"
-        cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
-        if cert_path.exists():
-            cred = credentials.Certificate(str(cert_path))
-            firebase_admin.initialize_app(cred)
-            logger.info("✅ Firebase Admin initialized with local credentials in Executor")
-        else:
-            firebase_admin.initialize_app()
-            logger.info("✅ Firebase Admin initialized with Default Credentials in Executor")
+        # datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+        # cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
+        # if cert_path.exists():
+        #     cred = credentials.Certificate(str(cert_path))
+        #     firebase_admin.initialize_app(cred)
+        #     logger.info("✅ Firebase Admin initialized with local credentials in Executor")
+        # else:
+        #     firebase_admin.initialize_app()
+        #     logger.info("✅ Firebase Admin initialized with Default Credentials in Executor")
+        firebase_admin.initialize_app(options={
+                'projectId': target_ui_project
+            })
+        print(f"✅ Firebase Admin initialized for cross-project audience: {target_ui_project}")
 except Exception as e:
     logger.error(f"❌ Firebase initialization error in Executor: {e}")
 

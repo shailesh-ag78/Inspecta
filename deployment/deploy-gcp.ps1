@@ -54,7 +54,10 @@ param(
     [string]$BucketName = "inspecta-file-bucket",
 
     [Parameter(Mandatory = $false)]
-    [string]$UPLOADS_FOLDER = "uploads"
+    [string]$UPLOADS_FOLDER = "uploads",
+
+    [Parameter(Mandatory = $false)]
+    [string]$UiProjectId = "inspecta-360"
 )
 
 $OPENAI_MODEL = "gpt-4o"
@@ -373,7 +376,7 @@ if ($DeployAgents) {
         --service-account="executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl"
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,UI_PROJECT_ID=$UiProjectId"
         
     # Fetch Executor URL
     Write-Host "Retrieving executor endpoint..."
@@ -401,7 +404,7 @@ if ($DeployUI) {
         --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl"
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl,UI_PROJECT_ID=$UiProjectId"
 
 
     #$UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
@@ -523,16 +526,17 @@ gcloud storage buckets add-iam-policy-binding gs://$BucketName `
 # This is critical for deploying Next.js apps with frameworksBackend
 # -------------------------------------------------------------
 Write-Host "Granting deployment roles to Firebase Admin SDK service account..."
-$FirebaseProjectId = "inspecta-360"
-$FirebaseSaEmail = "firebase-adminsdk-fbsvc@inspecta-360.iam.gserviceaccount.com"
+#$UiProjectId = "inspecta-360"
+#$FirebaseSaEmail = "firebase-adminsdk-fbsvc@inspecta-360.iam.gserviceaccount.com"
+$FirebaseSaEmail = "firebase-adminsdk-fbsvc@${UiProjectId}.iam.gserviceaccount.com"
 
 # Grant Cloud Run and Cloud Functions Admin to manage the backend services
-gcloud projects add-iam-policy-binding $FirebaseProjectId `
+gcloud projects add-iam-policy-binding $UiProjectId `
     --member="serviceAccount:$FirebaseSaEmail" `
     --role="roles/run.admin" `
     --quiet
 
-gcloud projects add-iam-policy-binding $FirebaseProjectId `
+gcloud projects add-iam-policy-binding $UiProjectId `
     --member="serviceAccount:$FirebaseSaEmail" `
     --role="roles/cloudfunctions.admin" `
     --quiet

@@ -137,16 +137,22 @@ async def startup_event():
     db_dsn = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
 
     # Initialize Firebase Admin SDK
+    target_ui_project = os.getenv("UI_PROJECT_ID", "inspecta-360")
+    print(f"🎯 Initializing UI Firebase for project: {target_ui_project}")
     try:
         if not firebase_admin._apps:
-            cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
-            if cert_path.exists():
-                cred = credentials.Certificate(str(cert_path))
-                firebase_admin.initialize_app(cred)
-                print("✅ Firebase Admin initialized with local credentials in UI Backend")
-            else:
-                firebase_admin.initialize_app()
-                print("✅ Firebase Admin initialized with Default Credentials in UI Backend")
+            # cert_path = datastore_path / "inspecta-360-firebase-adminsdk-fbsvc-bd599894b5.json"
+            # if cert_path.exists():
+            #     cred = credentials.Certificate(str(cert_path))
+            #     firebase_admin.initialize_app(cred)
+            #     print("✅ Firebase Admin initialized with local credentials in UI Backend")
+            # else:
+            #     firebase_admin.initialize_app()
+            #     print("✅ Firebase Admin initialized with Default Credentials in UI Backend")
+            firebase_admin.initialize_app(options={
+                'projectId': target_ui_project
+            })
+            print(f"✅ Firebase Admin initialized for cross-project audience: {target_ui_project}")
     except Exception as e:
         print(f"❌ Firebase initialization error: {e}")
 

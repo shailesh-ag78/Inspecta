@@ -1,7 +1,7 @@
 # deploy-ui.ps1
 # PowerShell script to deploy UI: installs firebase tools, configures GCP/Firebase services, and logs in using JSON key.
 
-#[CmdletBinding(DefaultParameterSetName = "DeploySet")]
+[CmdletBinding(DefaultParameterSetName = "DeploySet")]
 param (
     [Parameter(Mandatory = $true, ParameterSetName = "HelpSet")]
     [Alias("h", "help", "?")]
@@ -14,7 +14,10 @@ param (
     [string]$JsonKeyFile,
 
     [Parameter(Mandatory = $false, ParameterSetName = "DeploySet")]
-    [string]$GcpProjectId
+    [string]$GcpProjectId,
+
+    [Parameter(Mandatory = $false, ParameterSetName = "DeploySet")]
+    [string]$BackendProjectID
 )
 
 # Display help message if requested
@@ -25,6 +28,7 @@ if ($PsCmdlet.ParameterSetName -eq "HelpSet" -or $ShowHelp) {
     Write-Host "  -FirebaseProjectId   Target Firebase Project ID"
     Write-Host "  -JsonKeyFile         Path to Firebase Admin / GCP JSON key file"
     Write-Host "  -GcpProjectId        (Optional) Target Google Cloud Project ID. Defaults to FirebaseProjectId if omitted."
+    Write-Host "  -BackendProjectID    (Optional) Target Backend Google Cloud Project ID. Defaults to inspecta-backend if omitted."
     Write-Host "  -Help / -h           Show this help documentation"
     exit 0
 }
@@ -32,10 +36,22 @@ if ($PsCmdlet.ParameterSetName -eq "HelpSet" -or $ShowHelp) {
 # Set execution policy for the process scope to ensure scripts can run
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope Process -Force
 
+# Validate current directory
+$CurrentDirName = Split-Path -Leaf $pwd
+if ($CurrentDirName -ne "inspecta-dashboard" -and $CurrentDirName -ne "inspecta_dashboard") {
+    Write-Error "This script must be run from the 'inspecta-dashboard' directory. Current directory is '$CurrentDirName'."
+    exit 1
+}
+
 # Set GCP project ID default if not provided
 if ([string]::IsNullOrEmpty($GcpProjectId)) {
     $GcpProjectId = $FirebaseProjectId
     Write-Host "[*] GCP Project ID not specified. Defaulting to Firebase Project ID: $GcpProjectId" -ForegroundColor Yellow
+}
+
+if ([string]::IsNullOrEmpty($BackendProjectID)) {
+    $BackendProjectID = "inspecta-backend"
+    Write-Host "[*] Backend Project ID not specified. Defaulting to inspecta-backend: $BackendProjectID" -ForegroundColor Yellow
 }
 
 
@@ -159,7 +175,8 @@ if (-not [string]::IsNullOrEmpty($JsonKeyFile)) {
         Write-Warning "gcloud CLI not found in PATH. Skipping gcloud service account activation."
     }
 
-    # Verify firebase login works
+    # Verify firebase login work
+    firebase use inspecta-ai
     Write-Host "[*] Verifying Firebase login works..." -ForegroundColor Yellow
     & firebase projects:list --non-interactive
     if ($LASTEXITCODE -ne 0) {
@@ -276,6 +293,30 @@ foreach ($Role in $RolesToAssign) {
 }
 
 Write-Host "`n[+] Service account roles assigned successfully." -ForegroundColor Green
+
+# Write-Host "`n[*] Granting permission to backend GCP to access Firebase data" -ForegroundColor Cyan
+# gcloud projects add-iam-policy-binding $BackendProjectID `
+#     --member="serviceAccount:$SaEmail" `
+#     --role="roles/iam.serviceAccountUser" `
+#     --quiet
+
+# gcloud projects add-iam-policy-binding $BackendProjectID `
+#     --member="serviceAccount:$SaEmail" `
+#     --role="roles/firebase.admin" `
+#     --quiet
+
+# Clear out the old compiler cache from the previous build
+Remove-Item -Recurse -Force .next, out
+
+# Set new Environment variables
+$env:NEXT_PUBLIC_FIREBASE_API_KEY = "AIzaSyCZPe2j-rji_vufMOIhKwxtfgXW6hOpIuI"
+$env:NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN = "inspecta-ai.firebaseapp.com"
+$env:NEXT_PUBLIC_FIREBASE_PROJECT_ID = "inspecta-ai"
+$env:NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "inspecta-ai.firebasestorage.app"
+$env:NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = "809906015149"
+$env:NEXT_PUBLIC_FIREBASE_APP_ID = "1:809906015149:web:49dbd61c0cb1b688c16f24"
+
+npx firebase-tools use inspecta-ai
  
 # 5. Deploy Next.js Application from current directory to the firebase project
 Write-Host "`n[*] Starting Next.js Firebase Hosting deployment from directory ($pwd)..." -ForegroundColor Cyan
@@ -317,28 +358,29 @@ if (-not (Test-Path $FirebasercPath)) {
     Set-Content -Path $FirebasercPath -Value $FirebasercContent
 }
 
-# Create new service account key after updating all required roles
-$NewKeyName = "$GcpProjectId-uideployment.json"
-$DeploymentFolder = "G:\code\Inspecta\deployment"
-$DestKeyPath = Join-Path $DeploymentFolder $NewKeyName
+# # Create new service account key after updating all required roles
+# $NewKeyName = "$GcpProjectId-uideployment.json"
+# $DeploymentFolder = "G:\code\Inspecta\deployment"
+# $DestKeyPath = Join-Path $DeploymentFolder $NewKeyName
 
-Add-Type -AssemblyName PresentationFramework
-$PopupMessage = "Please create a new service account key JSON file named '$NewKeyName' for service account '$SaEmail', and copy it into the deployment folder:`n$([System.IO.Path]::GetFullPath($DeploymentFolder))`n`nPress OK once the file has been placed there."
-[System.Windows.MessageBox]::Show($PopupMessage, "Action Required: Copy Service Account Key", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
+# Add-Type -AssemblyName PresentationFramework
+# Write-Host "[*] Showing Popup for srvice account creation, please press OK to continue..." -ForegroundColor Yellow
+# $PopupMessage = "Please create a new service account key JSON file named '$NewKeyName' for service account '$SaEmail', and copy it into the deployment folder:`n$([System.IO.Path]::GetFullPath($DeploymentFolder))`n`nPress OK once the file has been placed there."
+# [System.Windows.MessageBox]::Show($PopupMessage, "Action Required: Copy Service Account Key", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
 
-if (-not (Test-Path $DestKeyPath)) {
-    [System.Windows.MessageBox]::Show("Error: Key file '$NewKeyName' not found in '$DeploymentFolder'. Deployment cannot proceed.", "Key File Missing", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
-    Write-Error "Required key file '$NewKeyName' was not found in the deployment directory."
-    exit 1
-}
+# if (-not (Test-Path $DestKeyPath)) {
+#     [System.Windows.MessageBox]::Show("Error: Key file '$NewKeyName' not found in '$DeploymentFolder'. Deployment cannot proceed.", "Key File Missing", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
+#     Write-Error "Required key file '$NewKeyName' was not found in the deployment directory."
+#     exit 1
+# }
 
-$AbsNewKeyPath = [System.IO.Path]::GetFullPath($DestKeyPath)
+$AbsNewKeyPath = [System.IO.Path]::GetFullPath($JsonKeyFile)
 $env:GOOGLE_APPLICATION_CREDENTIALS = $AbsNewKeyPath
 [Environment]::SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", $AbsNewKeyPath, "User")
-
+npx firebase-tools use $GcpProjectId --alias default
 
 Write-Host "[*] Triggering Firebase deployment..." -ForegroundColor Yellow
-& firebase deploy --only hosting --project $FirebaseProjectId --non-interactive
+& firebase deploy --only hosting --project $FirebaseProjectId
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Firebase deployment failed."
     exit 1
@@ -348,8 +390,6 @@ npm audit fix --force
 
 Write-Host "`n[+] Next.js application deployed successfully to Firebase!" -ForegroundColor Green
 Write-Host "🎉 Setup and deployment completed successfully!" -ForegroundColor Green
-
-npx firebase-tools use $GcpProjectId --alias default
 
 # npx firebase-tools functions:artifacts:setpolicy
 Write-Host "`n[*] Setting up artifact registry cleanup policy..." -ForegroundColor Yellow
