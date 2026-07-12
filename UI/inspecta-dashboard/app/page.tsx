@@ -550,7 +550,7 @@ export default function ReviewerDashboard() {
 
   const renderSettingsMenu = (isMobile: boolean) => {
     return (
-      <div className={`${isMobile ? 'flex lg:hidden' : 'hidden lg:flex'} flex-col items-center shrink-0`}>
+      <div className={`${isMobile ? 'flex sm:hidden' : 'hidden sm:flex'} flex-col items-center shrink-0`}>
         <div className="relative">
           <button
             onClick={() => setShowSettingsMenu(!showSettingsMenu)}
@@ -880,8 +880,8 @@ export default function ReviewerDashboard() {
     <div className={`h-screen flex flex-col bg-gradient-to-br ${theme.background.gradient}`}>
       {/* Header */}
       <header className={`${theme.header.bg} ${theme.header.text} shrink-0 border-b border-slate-300/20 shadow-lg`}>
-        <div className="max-w-[1600px] mx-auto px-4 py-3 lg:px-6 lg:py-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-          <div className="flex items-center justify-between w-full lg:w-auto">
+        <div className="max-w-[1600px] mx-auto px-4 py-3 lg:px-6 lg:py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          <div className="flex items-center justify-between w-full sm:w-auto">
             <div className="flex items-center gap-4 justify-start">
               <img src="/InspectaLogo.png" alt="Logo" className="h-12 w-12 rounded-full object-cover drop-shadow-[0_0_12px_rgba(59,130,246,0.7)]" />
               <div>
@@ -898,11 +898,11 @@ export default function ReviewerDashboard() {
             {renderSettingsMenu(true)}
           </div>
 
-          <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-[26px] justify-end w-full lg:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 lg:gap-[26px] justify-end w-full sm:w-auto">
             {/* Inspection Dropdown Group */}
-            <div className="flex items-center gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
               {/* Custom Inspection Dropdown */}
-              <div ref={inspectionDropdownRef} className="relative w-full lg:w-[305px] lg:shrink-0">
+              <div ref={inspectionDropdownRef} className="relative w-full sm:w-[305px] lg:shrink-0">
                 <button
                   onClick={() => setIsInspectionDropdownOpen(!isInspectionDropdownOpen)}
                   className={`w-full relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-1.5 text-left text-sm text-white shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-white/15`}
@@ -955,9 +955,9 @@ export default function ReviewerDashboard() {
             </div>
 
             {/* Incident Dropdown Group */}
-            <div className="flex items-center gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-3 w-full sm:w-auto">
               {/* Custom Incident Dropdown */}
-              <div ref={incidentDropdownRef} className="relative w-full lg:w-[277px] lg:shrink-0">
+              <div ref={incidentDropdownRef} className="relative w-full sm:w-[277px] lg:shrink-0">
                 <button
                   onClick={() => setIsIncidentDropdownOpen(!isIncidentDropdownOpen)}
                   className={`w-full relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-1.5 text-left text-sm text-white shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-white/15`}
@@ -1391,7 +1391,7 @@ export default function ReviewerDashboard() {
       </main>
 
       {/* Mobile Sticky Bottom Action Bar */}
-      <div className="lg:hidden shrink-0 bg-slate-900 border-t border-slate-700/50 p-3 flex gap-3 z-30 sticky bottom-0">
+      <div className="lg:hidden shrink-0 bg-slate-900 border-t border-slate-700/50 p-3 flex gap-3 z-30 sticky bottom-0 mobile-action-bar">
         <button
           onClick={handleAddInspection}
           className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"

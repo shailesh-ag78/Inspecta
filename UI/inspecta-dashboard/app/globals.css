@@ -45,3 +45,49 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(51, 65, 85, 0.8) rgba(15, 23, 42, 0.95);
 }
+
+/* Optimization for landscape orientation and short screens */
+@media (max-height: 500px) {
+  /* Reduce header vertical padding and gaps */
+  header {
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  header > div {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    gap: 6px !important;
+  }
+  header img {
+    height: 32px !important;
+    width: 32px !important;
+  }
+  header .text-2xl, header .text-1\.9xl {
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+  }
+  header button {
+    min-height: 36px !important;
+    padding-top: 2px !important;
+    padding-bottom: 2px !important;
+  }
+  header span {
+    font-size: 11px !important;
+  }
+  header button span {
+    font-size: 8px !important;
+    margin-top: 0 !important;
+  }
+
+  /* Reduce mobile sticky action bar height */
+  .mobile-action-bar {
+    padding: 4px 8px !important;
+    gap: 8px !important;
+  }
+  .mobile-action-bar button {
+    padding-top: 4px !important;
+    padding-bottom: 4px !important;
+    font-size: 11px !important;
+    border-radius: 8px !important;
+  }
+}
