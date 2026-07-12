@@ -306,7 +306,7 @@ Write-Host "`n[+] Service account roles assigned successfully." -ForegroundColor
 #     --quiet
 
 # Clear out the old compiler cache from the previous build
-Remove-Item -Recurse -Force .next, out
+Remove-Item -Recurse -Force .next
 
 # Set new Environment variables
 $env:NEXT_PUBLIC_FIREBASE_API_KEY = "AIzaSyCZPe2j-rji_vufMOIhKwxtfgXW6hOpIuI"
@@ -398,4 +398,11 @@ if ($LASTEXITCODE -ne 0) {
     Write-Warning "Failed to set up artifact registry cleanup policy."
 }
 
+# ==========  If you wan to use the same docker image created during web build =============
+# gcloud auth configure-docker
 
+# Pull the exact container image down from Google Cloud
+# docker pull gcr.io/your-gcp-project-id/ui-backend-service:latest
+
+# Run it locally, mapping port 3000 of the container to port 3000 on your laptop
+# docker run -p 3000:3000 gcr.io/your-gcp-project-id/ui-backend-service:latest
