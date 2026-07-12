@@ -339,6 +339,27 @@ else {
 }
 $JsonObj | ConvertTo-Json -Depth 10 | Set-Content -Path $FirebaseJsonPath
 
+# Add Content-Security-Policy (CSP) to firebase.json for XSS protection
+Write-Host "[*] Adding Content-Security-Policy header to firebase.json..." -ForegroundColor Yellow
+if ($JsonObj.hosting -is [array]) {
+    if (-not $JsonObj.hosting[0].headers) {
+        $JsonObj.hosting[0] | Add-Member -MemberType NoteProperty -Name "headers" -Value @()
+    }
+    $cspHeader = @{
+        key   = "Content-Security-Policy"
+        value = "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
+    }
+    $sourceHeader = @{
+        source  = "**"
+        headers = @($cspHeader)
+    }
+    $JsonObj.hosting[0].headers += $sourceHeader
+}
+else {
+    Write-Warning "Could not automatically add CSP header. firebase.json hosting config is not an array."
+}
+$JsonObj | ConvertTo-Json -Depth 10 | Set-Content -Path $FirebaseJsonPath
+
 # Enable webframeworks experiment
 Write-Host "[*] Enabling Firebase Web Frameworks experiment..." -ForegroundColor Yellow
 & firebase experiments:enable webframeworks --non-interactive

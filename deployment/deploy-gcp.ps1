@@ -570,9 +570,19 @@ else {
 
 # Create temporary CORS configuration file
 $CorsFilePath = Join-Path $PSScriptRoot "cors-config.json"
+
+# Dynamically create the list of allowed origins based on the UI Project ID
+$AllowedOrigins = @(
+    "https://$UiProjectId.web.app",
+    "https://$UiProjectId.firebaseapp.com",
+    "https://inspecta-360.web.app",
+    "http://localhost:3000",
+    "http://localhost:3001"
+)
+
 $CorsConfig = ConvertTo-Json -InputObject @(
     @{
-        origin         = @("https://inspecta-360.web.app", "https://inspecta-360.firebaseapp.com", "http://localhost:3000", "http://localhost:3001")
+        origin         = $AllowedOrigins
         method         = @("PUT", "GET", "POST", "OPTIONS")
         responseHeader = @("Content-Type", "Content-Length", "Content-Range", "Accept-Ranges", "ETag")
         maxAgeSeconds  = 3600

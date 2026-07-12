@@ -36,7 +36,7 @@ Act as an expert Google Cloud Solutions Architect and DevOps Engineer. Generate 
      * `EXECUTOR_SERVICE_URL`: The target private URL of the Executor Service.
 
 4. SERVICE 2: EXECUTOR SERVICE (Cloud Run)
-   - Ingress: Set to internal-only (`--ingress=internal`). This blocks all public internet access; it can only be hit by the UI Service inside the VPC.
+   - Ingress: Allow all traffic (`--ingress=all`) but require IAM authentication (`--no-allow-unauthenticated`). This makes the service publicly addressable but ensures only authorized service accounts (like `ui-service-sa`) can invoke it.
    - Performance: Set `--min-instances=1` to prevent cold starts when handling asynchronous webhook triggers.
    - Request Timeout: Set the execution timeout limit high (`--timeout=900` or higher) to accommodate long-running LangChain sequences.
    - Identity: Runs as `executor-service-sa`.
@@ -48,7 +48,7 @@ Act as an expert Google Cloud Solutions Architect and DevOps Engineer. Generate 
 
 5. SERVICES 3, 4, & 5: THE 3 AGENT SERVICES (Cloud Run x3)
    - Deploy 3 separate Cloud Run microservices named: `agent-1`, `agent-2`, and `agent-3`.
-   - Ingress: Set to internal-only (`--ingress=internal`) to fully isolate their compute.
+   - Ingress: Allow all traffic (`--ingress=all`) but require IAM authentication (`--no-allow-unauthenticated`). This ensures only the `executor-service-sa` can invoke them.
    - Scale: Keep `--min-instances=0` (scale to zero when idle) to minimize costs, as they are called ad-hoc by the executor.
    - Database Access: These services do NOT connect to the database. They require no database environment variables.
 

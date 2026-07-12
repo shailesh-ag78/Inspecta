@@ -78,6 +78,9 @@ app = FastAPI(
 # ============ CORS Configuration ============
 # Do not change the sequence. This shall happen before custom middleware @app.middleware("http")
 app.add_middleware(
+    # TODO (Security): For production, tighten the origin regex to your specific Firebase domain.
+    # allow_origin_regex=r"https://inspecta-360\.web\.app|https://inspecta-ai\.web\.app",
+    # The current regex is broad and allows any Firebase-hosted application.
     CORSMiddleware,
     allow_origins=["http://localhost:3000", "http://localhost:3001"],
     allow_origin_regex=r"https://.*\.web\.app|https://.*\.firebaseapp\.com",
@@ -711,9 +714,11 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # TODO (hardening): also verify that this blob belongs to `company_id`
-    # (look up the task/incident that owns this video_url) so one tenant cannot
-    # request another tenant's blob even with a valid token.
+    # Security Hardening: Verify that the requested path belongs to the caller's company.
+    # This prevents a user from one company from accessing another company's videos.
+    owns_video = await repository.verify_video_ownership(company_id, path)
+    if not owns_video:
+        raise HTTPException(status_code=403, detail="Access denied to the requested resource.")
 
     if path.startswith("gs://"):
         try:
