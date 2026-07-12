@@ -548,6 +548,72 @@ export default function ReviewerDashboard() {
     setLastUploadedFileName(null);
   }, [selectedInspection, selectedIncidentId]);
 
+  const renderSettingsMenu = (isMobile: boolean) => {
+    return (
+      <div className={`${isMobile ? 'flex lg:hidden' : 'hidden lg:flex'} flex-col items-center shrink-0`}>
+        <div className="relative">
+          <button
+            onClick={() => setShowSettingsMenu(!showSettingsMenu)}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white overflow-hidden transition hover:bg-white/20 cursor-pointer"
+            title="Profile Settings"
+          >
+            {user?.photoURL ? (
+              <img src={user.photoURL} alt={user.displayName || "User"} className="h-full w-full object-cover" />
+            ) : (
+              <User className="w-4 h-4" />
+            )}
+          </button>
+          {showSettingsMenu && (
+            <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-50">
+              <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3">
+                {user?.photoURL && (
+                  <img src={user.photoURL} alt="" className="h-10 w-10 rounded-full border border-slate-700" />
+                )}
+                <div className="min-w-0">
+                  <div className="font-semibold text-white truncate">{user?.displayName || "Task Reviewer"}</div>
+                  <div className="text-xs text-slate-400 truncate">{user?.email}</div>
+                </div>
+              </div>
+              <div className="p-2 border-b border-slate-800">
+                <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
+                {Object.values(themes).map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setTheme(t);
+                      setShowSettingsMenu(false);
+                    }}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 cursor-pointer ${theme.id === t.id
+                      ? 'bg-white/10 text-white'
+                      : 'hover:bg-slate-800 text-slate-200'
+                      }`}
+                  >
+                    <div className="font-medium">{t.name}</div>
+                    <div className="text-xs opacity-75 mt-1">
+                      <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="p-2 border-t border-slate-800">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-white/70 mt-1">
+          {companyNameLoading ? <Loader className="w-3 h-3 animate-spin inline-block" /> : companyName}
+        </span>
+      </div>
+    );
+  };
+
   // Update video position and panel state when activeTask changes
   useEffect(() => {
     // Stop playback immediately when switching tasks or clearing selection
@@ -814,24 +880,29 @@ export default function ReviewerDashboard() {
     <div className={`h-screen flex flex-col bg-gradient-to-br ${theme.background.gradient}`}>
       {/* Header */}
       <header className={`${theme.header.bg} ${theme.header.text} shrink-0 border-b border-slate-300/20 shadow-lg`}>
-        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4 justify-start">
-            <img src="/InspectaLogo.png" alt="Logo" className="h-14 w-14 rounded-full object-cover drop-shadow-[0_0_12px_rgba(59,130,246,0.7)]" />
-            <div>
-              <div className="text-[12px] uppercase tracking-[0.10em] font-bold 
-                bg-gradient-to-r from-[#3B82F6] via-[#FB923C] to-[#8B5CF6] 
-                text-transparent bg-clip-text drop-shadow-md">
-                INSPECTA
+        <div className="max-w-[1600px] mx-auto px-4 py-3 lg:px-6 lg:py-4 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+          <div className="flex items-center justify-between w-full lg:w-auto">
+            <div className="flex items-center gap-4 justify-start">
+              <img src="/InspectaLogo.png" alt="Logo" className="h-12 w-12 rounded-full object-cover drop-shadow-[0_0_12px_rgba(59,130,246,0.7)]" />
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.10em] font-bold 
+                  bg-gradient-to-r from-[#3B82F6] via-[#FB923C] to-[#8B5CF6] 
+                  text-transparent bg-clip-text drop-shadow-md">
+                  INSPECTA
+                </div>
+                <div className="text-1.9xl font-extrabold font-['Public_Sans']">Task Dashboard</div>
               </div>
-              <div className="text-2xl font-extrabold font-['Public_Sans']">Task Dashboard</div>
             </div>
+
+            {/* Mobile Settings Menu */}
+            {renderSettingsMenu(true)}
           </div>
 
-          <div className="flex items-center gap-[26px] justify-end">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 lg:gap-[26px] justify-end w-full lg:w-auto">
             {/* Inspection Dropdown Group */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full lg:w-auto">
               {/* Custom Inspection Dropdown */}
-              <div ref={inspectionDropdownRef} className="relative w-[305px] shrink-0">
+              <div ref={inspectionDropdownRef} className="relative w-full lg:w-[305px] lg:shrink-0">
                 <button
                   onClick={() => setIsInspectionDropdownOpen(!isInspectionDropdownOpen)}
                   className={`w-full relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-1.5 text-left text-sm text-white shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-white/15`}
@@ -847,7 +918,7 @@ export default function ReviewerDashboard() {
                   <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
                 </button>
                 {isInspectionDropdownOpen && (
-                  <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-700/50 bg-slate-900/95 backdrop-blur-md shadow-xl z-50 py-1.5 dropdown-scrollbar">
+                  <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-700/50 bg-slate-900 backdrop-blur-md shadow-xl z-50 py-1.5 dropdown-scrollbar">
                     {siteInspections.length === 0 ? (
                       <div className="px-3 py-2 text-xs text-slate-400">No inspections available</div>
                     ) : (
@@ -876,7 +947,7 @@ export default function ReviewerDashboard() {
               {/* Add Inspection Button */}
               <button
                 onClick={handleAddInspection}
-                className={`flex h-7 w-7 items-center justify-center rounded-full border ${theme.filters.border} bg-white/10 text-white transition hover:bg-white/20 hover:scale-105 cursor-pointer shrink-0`}
+                className={`hidden lg:flex h-7 w-7 items-center justify-center rounded-full border ${theme.filters.border} bg-white/10 text-white transition hover:bg-white/20 hover:scale-105 cursor-pointer shrink-0`}
                 title="Add Inspection"
               >
                 <Plus className="w-3 h-3" />
@@ -884,9 +955,9 @@ export default function ReviewerDashboard() {
             </div>
 
             {/* Incident Dropdown Group */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 w-full lg:w-auto">
               {/* Custom Incident Dropdown */}
-              <div ref={incidentDropdownRef} className="relative w-[277px] shrink-0">
+              <div ref={incidentDropdownRef} className="relative w-full lg:w-[277px] lg:shrink-0">
                 <button
                   onClick={() => setIsIncidentDropdownOpen(!isIncidentDropdownOpen)}
                   className={`w-full relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-1.5 text-left text-sm text-white shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-white/15`}
@@ -935,74 +1006,15 @@ export default function ReviewerDashboard() {
               {/* Action Icon next to Incident Control */}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className={`flex h-7 w-7 items-center justify-center rounded-full border ${theme.filters.border} bg-white/10 text-white transition hover:bg-white/20 hover:scale-105 cursor-pointer shrink-0`}
+                className={`hidden lg:flex h-7 w-7 items-center justify-center rounded-full border ${theme.filters.border} bg-white/10 text-white transition hover:bg-white/20 hover:scale-105 cursor-pointer shrink-0`}
                 title="Upload incident video"
               >
                 <Upload className="w-3 h-3" />
               </button>
             </div>
 
-            <div className="flex flex-col items-center">
-              <div className="relative">
-                <button
-                  onClick={() => setShowSettingsMenu(!showSettingsMenu)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-white/10 text-white overflow-hidden transition hover:bg-white/20 cursor-pointer"
-                  title="Profile Settings"
-                >
-                  {user?.photoURL ? (
-                    <img src={user.photoURL} alt={user.displayName || "User"} className="h-full w-full object-cover" />
-                  ) : (
-                    <User className="w-4 h-4" />
-                  )}
-                </button>
-                {showSettingsMenu && (
-                  <div className="absolute right-0 mt-2 w-72 rounded-2xl bg-slate-900 border border-slate-700 shadow-xl z-50">
-                    <div className="px-4 py-3 border-b border-slate-700 flex items-center gap-3">
-                      {user?.photoURL && (
-                        <img src={user.photoURL} alt="" className="h-10 w-10 rounded-full border border-slate-700" />
-                      )}
-                      <div className="min-w-0">
-                        <div className="font-semibold text-white truncate">{user?.displayName || "Task Reviewer"}</div>
-                        <div className="text-xs text-slate-400 truncate">{user?.email}</div>
-                      </div>
-                    </div>
-                    <div className="p-2 border-b border-slate-800">
-                      <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
-                      {Object.values(themes).map((t) => (
-                        <button
-                          key={t.id}
-                          onClick={() => {
-                            setTheme(t);
-                            setShowSettingsMenu(false);
-                          }}
-                          className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 cursor-pointer ${theme.id === t.id
-                            ? 'bg-white/10 text-white'
-                            : 'hover:bg-slate-800 text-slate-200'
-                            }`}
-                        >
-                          <div className="font-medium">{t.name}</div>
-                          <div className="text-xs opacity-75 mt-1">
-                            <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                    <div className="p-2 border-t border-slate-800">
-                      <button
-                        onClick={handleLogout}
-                        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all cursor-pointer"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Sign Out
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70 mt-1">
-                {companyNameLoading ? <Loader className="w-3 h-3 animate-spin inline-block" /> : companyName}
-              </span>
-            </div>
+            {/* Desktop Settings Menu */}
+            {renderSettingsMenu(false)}
           </div>
         </div>
       </header>
@@ -1020,9 +1032,9 @@ export default function ReviewerDashboard() {
       )}
 
       {/* Main Content */}
-      <main className="flex flex-1 overflow-hidden max-w-[1600px] mx-auto w-full">
+      <main className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden max-w-[1600px] mx-auto w-full">
         {/* Left Pane - Task Feed */}
-        <section className={`${isVideoCollapsed ? 'w-full' : 'w-3/5'} overflow-y-auto px-3 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
+        <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-3 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
           {/* Filters */}
           <div className="sticky top-0 z-20 -mx-3 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-6 shadow-md">
             <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200/70 bg-slate-200/80">
@@ -1243,7 +1255,7 @@ export default function ReviewerDashboard() {
 
         {/* Right Pane - Evidence Vault */}
         {!isVideoCollapsed && (
-          <aside className="w-2/5 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col shadow-inner relative border-l border-slate-700">
+          <aside className="w-full lg:w-2/5 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col shadow-inner relative border-t lg:border-t-0 lg:border-l border-slate-700 mt-4 lg:mt-0">
             <div className="p-5 pb-40 flex-1 overflow-y-auto">
               {/* Compact Header Row */}
               <div className="flex items-center justify-between mb-5">
@@ -1348,13 +1360,6 @@ export default function ReviewerDashboard() {
                     <Upload className="w-3.5 h-3.5" />
                     Upload incident video
                   </button>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept="video/*"
-                    onChange={uploadIncidentVideo}
-                    className="hidden"
-                  />
                 </div>
               </div>
               {/* Status Bar */}
@@ -1384,6 +1389,33 @@ export default function ReviewerDashboard() {
           </button>
         )}
       </main>
+
+      {/* Mobile Sticky Bottom Action Bar */}
+      <div className="lg:hidden shrink-0 bg-slate-900 border-t border-slate-700/50 p-3 flex gap-3 z-30 sticky bottom-0">
+        <button
+          onClick={handleAddInspection}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+        >
+          <Plus className="w-4 h-4" />
+          Add Inspection
+        </button>
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+        >
+          <Upload className="w-4 h-4" />
+          Upload Incident Video
+        </button>
+      </div>
+
+      {/* Hidden file input for Upload Video */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        accept="video/*"
+        onChange={uploadIncidentVideo}
+        className="hidden"
+      />
 
       {/* Add Inspection Modal */}
       <AddInspectionModal
