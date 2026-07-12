@@ -93,6 +93,25 @@ export default function ReviewerDashboard() {
   const [companyName, setCompanyName] = useState<string | null>(null);
   const [companyNameLoading, setCompanyNameLoading] = useState(false);
 
+  // Dropdown states & refs
+  const [isInspectionDropdownOpen, setIsInspectionDropdownOpen] = useState(false);
+  const [isIncidentDropdownOpen, setIsIncidentDropdownOpen] = useState(false);
+  const inspectionDropdownRef = useRef<HTMLDivElement | null>(null);
+  const incidentDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (inspectionDropdownRef.current && !inspectionDropdownRef.current.contains(event.target as Node)) {
+        setIsInspectionDropdownOpen(false);
+      }
+      if (incidentDropdownRef.current && !incidentDropdownRef.current.contains(event.target as Node)) {
+        setIsIncidentDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Video Upload States
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [lastUploadedFileName, setLastUploadedFileName] = useState<string | null>(null);
@@ -808,46 +827,119 @@ export default function ReviewerDashboard() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3 justify-end">
-            <div className={`relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-2 text-sm text-white shadow-sm`}>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">Inspection</span>
-              {siteInspectionsLoading ? (
-                <Loader className="w-4 h-4 animate-spin text-white/70 ml-2" />
-              ) : (
-                <select
-                  value={selectedInspection}
-                  onChange={(e) => setSelectedInspection(e.target.value)}
-                  className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
+          <div className="flex items-center gap-[26px] justify-end">
+            {/* Inspection Dropdown Group */}
+            <div className="flex items-center gap-3">
+              {/* Custom Inspection Dropdown */}
+              <div ref={inspectionDropdownRef} className="relative w-[305px] shrink-0">
+                <button
+                  onClick={() => setIsInspectionDropdownOpen(!isInspectionDropdownOpen)}
+                  className={`w-full relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-1.5 text-left text-sm text-white shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-white/15`}
                 >
-                  {siteInspections.length === 0 && <option className="text-slate-900 bg-white">No inspections available</option>}
-                  {siteInspections.map(item => (
-                    <option key={`${item.site_id}-${item.inspection_id}`} value={item.inspection_id || item.site_id} className="text-slate-900 bg-white">{item.label}</option>
-                  ))}
-                </select>
-              )}
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-white/70 block leading-tight">Inspection</span>
+                  {siteInspectionsLoading ? (
+                    <Loader className="w-4 h-4 animate-spin text-white/70 mt-1" />
+                  ) : (
+                    <span className="block truncate text-sm text-white font-semibold pr-6 mt-0.5">
+                      {siteInspections.find(item => (item.inspection_id || item.site_id) === selectedInspection)?.label || 'Select Inspection'}
+                    </span>
+                  )}
+                  <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+                </button>
+                {isInspectionDropdownOpen && (
+                  <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-700/50 bg-slate-900/95 backdrop-blur-md shadow-xl z-50 py-1.5 dropdown-scrollbar">
+                    {siteInspections.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-slate-400">No inspections available</div>
+                    ) : (
+                      siteInspections.map(item => {
+                        const val = item.inspection_id || item.site_id;
+                        const isSelected = val === selectedInspection;
+                        return (
+                          <button
+                            key={`${item.site_id}-${item.inspection_id}`}
+                            onClick={() => {
+                              setSelectedInspection(val);
+                              setIsInspectionDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-white/10 block truncate ${isSelected ? 'bg-blue-600 text-white font-semibold' : 'text-slate-300'
+                              }`}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Add Inspection Button */}
+              <button
+                onClick={handleAddInspection}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border ${theme.filters.border} bg-white/10 text-white transition hover:bg-white/20 hover:scale-105 cursor-pointer shrink-0`}
+                title="Add Inspection"
+              >
+                <Plus className="w-3 h-3" />
+              </button>
             </div>
-            <div className={`relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-2 text-sm text-white shadow-sm`}>
-              <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">Incident</span>
-              {incidentsLoading ? (
-                <Loader className="w-4 h-4 animate-spin text-white/70 ml-2" />
-              ) : (
-                <select
-                  value={selectedIncidentId}
-                  onChange={(e) => setSelectedIncidentId(e.target.value)}
-                  className="w-full bg-transparent border-none text-sm text-white outline-none appearance-none pr-8 focus:outline-none focus:ring-1 focus:ring-white/30"
+
+            {/* Incident Dropdown Group */}
+            <div className="flex items-center gap-3">
+              {/* Custom Incident Dropdown */}
+              <div ref={incidentDropdownRef} className="relative w-[277px] shrink-0">
+                <button
+                  onClick={() => setIsIncidentDropdownOpen(!isIncidentDropdownOpen)}
+                  className={`w-full relative rounded-2xl border ${theme.filters.border} bg-white/10 px-3 py-1.5 text-left text-sm text-white shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-white/15`}
                 >
-                  {incidents.length === 0 && <option className="text-slate-900 bg-white">No incidents available</option>}
-                  {incidents.map(incident => (
-                    <option key={incident.id} value={incident.id} className="text-slate-900 bg-white">
-                      {incident.title ||
-                        `Incident ${incident.id.slice(0, 4)} - ${incident.created ? new Date(incident.created).toLocaleTimeString() : 'Recent'}`
-                      }
-                    </option>
-                  ))}
-                </select>
-              )}
-              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-white/70 block leading-tight">Incident</span>
+                  {incidentsLoading ? (
+                    <Loader className="w-4 h-4 animate-spin text-white/70 mt-1" />
+                  ) : (
+                    <span className="block truncate text-sm text-white font-semibold pr-6 mt-0.5">
+                      {(() => {
+                        const incident = incidents.find(inc => inc.id === selectedIncidentId);
+                        if (!incident) return 'Select Incident';
+                        return incident.title || `Incident ${incident.id.slice(0, 4)} - ${incident.created ? new Date(incident.created).toLocaleTimeString() : 'Recent'}`;
+                      })()}
+                    </span>
+                  )}
+                  <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
+                </button>
+                {isIncidentDropdownOpen && (
+                  <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-700/50 bg-slate-900 backdrop-blur-md shadow-xl z-50 py-1.5 dropdown-scrollbar">
+                    {incidents.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-slate-400">No incidents available</div>
+                    ) : (
+                      incidents.map(incident => {
+                        const isSelected = incident.id === selectedIncidentId;
+                        const label = incident.title || `Incident ${incident.id.slice(0, 4)} - ${incident.created ? new Date(incident.created).toLocaleTimeString() : 'Recent'}`;
+                        return (
+                          <button
+                            key={incident.id}
+                            onClick={() => {
+                              setSelectedIncidentId(incident.id);
+                              setIsIncidentDropdownOpen(false);
+                            }}
+                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-white/10 block truncate ${isSelected ? 'bg-blue-600 text-white font-semibold' : 'text-slate-300'
+                              }`}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Action Icon next to Incident Control */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className={`flex h-7 w-7 items-center justify-center rounded-full border ${theme.filters.border} bg-white/10 text-white transition hover:bg-white/20 hover:scale-105 cursor-pointer shrink-0`}
+                title="Upload incident video"
+              >
+                <Upload className="w-3 h-3" />
+              </button>
             </div>
 
             <div className="flex flex-col items-center">
@@ -1027,7 +1119,7 @@ export default function ReviewerDashboard() {
                               task.severity_id === 3 ? 'bg-gradient-to-br from-green-400 to-green-600' :
                                 'bg-gradient-to-br from-yellow-400 to-orange-500'
                             }`}>
-                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[10px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
+                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[14px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-nowrap">
