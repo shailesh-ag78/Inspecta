@@ -7,6 +7,13 @@ import { auth, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import VideoPlayer from './VideoPlayer';
 import AddInspectionModal from '@/components/AddInspectionModal';
+import {
+  authenticatedFetch,
+  BACKEND_URL,
+  formatTasks,
+  formatIncidents,
+  formatSiteInspections,
+} from '@/lib/api';
 
 interface SiteInspection {
   site_id: string;
@@ -42,22 +49,6 @@ interface Task {
   video_url?: string;
   area: string;
   created_at: string;
-}
-
-// Authenticated fetch wrapper that automatically appends Firebase ID token
-async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const user = auth.currentUser;
-  const headers = { ...options.headers } as Record<string, string>;
-
-  if (user) {
-    const token = await user.getIdToken();
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  return fetch(url, {
-    ...options,
-    headers,
-  });
 }
 
 export default function ReviewerDashboard() {
@@ -128,20 +119,51 @@ export default function ReviewerDashboard() {
       }
 
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('inspectionId', selectedInspection);
+        // 1. Ask the backend for a signed upload URL + blob name + storage type.
+        const uploadUrlResp = await authenticatedFetch(
+          `/api/get-upload-url?fileName=${encodeURIComponent(file.name)}`
+        );
+        if (!uploadUrlResp.ok) throw new Error('Failed to get upload URL');
+        const uploadUrlJson = await uploadUrlResp.json();
+        const {
+          upload_url: uploadUrl,
+          blob_name: blobName,
+          storage_type: storageType,
+        } = uploadUrlJson.data || {};
 
-        const response = await authenticatedFetch('/frontend-api/video', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error('Upload failed');
+        // 2. Upload the file bytes straight to storage.
+        if (storageType === 'gcs') {
+          const gcsResponse = await fetch(uploadUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type || 'video/mp4' },
+            body: file,
+          });
+          if (!gcsResponse.ok) {
+            throw new Error(`Failed to upload to GCS: ${gcsResponse.status}`);
+          }
+        } else {
+          // 'local' storage only exists when the backend runs on a dev machine;
+          // a static browser client cannot write to that filesystem.
+          throw new Error(`Unsupported storage type for browser upload: ${storageType}`);
         }
 
-        const result = await response.json();
+        // 3. Register the incident (kicks off backend processing).
+        const inspectorId = 1; // TODO: derive from Firebase token claims
+        const registerResp = await authenticatedFetch(
+          `/api/inspections/${selectedInspection}/upload-incident`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              inspector_id: inspectorId,
+              file_url: uploadUrl,
+              blob_name: blobName,
+            }),
+          }
+        );
+        if (!registerResp.ok) throw new Error('Failed to register incident');
+
+        const result = await registerResp.json();
         setLastUploadedFileName(file.name);
         console.log("Video file uploaded successfully : ", result);
       } catch (error) {
@@ -194,7 +216,7 @@ export default function ReviewerDashboard() {
             throw new Error("Site Name and Address are required to add a new site.");
           }
 
-          const siteResponse = await authenticatedFetch('/api/backend/api/sites', {
+          const siteResponse = await authenticatedFetch('/api/sites', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -220,8 +242,8 @@ export default function ReviewerDashboard() {
 
         // 2. Create the inspection
         const query = data.friendlyName
-          ? `/api/backend/api/inspections?siteId=${targetSiteId}&friendlyName=${encodeURIComponent(data.friendlyName)}`
-          : `/api/backend/api/inspections?siteId=${targetSiteId}`;
+          ? `/api/inspections?siteId=${targetSiteId}&friendlyName=${encodeURIComponent(data.friendlyName)}`
+          : `/api/inspections?siteId=${targetSiteId}`;
 
         const inspectionResponse = await authenticatedFetch(query, {
           method: 'POST',
@@ -297,7 +319,7 @@ export default function ReviewerDashboard() {
       try {
         setCompanyName(null);
 
-        const response = await authenticatedFetch(`/frontend-api/company`);
+        const response = await authenticatedFetch(`/api/companyinfo`);
         if (response.ok) {
           const res = await response.json();
           if (res.data) {
@@ -342,14 +364,14 @@ export default function ReviewerDashboard() {
     try {
       setSiteInspectionsLoading(true);
       setSiteInspectionsError(null);
-      const response = await authenticatedFetch(`/frontend-api/site-inspections`);
+      const response = await authenticatedFetch(`/api/site-inspections`);
 
       if (!response.ok) {
         throw new Error(`Failed to fetch site-inspections: ${response.statusText}`);
       }
 
       const apiResponse = await response.json();
-      const combinedData = apiResponse.data || [];
+      const combinedData = formatSiteInspections(apiResponse.data || []);
       setSiteInspections(combinedData);
 
       // Auto-select first inspection (must have valid inspection_id)
@@ -385,14 +407,14 @@ export default function ReviewerDashboard() {
         setActiveTask(null);
         setTasks([]);
 
-        const response = await authenticatedFetch(`/frontend-api/incidents?inspectionId=${selectedInspection}`);
+        const response = await authenticatedFetch(`/api/incidents?inspectionId=${selectedInspection}`);
 
         if (!response.ok) {
           throw new Error(`Failed to fetch incidents: ${response.statusText}`);
         }
 
         const apiResponse = await response.json();
-        const incidentsData = apiResponse.data || [];
+        const incidentsData = formatIncidents(apiResponse.data || []);
         setIncidents(incidentsData);
 
         // Auto-select the first incident if available
@@ -420,13 +442,15 @@ export default function ReviewerDashboard() {
       setTasksLoading(true);
       setTasksError(null);
 
-      const response = await authenticatedFetch(`/frontend-api/tasks?incidentId=${incidentId}`);
+      const response = await authenticatedFetch(`/api/incidents/${incidentId}/tasks`);
       if (!response.ok) {
         throw new Error(`Failed to fetch tasks: ${response.statusText}`);
       }
 
       const apiResponse = await response.json();
-      const tasksData = Array.isArray(apiResponse) ? apiResponse : (apiResponse.data || []);
+      const tasksData = formatTasks(
+        Array.isArray(apiResponse) ? apiResponse : (apiResponse.data || [])
+      );
       console.log("%c >>> SUCCESS: Tasks received", "color: white; background: green", tasksData);
       tasksData.forEach((task: any, index: number) => {
         console.log(`⏱️ Start Time: ${task.start_time}s | End Time: ${task.end_time}s  => 🎬 [Task ${index + 1}] Title: "${task.task_title}"`);
@@ -459,16 +483,17 @@ export default function ReviewerDashboard() {
     setHasAutoPaused(false);
   }, [activeTask?.id]);
 
-  // Return undefined instead of a broken fallback path.
+  // Only http(s) URLs are known synchronously. gs:// paths are resolved to a
+  // signed URL asynchronously inside VideoPlayer, so we cannot predict the
+  // final src here — return undefined and let the pendingPlayTask flow drive
+  // playback once the media is ready (same path as a normal task switch).
   const getVideoSrc = useCallback((videoUrl?: string): string | undefined => {
     if (!videoUrl) return undefined;
-
     if (videoUrl.startsWith('http://') || videoUrl.startsWith('https://')) {
       return videoUrl;
     }
-
-    return `/frontend-api/video?path=${encodeURIComponent(videoUrl)}${token ? `&token=${encodeURIComponent(token)}` : ''}`;
-  }, [token]);
+    return undefined;
+  }, []);
 
   const isInitiatingPlayRef = useRef(false);
 
@@ -718,13 +743,12 @@ export default function ReviewerDashboard() {
     try {
       setTaskSaveLoading(true);
       setTaskEditError(null);
-      const response = await authenticatedFetch('/frontend-api/tasks', {
+      const response = await authenticatedFetch(`/api/tasks/${task.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          id: task.id,
           task_title: trimmedTitle,
           task_description: trimmedDescription,
         }),
@@ -732,10 +756,11 @@ export default function ReviewerDashboard() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || 'Failed to save task');
+        throw new Error(errorData?.detail || errorData?.error || 'Failed to save task');
       }
 
-      const updatedTask = await response.json();
+      const updatedResponse = await response.json();
+      const updatedTask = updatedResponse?.data || updatedResponse;
       setTasks((prevTasks) => prevTasks.map((item) => item.id === task.id ? {
         ...item,
         task_title: updatedTask?.task_title || trimmedTitle,

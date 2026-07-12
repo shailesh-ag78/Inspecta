@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, forwardRef } from 'react';
 import ReactPlayer from 'react-player';
+import { BACKEND_URL } from '@/lib/api';
 
 interface VideoPlayerProps {
     /**
@@ -33,24 +34,47 @@ const VideoPlayer = forwardRef<any, VideoPlayerProps>(
             // ReactPlayer needs to run on the client side.
             setIsClient(true);
 
-            if (filePath) {
-                // Construct the URL to our backend streaming endpoint.
-                // This endpoint will handle serving local files or redirecting to GCS.
-                const url = new URL('/frontend-api/video', window.location.origin);
-                url.searchParams.set('path', filePath);
-                if (token) {
-                    url.searchParams.set('token', token);
-                }
-                setMediaUrl(url.toString());
-            } else {
-                setMediaUrl('');
-            }
-        }, [filePath, token]);
+            let cancelled = false;
 
-        // Render a placeholder or nothing on the server
-        if (!isClient) {
-            return null;
-        }
+            const resolveMediaUrl = async () => {
+                if (!filePath) {
+                    setMediaUrl('');
+                    return;
+                }
+
+                // Direct http(s) URLs play as-is.
+                if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+                    setMediaUrl(filePath);
+                    return;
+                }
+
+                // gs:// (or local dev) paths: ask the backend for a signed URL
+                // and point the player straight at it.
+                try {
+                    const url = new URL(`${BACKEND_URL}/api/get-video-url`);
+                    url.searchParams.set('path', filePath);
+                    const headers: Record<string, string> = {};
+                    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                    const resp = await fetch(url.toString(), { headers });
+                    if (!resp.ok) throw new Error(`get-video-url failed: ${resp.status}`);
+                    const json = await resp.json();
+                    const signedUrl = json?.data?.url;
+                    if (!cancelled && signedUrl) {
+                        setMediaUrl(signedUrl);
+                    }
+                } catch (err) {
+                    console.error('Failed to resolve media URL:', err);
+                    if (!cancelled) setMediaUrl('');
+                }
+            };
+
+            resolveMediaUrl();
+
+            return () => {
+                cancelled = true;
+            };
+        }, [filePath, token]);
 
         const wrapperStyle: React.CSSProperties = isAudio
             ? {}
@@ -59,6 +83,23 @@ const VideoPlayer = forwardRef<any, VideoPlayerProps>(
         const playerStyle: React.CSSProperties = isAudio
             ? { width: '100%', height: '50px' }
             : { position: 'absolute', top: 0, left: 0 };
+
+        // Don't mount the player on the server, or before the media URL has
+        // resolved — passing an empty src makes the browser refetch the page.
+        if (!isClient || !mediaUrl) {
+            return (
+                <div className="player-wrapper" style={wrapperStyle}>
+                    {!isAudio && (
+                        <div
+                            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+                            className="flex items-center justify-center text-slate-600 text-xs uppercase tracking-widest"
+                        >
+                            Loading evidence…
+                        </div>
+                    )}
+                </div>
+            );
+        }
 
         return (
             <div className="player-wrapper" style={wrapperStyle}>

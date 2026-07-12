@@ -1,31 +1,20 @@
 {
-    "hosting":  [
-                    {
-                        "site":  "inspecta-ai",
-                        "source":  ".",
-                        "ignore":  [
-                                       "firebase.json",
-                                       "**/.*",
-                                       "**/node_modules/**",
-                                       "*.json",
-                                       "yarn.lock",
-                                       "pnpm-lock.yaml",
-                                       "README.md",
-                                       "LICENSE"
-                                   ],
-                        "cleanUrls":  true,
-                        "frameworksBackend":  {
-                                                  "region":  "us-central1"
-                                              },
-                        "rewrites":  [
-                                         {
-                                             "source":  "**",
-                                             "run":  {
-                                                         "serviceId":  "ssrinspectaai",
-                                                         "region":  "us-central1"
-                                                     }
-                                         }
-                                     ]
-                    }
-                ]
+    "hosting": [
+        {
+            "site": "inspecta-ai",
+            "public": "out",
+            "ignore": [
+                "firebase.json",
+                "**/.*",
+                "**/node_modules/**"
+            ],
+            "cleanUrls": true,
+            "rewrites": [
+                {
+                    "source": "**",
+                    "destination": "/index.html"
+                }
+            ]
+        }
+    ]
 }

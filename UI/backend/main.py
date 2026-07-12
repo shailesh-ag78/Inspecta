@@ -704,13 +704,16 @@ async def create_inspection(
 @app.get("/api/get-video-url")
 async def get_video_url(request: Request, path: str = Query(..., description="GCS path or local path")):
     """Create pre-signed URL of the video for display"""
-    # ##### Note #####  :Video control in UI does not send Auth header while calling this method. Hence Firebase authentication is skipped.
-    # In production enviornment, only GCP service based authentication is considered
+    # The static UI's VideoPlayer now sends the Firebase ID token as a Bearer
+    # header when requesting a signed URL, so we require an authenticated caller.
+    # This stops anonymous users from minting signed URLs for arbitrary blobs.
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # Avoid checking company_id since it will be None.
-    # company_id = getattr(request.state, "company_id", None)
-    # if company_id is None:
-    #     raise HTTPException(status_code=401, detail="Unauthorized")
+    # TODO (hardening): also verify that this blob belongs to `company_id`
+    # (look up the task/incident that owns this video_url) so one tenant cannot
+    # request another tenant's blob even with a valid token.
 
     if path.startswith("gs://"):
         try:

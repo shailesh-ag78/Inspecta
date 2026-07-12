@@ -1,13 +1,12 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  async rewrites() {
-    return [
-      {
-        source: '/api/backend/:path*',
-        destination: `${process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'}/:path*`,
-      },
-    ];
+  // Emit a fully static site into ./out on `next build`.
+  // No Node server: the browser talks to the Python backend directly.
+  output: "export",
+  // next/image optimization needs a server; disable it for static export.
+  images: {
+    unoptimized: true,
   },
 };
 
