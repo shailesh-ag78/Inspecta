@@ -118,6 +118,7 @@ export default function ReviewerDashboard() {
         return;
       }
 
+      document.body.style.cursor = 'wait';
       try {
         // 1. Ask the backend for a signed upload URL + blob name + storage type.
         const uploadUrlResp = await authenticatedFetch(
@@ -169,6 +170,8 @@ export default function ReviewerDashboard() {
       } catch (error) {
         console.error("Upload failed:", error);
         setLastUploadedFileName(`Failed to upload video ${file.name}`);
+      } finally {
+        document.body.style.cursor = 'default';
       }
     }
   };
@@ -206,6 +209,7 @@ export default function ReviewerDashboard() {
     newSiteAddress?: string;
     friendlyName?: string;
   }) => {
+    document.body.style.cursor = 'wait';
     try {
       const executionPromise = (async () => {
         let targetSiteId = data.siteId;
@@ -276,6 +280,8 @@ export default function ReviewerDashboard() {
     } catch (error) {
       console.error("Error adding inspection:", error);
       alert(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      document.body.style.cursor = 'default';
     }
   };
 
@@ -348,6 +354,9 @@ export default function ReviewerDashboard() {
     await signOut(auth);
     setShowSettingsMenu(false);
   };
+
+  // Combine the existing themes with the new one
+  const availableThemes = themes;
 
   const [hasAutoPaused, setHasAutoPaused] = useState(false);
 
@@ -601,24 +610,26 @@ export default function ReviewerDashboard() {
               </div>
               <div className="p-2 border-b border-slate-800">
                 <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
-                {Object.values(themes).map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => {
-                      setTheme(t);
-                      setShowSettingsMenu(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 cursor-pointer ${theme.id === t.id
-                      ? 'bg-white/10 text-white'
-                      : 'hover:bg-slate-800 text-slate-200'
-                      }`}
-                  >
-                    <div className="font-medium">{t.name}</div>
-                    <div className="text-xs opacity-75 mt-1">
-                      <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
-                    </div>
-                  </button>
-                ))}
+                {Object.values(availableThemes)
+                  .filter(t => !['Aqua Gradient', 'Aqua Light Gradient', 'Ocean Vibrant'].includes(t.name))
+                  .map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        setTheme(t);
+                        setShowSettingsMenu(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all mb-1 cursor-pointer ${theme.id === t.id
+                        ? 'bg-white/10 text-white'
+                        : 'hover:bg-slate-800 text-slate-200'
+                        }`}
+                    >
+                      <div className="font-medium">{t.name}</div>
+                      <div className="text-xs opacity-75 mt-1">
+                        <div className={`h-2 rounded w-full bg-gradient-to-r ${t.primary.from} ${t.primary.to}`}></div>
+                      </div>
+                    </button>
+                  ))}
               </div>
               <div className="p-2 border-t border-slate-800">
                 <button
@@ -1266,7 +1277,7 @@ export default function ReviewerDashboard() {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-slate-600 text-sm mb-3 leading-relaxed">{task.task_description}</p>
+                            <p className="text-slate-600 text-sm mb-3 leading-relaxed font-mono">{task.task_description}</p>
                           )}
                         </div>
                       </>
@@ -1280,8 +1291,9 @@ export default function ReviewerDashboard() {
 
         {/* Right Pane - Evidence Vault */}
         {!isVideoCollapsed && (
-          <aside className="w-full lg:w-2/5 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex flex-col shadow-inner relative border-t lg:border-t-0 lg:border-l border-slate-700 mt-4 lg:mt-0">
-            <div className="p-5 pb-40 flex-1 overflow-y-auto">
+          <aside className={`w-full lg:w-2/5 ${theme.header.bg} flex flex-col shadow-inner relative border-t lg:border-t-0 lg:border-l border-slate-700 mt-4 lg:mt-0`}>
+            <div className="absolute inset-0 bg-white/10 pointer-events-none" />
+            <div className="p-5 pb-40 flex-1 overflow-y-auto relative z-10">
               {/* Compact Header Row */}
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-white font-bold flex items-center min-w-0">
