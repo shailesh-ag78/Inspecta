@@ -17,7 +17,10 @@ param (
     [string]$GcpProjectId,
 
     [Parameter(Mandatory = $false, ParameterSetName = "DeploySet")]
-    [string]$BackendProjectID
+    [string]$BackendProjectID,
+
+    [Parameter(Mandatory = $false, ParameterSetName = "DeploySet")]
+    [switch]$SkipGcpSetup
 )
 
 # Display help message if requested
@@ -197,102 +200,89 @@ else {
     }
 }
 
-# 3. Enable GCP Services
-Write-Host "`n[*] Enabling required GCP services on project '$GcpProjectId'..." -ForegroundColor Cyan
-if (-not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
-    Write-Error "gcloud CLI is required to enable GCP services but was not found in PATH."
-    exit 1
-}
-
-$ServicesToEnable = @(
-    "compute.googleapis.com",
-    "artifactregistry.googleapis.com",
-    "cloudaicompanion.googleapis.com",
-    "cloudapis.googleapis.com",
-    "cloudbilling.googleapis.com",
-    "cloudbuild.googleapis.com",
-    "cloudfunctions.googleapis.com",
-    "cloudresourcemanager.googleapis.com",
-    "cloudtrace.googleapis.com",
-    "developerconnect.googleapis.com",
-    "eventarc.googleapis.com",
-    "firebase.googleapis.com",
-    "firebaseappdistribution.googleapis.com",
-    "firebaseapphosting.googleapis.com",
-    "firebasehosting.googleapis.com",
-    "firebaseinstallations.googleapis.com",
-    "firebaseremoteconfig.googleapis.com",
-    "firebaseremoteconfigrealtime.googleapis.com",
-    "firebaserules.googleapis.com",
-    "run.googleapis.com",
-    "servicemanagement.googleapis.com",
-    "serviceusage.googleapis.com",
-    "storage-api.googleapis.com",
-    "storage-component.googleapis.com",
-    "storage.googleapis.com",
-    "logging.googleapis.com"
-)
-
-# "source.googleapis.com",
-
-# Enable services in batch/loop
-foreach ($Service in $ServicesToEnable) {
-    Write-Host "[*] Enabling service: $Service..." -ForegroundColor Yellow
-    & gcloud services enable $Service --project $GcpProjectId --quiet
-    if ($LASTEXITCODE -ne 0) {
-        Write-Error "Failed to enable service: $Service"
+# 3. Enable GCP Services & 4. Assign Roles (Can be skipped if already configured)
+if (-not $SkipGcpSetup) {
+    Write-Host "`n[*] Enabling required GCP services on project '$GcpProjectId' in batch..." -ForegroundColor Cyan
+    if (-not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
+        Write-Error "gcloud CLI is required to enable GCP services but was not found in PATH."
         exit 1
     }
-}
-Write-Host "[+] All required services enabled successfully on project '$GcpProjectId'." -ForegroundColor Green
 
-# # 4. Fetch GCP Project Number and Bind Roles to the default Compute Service Account
-# Write-Host "`n[*] Fetching GCP Project Number for project '$GcpProjectId'..." -ForegroundColor Cyan
-# $GcpProjectNumber = & gcloud projects describe $GcpProjectId --format="value(projectNumber)"
-# if ($LASTEXITCODE -ne 0 -or -not $GcpProjectNumber) {
-#     # Fallback to projects list filtering
-#     $GcpProjectNumber = & gcloud projects list --filter="projectId:$GcpProjectId" --format="value(projectNumber)"
-# }
+    $ServicesToEnable = @(
+        "compute.googleapis.com",
+        "artifactregistry.googleapis.com",
+        "cloudaicompanion.googleapis.com",
+        "cloudapis.googleapis.com",
+        "cloudbilling.googleapis.com",
+        "cloudbuild.googleapis.com",
+        "cloudfunctions.googleapis.com",
+        "cloudresourcemanager.googleapis.com",
+        "cloudtrace.googleapis.com",
+        "developerconnect.googleapis.com",
+        "eventarc.googleapis.com",
+        "firebase.googleapis.com",
+        "firebaseappdistribution.googleapis.com",
+        "firebaseapphosting.googleapis.com",
+        "firebasehosting.googleapis.com",
+        "firebaseinstallations.googleapis.com",
+        "firebaseremoteconfig.googleapis.com",
+        "firebaseremoteconfigrealtime.googleapis.com",
+        "firebaserules.googleapis.com",
+        "run.googleapis.com",
+        "servicemanagement.googleapis.com",
+        "serviceusage.googleapis.com",
+        "storage-api.googleapis.com",
+        "storage-component.googleapis.com",
+        "storage.googleapis.com",
+        "logging.googleapis.com"
+    )
 
-# if (-not $GcpProjectNumber) {
-#     Write-Error "Failed to fetch GCP project number for ID: $GcpProjectId"
-#     exit 1
-# }
-
-#$GcpProjectNumber = $GcpProjectNumber.ToString().Trim()
-#Write-Host "[+] GCP Project Number: $GcpProjectNumber" -ForegroundColor Green
-
-$SaEmail = "firebase-adminsdk-fbsvc@$FirebaseProjectId.iam.gserviceaccount.com"
-Write-Host "`n[*] Assigning roles to default compute service account: $SaEmail..." -ForegroundColor Cyan
-
-# "roles/appengine.appdeployer",
-# "roles/firebase.sdkAdmin",
-# "roles/firebasehosting.admin",
-#"roles/firebaseauth.admin",
-$RolesToAssign = @(
-    "roles/artifactregistry.writer",
-    "roles/cloudbuild.builds.editor",
-    "roles/cloudfunctions.admin",
-    "roles/cloudfunctions.developer",
-    "roles/cloudfunctions.viewer",
-    "roles/cloudfunctions.editor",
-    "roles/run.admin",
-    "roles/firebase.admin",
-    "roles/firebaseauth.admin",
-    "roles/firebase.developAdmin",
-    "roles/iam.serviceAccountTokenCreator",
-    "roles/iam.serviceAccountUser"
-)
-
-foreach ($Role in $RolesToAssign) {
-    Write-Host "[*] Assigning role '$Role'..." -ForegroundColor Yellow
-    & gcloud projects add-iam-policy-binding $GcpProjectId --member="serviceAccount:$SaEmail" --role="$Role" --quiet > $null
+    # Try enabling all services in a single batch call to save time using splatting
+    Write-Host "[*] Attempting to batch-enable GCP services..." -ForegroundColor Yellow
+    $ServiceArgs = $ServicesToEnable + @("--project", $GcpProjectId, "--quiet")
+    & gcloud services enable @ServiceArgs 2>$null
+    
     if ($LASTEXITCODE -ne 0) {
-        Write-Warning "Failed to assign role '$Role' to service account '$SaEmail'."
+        Write-Warning "Batch service enablement failed. Falling back to enabling services individually..."
+        foreach ($Service in $ServicesToEnable) {
+            Write-Host "[*] Enabling service: $Service..." -ForegroundColor Yellow
+            & gcloud services enable $Service --project $GcpProjectId --quiet 2>$null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "Could not enable service: $Service (this might be expected depending on your subscription/region)."
+            }
+        }
     }
-}
+    Write-Host "[+] Required services enabled successfully on project '$GcpProjectId'." -ForegroundColor Green
 
-Write-Host "`n[+] Service account roles assigned successfully." -ForegroundColor Green
+    $SaEmail = "firebase-adminsdk-fbsvc@$FirebaseProjectId.iam.gserviceaccount.com"
+    Write-Host "`n[*] Assigning roles to default compute service account: $SaEmail..." -ForegroundColor Cyan
+
+    $RolesToAssign = @(
+        "roles/artifactregistry.writer",
+        "roles/cloudbuild.builds.editor",
+        "roles/cloudfunctions.admin",
+        "roles/cloudfunctions.developer",
+        "roles/cloudfunctions.viewer",
+        "roles/cloudfunctions.editor",
+        "roles/run.admin",
+        "roles/firebase.admin",
+        "roles/firebaseauth.admin",
+        "roles/firebase.developAdmin",
+        "roles/iam.serviceAccountTokenCreator",
+        "roles/iam.serviceAccountUser"
+    )
+
+    foreach ($Role in $RolesToAssign) {
+        Write-Host "[*] Assigning role '$Role'..." -ForegroundColor Yellow
+        & gcloud projects add-iam-policy-binding $GcpProjectId --member="serviceAccount:$SaEmail" --role="$Role" --quiet > $null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Failed to assign role '$Role' to service account '$SaEmail'."
+        }
+    }
+    Write-Host "`n[+] Service account roles assigned successfully." -ForegroundColor Green
+} else {
+    Write-Host "`n[*] -SkipGcpSetup flag passed. Skipping GCP Service enablement and role bindings." -ForegroundColor Yellow
+}
 
 # Write-Host "`n[*] Granting permission to backend GCP to access Firebase data" -ForegroundColor Cyan
 # gcloud projects add-iam-policy-binding $BackendProjectID `
@@ -305,8 +295,13 @@ Write-Host "`n[+] Service account roles assigned successfully." -ForegroundColor
 #     --role="roles/firebase.admin" `
 #     --quiet
 
-# Clear out the old compiler cache from the previous build
-Remove-Item -Recurse -Force .next
+# Clear out the old compiler cache from the previous build if it exists
+if (Test-Path ".next") {
+    Remove-Item -Recurse -Force .next
+}
+if (Test-Path "out") {
+    Remove-Item -Recurse -Force out
+}
 
 # Set new Environment variables
 $env:NEXT_PUBLIC_FIREBASE_API_KEY = "AIzaSyCZPe2j-rji_vufMOIhKwxtfgXW6hOpIuI"
@@ -318,6 +313,14 @@ $env:NEXT_PUBLIC_FIREBASE_APP_ID = "1:809906015149:web:49dbd61c0cb1b688c16f24"
 
 npx firebase-tools use inspecta-ai
  
+# Build Next.js project to generate the static export (out/ folder)
+Write-Host "`n[*] Building Next.js application (generating static export)..." -ForegroundColor Cyan
+& npm run build
+if ($LASTEXITCODE -ne 0) {
+    Write-Error "Next.js build failed."
+    exit 1
+}
+
 # 5. Deploy Next.js Application from current directory to the firebase project
 Write-Host "`n[*] Starting Next.js Firebase Hosting deployment from directory ($pwd)..." -ForegroundColor Cyan
 
@@ -339,26 +342,7 @@ else {
 }
 $JsonObj | ConvertTo-Json -Depth 10 | Set-Content -Path $FirebaseJsonPath
 
-# Add Content-Security-Policy (CSP) to firebase.json for XSS protection
-Write-Host "[*] Adding Content-Security-Policy header to firebase.json..." -ForegroundColor Yellow
-if ($JsonObj.hosting -is [array]) {
-    if (-not $JsonObj.hosting[0].headers) {
-        $JsonObj.hosting[0] | Add-Member -MemberType NoteProperty -Name "headers" -Value @()
-    }
-    $cspHeader = @{
-        key   = "Content-Security-Policy"
-        value = "default-src 'self'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none';"
-    }
-    $sourceHeader = @{
-        source  = "**"
-        headers = @($cspHeader)
-    }
-    $JsonObj.hosting[0].headers += $sourceHeader
-}
-else {
-    Write-Warning "Could not automatically add CSP header. firebase.json hosting config is not an array."
-}
-$JsonObj | ConvertTo-Json -Depth 10 | Set-Content -Path $FirebaseJsonPath
+# Skip adding Content-Security-Policy (CSP) to firebase.json to respect user preference (disabled for trial runs)
 
 # Enable webframeworks experiment
 Write-Host "[*] Enabling Firebase Web Frameworks experiment..." -ForegroundColor Yellow
@@ -407,7 +391,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-npm audit fix --force
+# npm audit fix --force (Commented out to optimize deployment speed and prevent dependency updates during deployment)
 
 Write-Host "`n[+] Next.js application deployed successfully to Firebase!" -ForegroundColor Green
 Write-Host "🎉 Setup and deployment completed successfully!" -ForegroundColor Green

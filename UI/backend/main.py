@@ -77,6 +77,17 @@ app = FastAPI(
 
 # ============ CORS Configuration ============
 # Do not change the sequence. This shall happen before custom middleware @app.middleware("http")
+# app.add_middleware(
+#     # TODO (Security): For production, tighten the origin regex to your specific Firebase domain.
+#     # allow_origin_regex=r"https://inspecta-360\.web\.app|https://inspecta-ai\.web\.app",
+#     # The current regex is broad and allows any Firebase-hosted application.
+#     CORSMiddleware,
+#     allow_origins=["http://localhost:3000", "http://localhost:3001"],
+#     allow_origin_regex=r"https://.*\.web\.app|https://.*\.firebaseapp\.com",
+#     allow_credentials=True,
+#     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+#     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+# )
 app.add_middleware(
     # TODO (Security): For production, tighten the origin regex to your specific Firebase domain.
     # allow_origin_regex=r"https://inspecta-360\.web\.app|https://inspecta-ai\.web\.app",
@@ -86,7 +97,7 @@ app.add_middleware(
     allow_origin_regex=r"https://.*\.web\.app|https://.*\.firebaseapp\.com",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
+    allow_headers=["*"],
 )
 print("✅ CORS Middleware configured for local and Firebase hosting")
 

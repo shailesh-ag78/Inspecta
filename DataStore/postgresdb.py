@@ -252,6 +252,23 @@ class IncidentRepository:
                     )
                     return await cur.fetchone() is not None
 
+    async def verify_video_ownership(self, company_id: int, video_path: str) -> bool:
+            """
+            Security Check: Verifies the video path belongs to the company.
+            Checks if the path contains 'CompanyStorage{company_id}' or exists in incident_tasks.
+            """
+            storage_folder = f"CompanyStorage{company_id}"
+            if storage_folder in video_path:
+                return True
+                
+            async with self.session(company_id) as conn:
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "SELECT 1 FROM incident_tasks WHERE video_url = %s AND company_id = %s",
+                        (video_path, company_id)
+                    )
+                    return await cur.fetchone() is not None
+
     async def get_company_info(self, company_id: int) -> Optional[Dict[str, Any]]:
         """Fetches company name + industry for a given company id.
 

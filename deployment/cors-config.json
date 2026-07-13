@@ -15,8 +15,9 @@
                                "ETag"
                            ],
         "origin":  [
+                       "https://inspecta-ai.web.app",
+                       "https://inspecta-ai.firebaseapp.com",
                        "https://inspecta-360.web.app",
-                       "https://inspecta-360.firebaseapp.com",
                        "http://localhost:3000",
                        "http://localhost:3001"
                    ]

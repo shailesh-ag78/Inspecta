@@ -502,6 +502,11 @@ gcloud projects add-iam-policy-binding $ProjectID `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/iam.serviceAccountTokenCreator"
 
+# Grant UI SA permissions on the bucket
+gcloud storage buckets add-iam-policy-binding gs://$BucketName `
+    --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/storage.objectUser"
+
 # Grant Executor SA permissions on the bucket
 gcloud storage buckets add-iam-policy-binding gs://$BucketName `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `

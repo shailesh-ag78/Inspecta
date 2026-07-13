@@ -25,7 +25,7 @@ gcloud projects add-iam-policy-binding inspecta-ai `
  "https://inspecta-ai.firebaseapp.com",
  
 7. Ensure you are in ...\UI\inspecta_dashboard\ folder.  Execute Script
-  G:\code\Inspecta\deployment\deploy-ui.ps1 -firebaseprojectid "inspecta-ai" -jsonkeyfile "G:\code\Inspecta\deployment\inspecta-ai-firebase-adminsdk-fbsvc-895e11e210.json"
+  G:\code\Inspecta\deployment\deploy-ui.ps1 -firebaseprojectid "inspecta-ai" -jsonkeyfile "G:\code\Inspecta\deployment\inspecta-ai-firebase-adminsdk-fbsvc-895e11e210.json" -SkipGcpSetup
 
 8. npx firebase-tools deploy --only hosting --project inspecta-ai
 
