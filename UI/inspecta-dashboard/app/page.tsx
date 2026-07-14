@@ -66,9 +66,9 @@ export default function ReviewerDashboard() {
   const [theme, setTheme] = useState<Theme>(defaultTheme);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [filters, setFilters] = useState({
-    severity: 'all',
-    task_type: 'all',
-    task_status: 'all'
+    severities: [1, 2, 3],
+    task_types: ['install', 'repair', 'verify', 'clear'],
+    task_statuses: ['pending', 'in_progress', 'review', 'completed', 'failed']
   });
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
   const [isVideoCollapsed, setIsVideoCollapsed] = useState(false);
@@ -78,6 +78,7 @@ export default function ReviewerDashboard() {
   const [editingTitle, setEditingTitle] = useState('');
   const [editingDescription, setEditingDescription] = useState('');
   const [editingSeverity, setEditingSeverity] = useState<number>(3);
+  const [editingStatus, setEditingStatus] = useState<number>(1);
   const [taskSaveLoading, setTaskSaveLoading] = useState(false);
   const [taskEditError, setTaskEditError] = useState<string | null>(null);
   const [pendingPlayTask, setPendingPlayTask] = useState<{ id: string; start: number; end: number } | null>(null);
@@ -747,11 +748,23 @@ export default function ReviewerDashboard() {
     setExpandedTasks(newExpanded);
   };
 
+  const getStatusLabelFromId = (id: number): string => {
+    const mapping: Record<number, string> = {
+      1: 'pending',
+      2: 'in_progress',
+      3: 'review',
+      4: 'completed',
+      5: 'failed'
+    };
+    return mapping[id] || 'pending';
+  };
+
   const startEditingTask = (task: Task) => {
     setEditingTaskId(task.id);
     setEditingTitle(task.task_title || '');
     setEditingDescription(task.task_description || '');
     setEditingSeverity(task.severity_id);
+    setEditingStatus(task.status_id);
     setTaskEditError(null);
   };
 
@@ -760,6 +773,7 @@ export default function ReviewerDashboard() {
     setEditingTitle('');
     setEditingDescription('');
     setEditingSeverity(3);
+    setEditingStatus(1);
     setTaskEditError(null);
   };
 
@@ -769,7 +783,8 @@ export default function ReviewerDashboard() {
     if (
       trimmedTitle === (task.task_title || '').trim() &&
       trimmedDescription === (task.task_description || '').trim() &&
-      editingSeverity === task.severity_id
+      editingSeverity === task.severity_id &&
+      editingStatus === task.status_id
     ) {
       cancelEditingTask();
       return;
@@ -787,6 +802,7 @@ export default function ReviewerDashboard() {
           task_title: trimmedTitle,
           task_description: trimmedDescription,
           severity_id: editingSeverity,
+          status_id: editingStatus,
         }),
       });
 
@@ -802,6 +818,9 @@ export default function ReviewerDashboard() {
         task_title: updatedTask?.task_title || trimmedTitle,
         task_description: updatedTask?.task_description || trimmedDescription,
         severity_id: updatedTask?.severity_id || editingSeverity,
+        status_id: updatedTask?.status_id || editingStatus,
+        task_status: getStatusLabelFromId(updatedTask?.status_id || editingStatus),
+        status_label: getStatusLabelFromId(updatedTask?.status_id || editingStatus),
       } : item));
 
       if (activeTask?.id === task.id) {
@@ -810,6 +829,9 @@ export default function ReviewerDashboard() {
           task_title: updatedTask?.task_title || trimmedTitle,
           task_description: updatedTask?.task_description || trimmedDescription,
           severity_id: updatedTask?.severity_id || editingSeverity,
+          status_id: updatedTask?.status_id || editingStatus,
+          task_status: getStatusLabelFromId(updatedTask?.status_id || editingStatus),
+          status_label: getStatusLabelFromId(updatedTask?.status_id || editingStatus),
         });
       }
 
@@ -875,9 +897,9 @@ export default function ReviewerDashboard() {
 
 
   const filteredTasks = tasks.filter(task => {
-    if (filters.severity !== 'all' && task.severity_id !== parseInt(filters.severity)) return false;
-    if (filters.task_type !== 'all' && task.task_type !== filters.task_type) return false;
-    if (filters.task_status !== 'all' && task.task_status !== filters.task_status) return false;
+    if (!filters.severities.includes(task.severity_id)) return false;
+    if (!filters.task_types.includes(task.task_type)) return false;
+    if (!filters.task_statuses.includes(task.task_status)) return false;
     return true;
   });
 
@@ -1099,7 +1121,7 @@ export default function ReviewerDashboard() {
         {/* Left Pane - Task Feed */}
         <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-3 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
           {/* Filters */}
-          <div className="sticky top-0 z-20 -mx-3 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-6 shadow-md">
+          <div className="sticky top-0 z-20 -mx-3 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
             <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200/70 bg-slate-200/80">
               <h3 className="text-base font-semibold text-slate-900 flex items-center gap-3">
                 <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
@@ -1118,46 +1140,85 @@ export default function ReviewerDashboard() {
               <div className="px-3 py-4">
                 <div className="grid grid-cols-3 gap-4">
                   {/* Types Filter */}
-                  <div>
-                    <select
-                      value={filters.task_type}
-                      onChange={(e) => setFilters({ ...filters, task_type: e.target.value })}
-                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
-                    >
-                      <option value="all" className="text-xs">All Types</option>
-                      <option value="install" className="text-xs">🛠️ Install</option>
-                      <option value="repair" className="text-xs">🔧 Repair</option>
-                      <option value="verify" className="text-xs">📋 Verify</option>
-                      <option value="clear" className="text-xs">🧹 Clear</option>
-                    </select>
+                  <div className="p-3 rounded-xl border border-slate-200/80 bg-white/60 backdrop-blur-sm shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-2.5 uppercase tracking-wider">Task Type</h4>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { id: 'install', label: '🛠️ Install' },
+                        { id: 'repair', label: '🔧 Repair' },
+                        { id: 'verify', label: '📋 Verify' },
+                        { id: 'clear', label: '🧹 Clear' }
+                      ].map((t) => (
+                        <label key={t.id} className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={filters.task_types.includes(t.id)}
+                            onChange={() => {
+                              const updated = filters.task_types.includes(t.id)
+                                ? filters.task_types.filter(item => item !== t.id)
+                                : [...filters.task_types, t.id];
+                              setFilters({ ...filters, task_types: updated });
+                            }}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 w-4 h-4 cursor-pointer transition-all"
+                          />
+                          <span>{t.label}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   {/* Severity Filter */}
-                  <div>
-                    <select
-                      value={filters.severity}
-                      onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
-                    >
-                      <option value="all" className="text-xs">All Severities</option>
-                      <option value="1" className="text-xs">🔴 Severe</option>
-                      <option value="2" className="text-xs">🟡 Regular</option>
-                      <option value="3" className="text-xs">🟢 Low</option>
-                    </select>
+                  <div className="p-3 rounded-xl border border-slate-200/80 bg-white/60 backdrop-blur-sm shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-2.5 uppercase tracking-wider">Severity</h4>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { id: 1, label: '🔴 Severe' },
+                        { id: 2, label: '🟡 Regular' },
+                        { id: 3, label: '🟢 Low' }
+                      ].map((s) => (
+                        <label key={s.id} className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={filters.severities.includes(s.id)}
+                            onChange={() => {
+                              const updated = filters.severities.includes(s.id)
+                                ? filters.severities.filter(item => item !== s.id)
+                                : [...filters.severities, s.id];
+                              setFilters({ ...filters, severities: updated });
+                            }}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 w-4 h-4 cursor-pointer transition-all"
+                          />
+                          <span>{s.label}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                   {/* Status Filter */}
-                  <div>
-                    <select
-                      value={filters.task_status}
-                      onChange={(e) => setFilters({ ...filters, task_status: e.target.value })}
-                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
-                    >
-                      <option value="all" className="text-xs">All Statuses</option>
-                      <option value="pending" className="text-xs">🕒 Pending</option>
-                      <option value="in_progress" className="text-xs">🔄 In Progress</option>
-                      <option value="review" className="text-xs">👁️ Review</option>
-                      <option value="completed" className="text-xs">✅ Completed</option>
-                      <option value="failed" className="text-xs">❌ Failed</option>
-                    </select>
+                  <div className="p-3 rounded-xl border border-slate-200/80 bg-white/60 backdrop-blur-sm shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-2.5 uppercase tracking-wider">Status</h4>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { id: 'pending', label: '🕒 Pending' },
+                        { id: 'in_progress', label: '🔄 In Progress' },
+                        { id: 'review', label: '👁️ Review' },
+                        { id: 'completed', label: '✅ Completed' },
+                        { id: 'failed', label: '❌ Failed' }
+                      ].map((st) => (
+                        <label key={st.id} className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={filters.task_statuses.includes(st.id)}
+                            onChange={() => {
+                              const updated = filters.task_statuses.includes(st.id)
+                                ? filters.task_statuses.filter(item => item !== st.id)
+                                : [...filters.task_statuses, st.id];
+                              setFilters({ ...filters, task_statuses: updated });
+                            }}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 w-4 h-4 cursor-pointer transition-all"
+                          />
+                          <span>{st.label}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1176,7 +1237,7 @@ export default function ReviewerDashboard() {
               <p>No tasks available for this incident.</p>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-0.75">
               {filteredTasks.map((task) => {
                 const isExpanded = expandedTasks.has(task.id);
                 return (
@@ -1219,46 +1280,46 @@ export default function ReviewerDashboard() {
                               value={editingSeverity}
                               onChange={(e) => setEditingSeverity(parseInt(e.target.value))}
                               onClick={(e) => e.stopPropagation()}
-                              className="text-xs border border-slate-300/80 rounded-lg px-2 py-1 bg-white text-slate-700 focus:border-blue-400 focus:outline-none"
+                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-white text-slate-700 focus:border-blue-400 focus:outline-none"
                             >
                               <option value={1}>🔴 Severe</option>
                               <option value={2}>🟡 Regular</option>
                               <option value={3}>🟢 Low</option>
                             </select>
+                          ) : null}
+
+                          {editingTaskId === task.id ? (
+                            <select
+                              value={editingStatus}
+                              onChange={(e) => setEditingStatus(parseInt(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-white text-slate-700 focus:border-blue-400 focus:outline-none"
+                            >
+                              <option value={1}>🕒 Pending</option>
+                              <option value={2}>🔄 In Progress</option>
+                              <option value={3}>👁️ Review</option>
+                              <option value={4}>✅ Completed</option>
+                              <option value={5}>❌ Failed</option>
+                            </select>
                           ) : (
-                            <>
-                              {/* Severity: Text on desktop, Emoji on mobile */}
-                              <span className={`hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded text-white ${task.severity_id === 1 ? 'bg-red-600' :
-                                task.severity_id === 3 ? 'bg-green-600' :
-                                  'bg-yellow-500'
-                                }`}>
-                                {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
-                              </span>
-                              <span className="inline sm:hidden text-sm" title={task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}>
-                                {task.severity_id === 1 ? '🔴' : task.severity_id === 3 ? '🟢' : '🟡'}
-                              </span>
-                            </>
-                          )}
+                            task.status_label && (
+                              <>
+                                {/* Status: Text on desktop */}
+                                <div className="hidden sm:flex items-center gap-1.5 text-xs capitalize text-slate-500 border border-slate-200 rounded px-2 py-0.5 bg-slate-50/50">
+                                  <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} ${getTaskStatusColor(task.task_status)} text-[11px]`} />
+                                  <span>{task.status_label}</span>
+                                </div>
 
-                          {task.status_label && (
-                            <>
-                              <div className="h-4 w-[1px] bg-slate-300 mx-1.5" />
-                              
-                              {/* Status: Text on desktop */}
-                              <div className="hidden sm:flex items-center gap-1.5 text-xs capitalize text-slate-500 border border-slate-200 rounded px-2 py-0.5 bg-slate-50/50">
-                                <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} ${getTaskStatusColor(task.task_status)} text-[11px]`} />
-                                <span>{task.status_label}</span>
-                              </div>
-
-                              {/* Status: Emoji on mobile */}
-                              <span className="inline sm:hidden text-sm" title={task.status_label}>
-                                {task.task_status === 'pending' ? '🕒' :
-                                 task.task_status === 'in_progress' ? '🔄' :
-                                 task.task_status === 'review' ? '👁️' :
-                                 task.task_status === 'completed' ? '✅' :
-                                 task.task_status === 'failed' ? '❌' : '❓'}
-                              </span>
-                            </>
+                                {/* Status: Emoji on mobile */}
+                                <span className="inline sm:hidden text-sm" title={task.status_label}>
+                                  {task.task_status === 'pending' ? '🕒' :
+                                    task.task_status === 'in_progress' ? '🔄' :
+                                      task.task_status === 'review' ? '👁️' :
+                                        task.task_status === 'completed' ? '✅' :
+                                          task.task_status === 'failed' ? '❌' : '❓'}
+                                </span>
+                              </>
+                            )
                           )}
                         </div>
                       </div>

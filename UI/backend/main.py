@@ -1,3 +1,4 @@
+# Force reload comment
 from os import path
 import sys
 import os
@@ -151,7 +152,7 @@ async def startup_event():
     db_dsn = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
 
     # Initialize Firebase Admin SDK
-    target_ui_project = os.getenv("UI_PROJECT_ID", "inspecta-360")
+    target_ui_project = os.getenv("UI_PROJECT_ID", "inspecta-ai")
     print(f"🎯 Initializing UI Firebase for project: {target_ui_project}")
     try:
         if not firebase_admin._apps:
@@ -211,6 +212,8 @@ class IncidentInput(BaseModel):
 class TaskUpdateInput(BaseModel):
     task_title: str
     task_description: str
+    severity_id: Optional[int] = None
+    status_id: Optional[int] = None
 
 class TaskReviewInput(BaseModel):
     comments: str
@@ -493,7 +496,9 @@ async def update_task(
             company_id=company_id,
             task_id=taskId,
             title=task_update.task_title,
-            description=task_update.task_description
+            description=task_update.task_description,
+            severity_id=task_update.severity_id,
+            status_id=task_update.status_id
         )
         
         return {"status": "success", "data": updated}

@@ -163,33 +163,38 @@ class IncidentRepository:
                     (audio_path, incident_id)
                 )
 
-    async def update_task(self, company_id: int, task_id: str, title: str, description: str):
-        """Human-in-the-loop: Update task after expert review."""
+    async def update_task(self, company_id: int, task_id: str, title: str, description: str, severity_id: Optional[int] = None, status_id: Optional[int] = None):
+        """Human-in-the-loop: Update task."""
         async with self.session(company_id) as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
                     """
                     UPDATE incident_tasks 
-                    SET task_title = %s, task_description = %s 
+                    SET task_title = %s, 
+                        task_description = %s,
+                        severity_id = COALESCE(%s, severity_id),
+                        status_id = COALESCE(%s, status_id)
                     WHERE id = %s
                     RETURNING *
                     """,
-                    (title, description, task_id)
+                    (title, description, severity_id, status_id, task_id)
                 )
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
-    async def update_task_review(self, company_id: int, task_id: str, comments: str):
+    async def update_task_review(self, company_id: int, task_id: str, comments: str, status_id: Optional[int] = None):
         """Human-in-the-loop: Update task after expert review."""
         async with self.session(company_id) as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
                     """
                     UPDATE incident_tasks 
-                    SET task_review_comments = %s 
+                    SET task_review_comments = %s,
+                        status_id = COALESCE(%s, status_id)
                     WHERE id = %s
+                    RETURNING *
                     """,
-                    (comments, task_id)
+                    (comments, status_id, task_id)
                 )
                 row = await cur.fetchone()
                 return dict(row) if row else None
