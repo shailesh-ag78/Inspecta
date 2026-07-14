@@ -1090,18 +1090,7 @@ export default function ReviewerDashboard() {
             {!isFiltersCollapsed && (
               <div className="px-3 py-4">
                 <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <select
-                      value={filters.severity}
-                      onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
-                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
-                    >
-                      <option value="all" className="text-xs">All Severities</option>
-                      <option value="1" className="text-xs">🔴 Severe</option>
-                      <option value="2" className="text-xs">🟡 Regular</option>
-                      <option value="3" className="text-xs">🟢 Low</option>
-                    </select>
-                  </div>
+                  {/* Types Filter */}
                   <div>
                     <select
                       value={filters.task_type}
@@ -1115,6 +1104,20 @@ export default function ReviewerDashboard() {
                       <option value="clear" className="text-xs">🧹 Clear</option>
                     </select>
                   </div>
+                  {/* Severity Filter */}
+                  <div>
+                    <select
+                      value={filters.severity}
+                      onChange={(e) => setFilters({ ...filters, severity: e.target.value })}
+                      className={`w-full text-xs border ${theme.filters.border} rounded-lg px-3 py-1.5 bg-white text-slate-700 focus:${theme.filters.focus} transition-all`}
+                    >
+                      <option value="all" className="text-xs">All Severities</option>
+                      <option value="1" className="text-xs">🔴 Severe</option>
+                      <option value="2" className="text-xs">🟡 Regular</option>
+                      <option value="3" className="text-xs">🟢 Low</option>
+                    </select>
+                  </div>
+                  {/* Status Filter */}
                   <div>
                     <select
                       value={filters.task_status}
@@ -1160,95 +1163,74 @@ export default function ReviewerDashboard() {
                   >
                     {/* Task Header - Always Visible */}
                     <div className="space-y-2 p-2.5">
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex items-start gap-3 min-w-0">
-                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shadow-lg text-white ${task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600' :
+                      {/* First Row: Icon, Title on Left; Severity, Status, Chevron on Right */}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className={`w-[29px] h-[29px] rounded-lg flex items-center justify-center shadow-lg text-white shrink-0 ${task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600' :
                             task.severity_id === 2 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' :
                               task.severity_id === 3 ? 'bg-gradient-to-br from-green-400 to-green-600' :
                                 'bg-gradient-to-br from-yellow-400 to-orange-500'
                             }`}>
-                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[14px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
+                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[12.5px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
                           </div>
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-nowrap">
-                              {editingTaskId === task.id ? (
-                                <input
-                                  value={editingTitle}
-                                  onChange={(e) => setEditingTitle(e.target.value)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  /*className="flex-[1.15] min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"*/
-                                  /* Changed flex-[1.15] to w-80 (320px) */
-                                  className="w-96 min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                                />
-                              ) : (
-                                /*<h3 className="flex-[1.15] min-w-0 pr-2 font-semibold text-slate-900 text-sm truncate">{task.task_title}</h3>*/
-                                /* Changed flex-[1.15] to w-80 to match the input width */
-                                <h3 className="w-96 min-w-0 pr-2 font-semibold text-slate-900 text-sm truncate">
-                                  {task.task_title}
-                                </h3>
-                              )}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleTaskClick(task, true);
-                                }}
-                                title="Play video"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
-                              >
-                                <i className="fa-solid fa-play text-[11px]" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openTaskForEditing(task);
-                                }}
-                                title="Modify task"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
-                              >
-                                <i className="fa-solid fa-pen text-[11px]" />
-                              </button>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-slate-500 mt-1">
-                              {task.status_label && (
-                                <div className="flex items-center gap-2 text-xs capitalize text-slate-500">
-                                  <span>{task.status_label}</span>
-                                  <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} ${getTaskStatusColor(task.task_status)} text-[11px]`} />
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                          {editingTaskId === task.id ? (
+                            <input
+                              value={editingTitle}
+                              onChange={(e) => setEditingTitle(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                            />
+                          ) : (
+                            <h3 className="font-semibold text-slate-900 text-sm break-words min-w-0 flex-1">
+                              {task.task_title}
+                            </h3>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <span className={`text-[10px] font-black px-2 py-1 rounded text-white ${task.severity_id === 1 ? 'bg-red-600' :
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Severity: Text on desktop, Emoji on mobile */}
+                          <span className={`hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded text-white ${task.severity_id === 1 ? 'bg-red-600' :
                             task.severity_id === 3 ? 'bg-green-600' :
                               'bg-yellow-500'
                             }`}>
                             {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
                           </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleTaskExpansion(task.id);
-                            }}
-                            className="text-slate-500 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
-                          >
-                            <ChevronLeft className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
-                          </button>
+                          <span className="inline sm:hidden text-sm" title={task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}>
+                            {task.severity_id === 1 ? '🔴' : task.severity_id === 3 ? '🟢' : '🟡'}
+                          </span>
+
+                          {task.status_label && (
+                            <>
+                              <div className="h-4 w-[1px] bg-slate-300 mx-1.5" />
+                              
+                              {/* Status: Text on desktop */}
+                              <div className="hidden sm:flex items-center gap-1.5 text-xs capitalize text-slate-500 border border-slate-200 rounded px-2 py-0.5 bg-slate-50/50">
+                                <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} ${getTaskStatusColor(task.task_status)} text-[11px]`} />
+                                <span>{task.status_label}</span>
+                              </div>
+
+                              {/* Status: Emoji on mobile */}
+                              <span className="inline sm:hidden text-sm" title={task.status_label}>
+                                {task.task_status === 'pending' ? '🕒' :
+                                 task.task_status === 'in_progress' ? '🔄' :
+                                 task.task_status === 'review' ? '👁️' :
+                                 task.task_status === 'completed' ? '✅' :
+                                 task.task_status === 'failed' ? '❌' : '❓'}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
-                    </div>
 
-                    {/* Expandable Content */}
-                    {isExpanded && (
-                      <>
-                        <div className="px-2.5 pb-1.5">
+                      {/* Second Row: Task Description on Left, Play & Edit Buttons on Right */}
+                      <div className="flex items-start justify-between gap-4 mt-2">
+                        <div className="min-w-0 flex-1">
                           {editingTaskId === task.id ? (
                             <div className="space-y-3">
                               <textarea
                                 value={editingDescription}
                                 onChange={(e) => setEditingDescription(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
-                                rows={4}
+                                rows={Math.max(2, (task.task_description ? task.task_description.split('\n').length * 2 : 2))}
                                 className="w-full rounded-2xl border border-slate-300/80 bg-slate-50 p-3 text-sm text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                               />
                               {taskEditError && (
@@ -1277,11 +1259,48 @@ export default function ReviewerDashboard() {
                               </div>
                             </div>
                           ) : (
-                            <p className="text-slate-600 text-sm mb-3 leading-relaxed font-mono">{task.task_description}</p>
+                            <p className={`text-black text-sm font-normal ${isExpanded ? 'whitespace-pre-wrap' : 'truncate'}`}>
+                              {task.task_description}
+                            </p>
                           )}
                         </div>
-                      </>
-                    )}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {editingTaskId !== task.id && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTaskClick(task, true);
+                                }}
+                                title="Play video"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                              >
+                                <i className="fa-solid fa-play text-[11px]" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTaskForEditing(task);
+                                }}
+                                title="Modify task"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                              >
+                                <i className="fa-solid fa-pen text-[11px]" />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleTaskExpansion(task.id);
+                            }}
+                            className="text-slate-500 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
+                          >
+                            <ChevronLeft className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 );
               })}
