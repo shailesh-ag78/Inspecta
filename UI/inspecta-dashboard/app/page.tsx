@@ -114,8 +114,12 @@ export default function ReviewerDashboard() {
       const file = e.target.files[0];
       setSelectedFile(file);
 
-      if (!selectedInspection) {
-        alert("Please select an inspection before uploading a video.");
+      const selectedItem = siteInspections.find(
+        (item) => (item.inspection_id || item.site_id) === selectedInspection
+      );
+
+      if (!selectedInspection || !selectedItem || !selectedItem.inspection_id) {
+        alert("Please select a site with a valid inspection before uploading a video.");
         return;
       }
 
@@ -407,6 +411,22 @@ export default function ReviewerDashboard() {
   useEffect(() => {
     if (!selectedInspection) return;
 
+    // Find the selected site inspection to see if it actually has an inspection_id
+    const selectedItem = siteInspections.find(
+      (item) => (item.inspection_id || item.site_id) === selectedInspection
+    );
+
+    if (!selectedItem || !selectedItem.inspection_id) {
+      // No inspection exists for this site, so there are no incidents
+      setIncidents([]);
+      setSelectedIncidentId('');
+      setActiveTask(null);
+      setTasks([]);
+      setIncidentsLoading(false);
+      setIncidentsError(null);
+      return;
+    }
+
     const fetchIncidents = async () => {
       try {
         setIncidentsLoading(true);
@@ -444,7 +464,7 @@ export default function ReviewerDashboard() {
     };
 
     fetchIncidents();
-  }, [selectedInspection]);
+  }, [selectedInspection, siteInspections]);
 
   // Helper function to fetch tasks for an incident
   const fetchTasksForIncident = useCallback(async (incidentId: string) => {
