@@ -77,6 +77,7 @@ export default function ReviewerDashboard() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingDescription, setEditingDescription] = useState('');
+  const [editingSeverity, setEditingSeverity] = useState<number>(3);
   const [taskSaveLoading, setTaskSaveLoading] = useState(false);
   const [taskEditError, setTaskEditError] = useState<string | null>(null);
   const [pendingPlayTask, setPendingPlayTask] = useState<{ id: string; start: number; end: number } | null>(null);
@@ -730,6 +731,7 @@ export default function ReviewerDashboard() {
     setEditingTaskId(task.id);
     setEditingTitle(task.task_title || '');
     setEditingDescription(task.task_description || '');
+    setEditingSeverity(task.severity_id);
     setTaskEditError(null);
   };
 
@@ -737,6 +739,7 @@ export default function ReviewerDashboard() {
     setEditingTaskId(null);
     setEditingTitle('');
     setEditingDescription('');
+    setEditingSeverity(3);
     setTaskEditError(null);
   };
 
@@ -745,7 +748,8 @@ export default function ReviewerDashboard() {
     const trimmedDescription = editingDescription.trim();
     if (
       trimmedTitle === (task.task_title || '').trim() &&
-      trimmedDescription === (task.task_description || '').trim()
+      trimmedDescription === (task.task_description || '').trim() &&
+      editingSeverity === task.severity_id
     ) {
       cancelEditingTask();
       return;
@@ -762,6 +766,7 @@ export default function ReviewerDashboard() {
         body: JSON.stringify({
           task_title: trimmedTitle,
           task_description: trimmedDescription,
+          severity_id: editingSeverity,
         }),
       });
 
@@ -776,6 +781,7 @@ export default function ReviewerDashboard() {
         ...item,
         task_title: updatedTask?.task_title || trimmedTitle,
         task_description: updatedTask?.task_description || trimmedDescription,
+        severity_id: updatedTask?.severity_id || editingSeverity,
       } : item));
 
       if (activeTask?.id === task.id) {
@@ -783,6 +789,7 @@ export default function ReviewerDashboard() {
           ...task,
           task_title: updatedTask?.task_title || trimmedTitle,
           task_description: updatedTask?.task_description || trimmedDescription,
+          severity_id: updatedTask?.severity_id || editingSeverity,
         });
       }
 
@@ -1187,16 +1194,31 @@ export default function ReviewerDashboard() {
                           )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          {/* Severity: Text on desktop, Emoji on mobile */}
-                          <span className={`hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded text-white ${task.severity_id === 1 ? 'bg-red-600' :
-                            task.severity_id === 3 ? 'bg-green-600' :
-                              'bg-yellow-500'
-                            }`}>
-                            {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
-                          </span>
-                          <span className="inline sm:hidden text-sm" title={task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}>
-                            {task.severity_id === 1 ? '🔴' : task.severity_id === 3 ? '🟢' : '🟡'}
-                          </span>
+                          {editingTaskId === task.id ? (
+                            <select
+                              value={editingSeverity}
+                              onChange={(e) => setEditingSeverity(parseInt(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-xs border border-slate-300/80 rounded-lg px-2 py-1 bg-white text-slate-700 focus:border-blue-400 focus:outline-none"
+                            >
+                              <option value={1}>🔴 Severe</option>
+                              <option value={2}>🟡 Regular</option>
+                              <option value={3}>🟢 Low</option>
+                            </select>
+                          ) : (
+                            <>
+                              {/* Severity: Text on desktop, Emoji on mobile */}
+                              <span className={`hidden sm:inline text-[9px] font-black px-1.5 py-0.5 rounded text-white ${task.severity_id === 1 ? 'bg-red-600' :
+                                task.severity_id === 3 ? 'bg-green-600' :
+                                  'bg-yellow-500'
+                                }`}>
+                                {task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}
+                              </span>
+                              <span className="inline sm:hidden text-sm" title={task.severity_id === 1 ? 'SEVERE' : task.severity_id === 3 ? 'LOW' : 'REGULAR'}>
+                                {task.severity_id === 1 ? '🔴' : task.severity_id === 3 ? '🟢' : '🟡'}
+                              </span>
+                            </>
+                          )}
 
                           {task.status_label && (
                             <>
