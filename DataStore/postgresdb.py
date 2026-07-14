@@ -377,3 +377,23 @@ class IncidentRepository:
                 rows = [dict(row) for row in await cur.fetchall()]
                 print(f"DEBUG: Query returned {len(rows)} rows for company_id={company_id}")
                 return rows
+
+    async def get_all_incidents_for_company(self, company_id: int) -> List[Dict]:
+        """Fetches all incidents for the company, filtered by RLS."""
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT * FROM incidents WHERE company_id = %s ORDER BY created_at DESC", 
+                    (company_id,)
+                )
+                return [dict(row) for row in await cur.fetchall()]
+
+    async def get_all_tasks_for_company(self, company_id: int) -> List[Dict]:
+        """Fetches all tasks for the company, filtered by RLS."""
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT * FROM incident_tasks WHERE company_id = %s ORDER BY created_at ASC", 
+                    (company_id,)
+                )
+                return [dict(row) for row in await cur.fetchall()]

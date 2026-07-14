@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut, Upload, Plus } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut, Upload, Plus, RotateCcw } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 import { auth, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
@@ -71,6 +71,11 @@ export default function ReviewerDashboard() {
     task_statuses: ['pending', 'in_progress', 'review', 'completed', 'failed']
   });
   const [isFiltersCollapsed, setIsFiltersCollapsed] = useState(true);
+  const [isKpisCollapsed, setIsKpisCollapsed] = useState(true);
+  const [isKpiFlipped, setIsKpiFlipped] = useState(false);
+  const [daysFilter, setDaysFilter] = useState<number | ''>('');
+  const [assignedToMe, setAssignedToMe] = useState(false);
+  const [withVideoOnly, setWithVideoOnly] = useState(false);
   const [isVideoCollapsed, setIsVideoCollapsed] = useState(false);
   const [selectedInspection, setSelectedInspection] = useState<string>('');
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
@@ -103,6 +108,12 @@ export default function ReviewerDashboard() {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsKpisCollapsed(window.innerWidth < 1024);
+    }
   }, []);
 
   // Video Upload States
@@ -408,9 +419,52 @@ export default function ReviewerDashboard() {
     fetchSiteInspections();
   }, [user, authLoading, fetchSiteInspections]);
 
-  // Fetch incidents when inspection changes
+  // Fetch incidents/tasks when inspection changes
   useEffect(() => {
-    if (!selectedInspection) return;
+    const fetchCompanyWideData = async () => {
+      try {
+        setIncidentsLoading(true);
+        setIncidentsError(null);
+        setTasksLoading(true);
+        setTasksError(null);
+
+        // Reset current selections
+        setSelectedIncidentId('');
+        setActiveTask(null);
+
+        // Fetch all incidents
+        const incidentsResponse = await authenticatedFetch('/api/incidents');
+        if (!incidentsResponse.ok) {
+          throw new Error(`Failed to fetch all incidents: ${incidentsResponse.statusText}`);
+        }
+        const incidentsJson = await incidentsResponse.json();
+        const formattedInc = formatIncidents(incidentsJson.data || []);
+        setIncidents(formattedInc);
+
+        // Fetch all tasks
+        const tasksResponse = await authenticatedFetch('/api/tasks');
+        if (!tasksResponse.ok) {
+          throw new Error(`Failed to fetch all tasks: ${tasksResponse.statusText}`);
+        }
+        const tasksJson = await tasksResponse.json();
+        const formattedTsk = formatTasks(
+          Array.isArray(tasksJson) ? tasksJson : (tasksJson.data || [])
+        );
+        setTasks(formattedTsk);
+        setExpandedTasks(new Set());
+      } catch (error) {
+        console.error('Error fetching company wide data:', error);
+        setIncidentsError(error instanceof Error ? error.message : 'Failed to fetch company data');
+      } finally {
+        setIncidentsLoading(false);
+        setTasksLoading(false);
+      }
+    };
+
+    if (!selectedInspection) {
+      fetchCompanyWideData();
+      return;
+    }
 
     // Find the selected site inspection to see if it actually has an inspection_id
     const selectedItem = siteInspections.find(
@@ -502,13 +556,15 @@ export default function ReviewerDashboard() {
   // Fetch tasks when selectedIncidentId changes
   useEffect(() => {
     if (!selectedIncidentId) {
-      setTasks([]);
-      setActiveTask(null);
+      if (selectedInspection) {
+        setTasks([]);
+        setActiveTask(null);
+      }
       return;
     }
     console.log("%c >>> TRIGGER: Fetching tasks for Incident:", "color: white; background: blue; font-weight: bold", selectedIncidentId);
     fetchTasksForIncident(selectedIncidentId);
-  }, [selectedIncidentId, fetchTasksForIncident]);
+  }, [selectedIncidentId, selectedInspection, fetchTasksForIncident]);
 
   useEffect(() => {
     setHasAutoPaused(false);
@@ -900,8 +956,69 @@ export default function ReviewerDashboard() {
     if (!filters.severities.includes(task.severity_id)) return false;
     if (!filters.task_types.includes(task.task_type)) return false;
     if (!filters.task_statuses.includes(task.task_status)) return false;
+
+    // Days Filter: created in last XX days
+    if (daysFilter !== '') {
+      if (!task.created_at) return false;
+      const taskTime = new Date(task.created_at).getTime();
+      if (isNaN(taskTime)) return false;
+      // Calculate milliseconds for daysFilter
+      const limitTime = Date.now() - (Number(daysFilter) * 24 * 60 * 60 * 1000);
+      if (taskTime < limitTime) return false;
+    }
+
+    // Assigned to me filter: Status != completed
+    if (assignedToMe) {
+      if (task.task_status === 'completed') return false;
+    }
+
+    // Video Filter: tasks with video_url
+    if (withVideoOnly) {
+      if (!task.video_url) return false;
+    }
+
     return true;
   });
+
+  // Calculate KPI metrics
+  const kpiSelectedItem = siteInspections.find(
+    (item) => (item.inspection_id || item.site_id) === selectedInspection
+  );
+
+  const hasActiveInspection = kpiSelectedItem && kpiSelectedItem.inspection_id;
+
+  const kpiInspectionsForSiteCount = hasActiveInspection
+    ? siteInspections.filter(item => item.site_id === kpiSelectedItem.site_id && item.inspection_id).length
+    : siteInspections.filter(item => item.inspection_id).length;
+
+  const activeIncidentsCount = incidents.length;
+
+  const kpiOneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const kpiWeeklyInspections = siteInspections.filter(item => {
+    if (!item.inspection_created_at) return false;
+    const createdTime = new Date(item.inspection_created_at).getTime();
+    return createdTime >= kpiOneWeekAgo;
+  }).length;
+
+  const kpiStatusCounts = {
+    pending: tasks.filter(t => t.task_status === 'pending').length,
+    in_progress: tasks.filter(t => t.task_status === 'in_progress').length,
+    review: tasks.filter(t => t.task_status === 'review').length,
+    completed: tasks.filter(t => t.task_status === 'completed').length,
+    failed: tasks.filter(t => t.task_status === 'failed').length,
+  };
+
+  const kpiSeverityCounts = {
+    severe: tasks.filter(t => t.severity_id === 1).length,
+    regular: tasks.filter(t => t.severity_id === 2).length,
+    low: tasks.filter(t => t.severity_id === 3).length,
+  };
+
+  const kpiTotalTasks = tasks.length;
+  const kpiCompletionRate = kpiTotalTasks > 0
+    ? Math.round((kpiStatusCounts.completed / kpiTotalTasks) * 100)
+    : 0;
+  const kpiActiveSevere = tasks.filter(t => t.severity_id === 1 && t.task_status !== 'completed').length;
 
   if (authLoading) {
     return (
@@ -1004,6 +1121,16 @@ export default function ReviewerDashboard() {
                 </button>
                 {isInspectionDropdownOpen && (
                   <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-700/50 bg-slate-900 backdrop-blur-md shadow-xl z-50 py-1.5 dropdown-scrollbar">
+                    <button
+                      onClick={() => {
+                        setSelectedInspection("");
+                        setIsInspectionDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-white/10 block truncate ${selectedInspection === "" ? 'bg-blue-600 text-white font-semibold' : 'text-slate-300'
+                        }`}
+                    >
+                      🌍 All Inspections (Company)
+                    </button>
                     {siteInspections.length === 0 ? (
                       <div className="px-3 py-2 text-xs text-slate-400">No inspections available</div>
                     ) : (
@@ -1120,6 +1247,129 @@ export default function ReviewerDashboard() {
       <main className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden max-w-[1600px] mx-auto w-full">
         {/* Left Pane - Task Feed */}
         <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-3 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
+          {/* KPIs Section */}
+          <div className="bg-slate-100/98 border-b border-slate-200/70 mb-2 rounded-2xl overflow-hidden shadow-md">
+            <div className="flex items-center justify-between px-4 py-2 bg-slate-200/80 border-b border-slate-200/70">
+              <div className="flex items-center gap-2">
+                <i className={`fa-solid fa-chart-line ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
+              </div>
+              <button
+                onClick={() => setIsKpisCollapsed(!isKpisCollapsed)}
+                className={`text-white transition-all p-1 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
+              >
+                <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${isKpisCollapsed ? '' : 'rotate-180'}`} />
+              </button>
+            </div>
+            {!isKpisCollapsed && (
+              <div className="p-3 bg-slate-50/50">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 justify-center items-center">
+                  {/* KPI Tile 1 */}
+                  <div className="p-2.5 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between aspect-square w-full max-w-[145px] mx-auto">
+                    <div className="text-[11px] text-slate-700 space-y-1">
+                      <div className="flex flex-col border-b border-slate-100 pb-0.5">
+                        <span className="font-bold text-slate-900 truncate">
+                          {kpiSelectedItem ? kpiSelectedItem.inspection_id ? kpiSelectedItem.site_name : 'No Inspection' : 'All Sites'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between border-b border-slate-100 pb-0.5">
+                        <span className="font-medium">Inspections:</span>
+                        <span className="font-bold text-slate-900">{kpiInspectionsForSiteCount}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="font-medium">Incidents:</span>
+                        <span className="font-bold text-slate-900">{activeIncidentsCount}</span>
+                      </div>
+                    </div>
+                    <div className="text-[8.5px] text-slate-500 font-semibold bg-blue-50 border border-blue-100 rounded py-0.5 text-center leading-tight">
+                      {kpiWeeklyInspections} weekly company-wide
+                    </div>
+                  </div>
+
+                  {/* KPI Tile 2: Flippable Tile */}
+                  <div
+                    onClick={() => setIsKpiFlipped(!isKpiFlipped)}
+                    className="relative aspect-square w-full max-w-[145px] mx-auto cursor-pointer [perspective:1000px] group select-none"
+                    title="Click to flip tile"
+                  >
+                    <div className={`relative w-full h-full duration-500 [transform-style:preserve-3d] ${isKpiFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
+                      {/* Front Side - Statuses in 4 Corners */}
+                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-gradient-to-br from-slate-50 to-indigo-50/70 border border-indigo-200/50 rounded-xl p-2 shadow-sm flex flex-col justify-between">
+                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[9px] text-slate-700 p-0.5">
+                          <div className="aspect-square flex flex-col items-center justify-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Pending</span>
+                            <span className="text-[15px] font-black text-slate-700 leading-none">{kpiStatusCounts.pending}</span>
+                          </div>
+                          <div className="aspect-square flex flex-col items-center justify-center bg-blue-50/60 border border-blue-100 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Active</span>
+                            <span className="text-[15px] font-black text-blue-700 leading-none">{kpiStatusCounts.in_progress}</span>
+                          </div>
+                          <div className="aspect-square flex flex-col items-center justify-center bg-purple-50/60 border border-purple-100 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Review</span>
+                            <span className="text-[15px] font-black text-purple-700 leading-none">{kpiStatusCounts.review}</span>
+                          </div>
+                          <div className="aspect-square flex flex-col items-center justify-center bg-green-50/60 border border-green-100 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Done</span>
+                            <span className="text-[15px] font-black text-green-700 leading-none">{kpiStatusCounts.completed}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Back Side - Severities */}
+                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] bg-gradient-to-br from-slate-50 to-rose-50/50 border border-rose-200/50 rounded-xl p-2 shadow-sm flex flex-col justify-between">
+                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[9px] text-slate-700 p-0.5">
+                          <div className="aspect-square flex flex-col items-center justify-center bg-red-50/60 border border-red-100 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-red-500/80 font-bold uppercase leading-none mb-2.5">Severe</span>
+                            <span className="text-[15px] font-black text-red-700 leading-none">{kpiSeverityCounts.severe}</span>
+                          </div>
+                          <div className="aspect-square flex flex-col items-center justify-center bg-yellow-50/60 border border-yellow-100 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-yellow-600/80 font-bold uppercase leading-none mb-2.5">Regular</span>
+                            <span className="text-[15px] font-black text-yellow-800 leading-none">{kpiSeverityCounts.regular}</span>
+                          </div>
+                          <div className="aspect-square flex flex-col items-center justify-center bg-green-50/60 border border-green-100 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-green-600/80 font-bold uppercase leading-none mb-2.5">Low</span>
+                            <span className="text-[15px] font-black text-green-700 leading-none">{kpiSeverityCounts.low}</span>
+                          </div>
+                          <div className="aspect-square flex flex-col items-center justify-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
+                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Total</span>
+                            <span className="text-[15px] font-black text-slate-800 leading-none">{kpiTotalTasks}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* KPI Tile 3: Resolution & Backlog */}
+                  <div className="p-2.5 bg-gradient-to-br from-slate-50 to-emerald-50/70 border border-emerald-200/50 rounded-xl shadow-sm flex flex-col justify-between aspect-square w-full max-w-[145px] mx-auto">
+                    <div className="space-y-1 mt-1">
+                      <div className="flex justify-between text-[11px] font-medium text-slate-700">
+                        <span>Done Rate:</span>
+                        <span className="font-bold text-slate-900">{kpiCompletionRate}%</span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} transition-all duration-500`}
+                          style={{ width: `${kpiCompletionRate}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[9px] font-bold bg-amber-50 border border-amber-100 rounded p-1 leading-none mb-1">
+                      <span className="text-amber-800">⚠️ Severe Tasks:</span>
+                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] text-white font-extrabold ${kpiActiveSevere > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`}>
+                        {kpiActiveSevere}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* KPI Tile 4 (Placeholder) */}
+                  <div className="p-2.5 bg-gradient-to-br from-white to-slate-100/40 border border-dashed border-slate-300 rounded-xl shadow-sm flex flex-col justify-center items-center aspect-square w-full max-w-[145px] mx-auto opacity-60">
+                    <Plus className="w-5 h-5 text-slate-400 mb-1" />
+                    <span className="text-[10px] font-semibold text-slate-400">Add Metric</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Filters */}
           <div className="sticky top-0 z-20 -mx-3 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
             <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200/70 bg-slate-200/80">
@@ -1159,7 +1409,7 @@ export default function ReviewerDashboard() {
                                 : [...filters.task_types, t.id];
                               setFilters({ ...filters, task_types: updated });
                             }}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 w-4 h-4 cursor-pointer transition-all"
+                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
                           />
                           <span>{t.label}</span>
                         </label>
@@ -1185,7 +1435,7 @@ export default function ReviewerDashboard() {
                                 : [...filters.severities, s.id];
                               setFilters({ ...filters, severities: updated });
                             }}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 w-4 h-4 cursor-pointer transition-all"
+                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
                           />
                           <span>{s.label}</span>
                         </label>
@@ -1213,13 +1463,153 @@ export default function ReviewerDashboard() {
                                 : [...filters.task_statuses, st.id];
                               setFilters({ ...filters, task_statuses: updated });
                             }}
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500/20 w-4 h-4 cursor-pointer transition-all"
+                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
                           />
                           <span>{st.label}</span>
                         </label>
                       ))}
                     </div>
                   </div>
+                </div>
+
+                {/* Additional Quick Filters */}
+                {/* Additional Quick Filters */}
+                <div className="mt-4 pt-4 border-t border-slate-200/80 flex items-start justify-between gap-4 text-xs">
+                  <div className="flex flex-wrap items-center gap-4 flex-1">
+                    {/* Day Filter combo box */}
+                    <div className="relative group flex items-center gap-2">
+                      <span
+                        onClick={() => {
+                          if (daysFilter !== '') {
+                            setIsFiltersCollapsed(true);
+                          }
+                        }}
+                        className="cursor-pointer font-semibold text-slate-700 hover:text-blue-600 transition-colors hover:underline select-none"
+                      >
+                        Tasks created in last
+                      </span>
+                      <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm">
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="XX"
+                          value={daysFilter}
+                          onChange={(e) => {
+                            const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                            setDaysFilter(val);
+                          }}
+                          className="w-12 px-2 py-1 text-xs border-r border-slate-200 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-slate-700 font-semibold"
+                        />
+                        <select
+                          value={daysFilter === '' ? 'custom' : daysFilter}
+                          onChange={(e) => {
+                            const val = e.target.value === 'custom' ? '' : parseInt(e.target.value);
+                            setDaysFilter(val);
+                            setIsFiltersCollapsed(true);
+                          }}
+                          className="px-1 py-1 text-[11px] bg-slate-50 cursor-pointer focus:outline-none text-slate-600 border-none font-medium"
+                        >
+                          <option value="custom">Custom</option>
+                          <option value="1">1</option>
+                          <option value="5">5</option>
+                          <option value="7">7</option>
+                          <option value="15">15</option>
+                        </select>
+                      </div>
+                      <span className="text-slate-600 select-none">days</span>
+
+                      {/* Windows Explorer Style Tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 bg-[#fefefe] border border-slate-400 rounded p-2.5 shadow-[3px_3px_5px_rgba(0,0,0,0.15)] z-50 w-72 text-slate-800 pointer-events-none text-left">
+                        <div className="font-bold text-[11px] text-slate-950 mb-0.5 flex items-center gap-1.5">
+                          Created in Last Days
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-snug">
+                          Filters the task feed to display only tasks created within the last selected days (Today - Selection).
+                        </div>
+                        {/* Arrow */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white -mt-0.5"></div>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-slate-400 -mt-1 -z-10"></div>
+                      </div>
+                    </div>
+
+                    <span className="text-slate-300 select-none">|</span>
+
+                    {/* Assigned to me link filter */}
+                    <div className="relative group flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setAssignedToMe(!assignedToMe);
+                          setIsFiltersCollapsed(true);
+                        }}
+                        className={`font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${assignedToMe
+                          ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          }`}
+                      >
+                        👤 My Tasks
+                      </button>
+
+                      {/* Windows Explorer Style Tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 bg-[#fefefe] border border-slate-400 rounded p-2.5 shadow-[3px_3px_5px_rgba(0,0,0,0.15)] z-50 w-72 text-slate-800 pointer-events-none text-left">
+                        <div className="font-bold text-[11px] text-slate-950 mb-0.5 flex items-center gap-1.5">
+                          👤 My Tasks
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-snug">
+                          Filters tasks that you are currently responsible for. Shows all tasks with status other than Completed.
+                        </div>
+                        {/* Arrow */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white -mt-0.5"></div>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-slate-400 -mt-1 -z-10"></div>
+                      </div>
+                    </div>
+
+                    <span className="text-slate-300 select-none">|</span>
+
+                    {/* Tasks with video evidence filter */}
+                    <div className="relative group flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setWithVideoOnly(!withVideoOnly);
+                          setIsFiltersCollapsed(true);
+                        }}
+                        className={`font-semibold flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all ${withVideoOnly
+                          ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                          }`}
+                      >
+                        📹 Tasks with video
+                      </button>
+
+                      {/* Windows Explorer Style Tooltip */}
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all duration-200 bg-[#fefefe] border border-slate-400 rounded p-2.5 shadow-[3px_3px_5px_rgba(0,0,0,0.15)] z-50 w-72 text-[#333] pointer-events-none text-left">
+                        <div className="font-bold text-[11px] text-slate-950 mb-0.5 flex items-center gap-1.5">
+                          📹 Tasks with Video
+                        </div>
+                        <div className="text-[10px] text-slate-600 leading-snug">
+                          Filters tasks to include only those containing attached video clips.
+                        </div>
+                        {/* Arrow */}
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white -mt-0.5"></div>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 border-[5px] border-transparent border-t-slate-400 -mt-1 -z-10"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Clear all additional filters if active */}
+                  {(daysFilter !== '' || assignedToMe || withVideoOnly) && (
+                    <button
+                      onClick={() => {
+                        setDaysFilter('');
+                        setAssignedToMe(false);
+                        setWithVideoOnly(false);
+                      }}
+                      className="text-xs text-red-500 hover:text-red-700 font-medium hover:underline cursor-pointer flex items-center gap-1 shrink-0 mt-1"
+                      title="Reset Quick Filters"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Reset Quick Filters</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

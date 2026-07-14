@@ -308,28 +308,39 @@ async def get_incidents_for_site_or_inspection(
     siteId: int = Query(None, description="Site ID"),
     inspectionId: str = Query(None, description="Inspection ID")
 ):
-    """Fetch incidents for a given site or inspection"""
+    """Fetch incidents for a given site or inspection, or all company incidents"""
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     try:
         if not siteId and not inspectionId:
-            raise HTTPException(status_code=400, detail="Either siteId or inspectionId is required")
-        
-        if inspectionId:
+            print(f"Received GET /api/incidents request for ALL incidents under companyId {company_id}")
+            incidents = await repository.get_all_incidents_for_company(company_id)
+        elif inspectionId:
             print(f"Received GET /api/incidents request for inspectionId {inspectionId} and companyId {company_id}")
             incidents = await repository.get_incidents_for_inspection(inspectionId, company_id)
         else:
             print(f"Received GET /api/incidents request for siteId {siteId} and companyId {company_id}")
-            # ToDO: Implement get_incidents_for_site in repository if not already done
-            # or reuse get_site_inspection_combinations() by making SiteId as optional input
             incidents = await repository.get_incidents_for_site(siteId, company_id)
         
         print(f"✅ Fetched {len(incidents)} incidents")
         return {"status": "success", "data": incidents}
     except Exception as e:
         print(f"❌ Error fetching incidents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/tasks")
+async def get_all_tasks(request: Request):
+    """Fetch all tasks for a company"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    try:
+        tasks = await repository.get_all_tasks_for_company(company_id)
+        return {"status": "success", "data": tasks}
+    except Exception as e:
+        print(f"❌ Error fetching all tasks: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/incidents/{incidentId}")
