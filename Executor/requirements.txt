@@ -16,3 +16,5 @@ firebase-admin
 python-dotenv>=1.0.0
 pytest
 google-auth
+google-genai
+Pydantic

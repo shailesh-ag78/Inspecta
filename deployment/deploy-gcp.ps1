@@ -57,7 +57,7 @@ param(
     [string]$UPLOADS_FOLDER = "uploads",
 
     [Parameter(Mandatory = $false)]
-    [string]$UiProjectId = "inspecta-360"
+    [string]$UiProjectId = "inspecta-ai"
 )
 
 $OPENAI_MODEL = "gpt-4o"
@@ -374,6 +374,7 @@ if ($DeployAgents) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,UI_PROJECT_ID=$UiProjectId"
@@ -402,6 +403,7 @@ if ($DeployUI) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
+        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl,UI_PROJECT_ID=$UiProjectId"
@@ -464,6 +466,18 @@ gcloud secrets add-iam-policy-binding GROQ_API_KEY `
 Write-Host "Granting secretAccessor permissions for OPENAI_API_KEY to taskgen-service-sa..."
 gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
     --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to executor-service-sa..."
+gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
+    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to ui-service-sa..."
+gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
+    --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/secretmanager.secretAccessor" `
     --quiet
 

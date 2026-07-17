@@ -26,7 +26,7 @@ if sys.platform == 'win32':
 datastore_path = Path(__file__).parent.parent.parent / "DataStore"
 sys.path.append(str(datastore_path))
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import FastAPI, HTTPException, Query, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
@@ -47,9 +47,9 @@ import contextvars
 import google.auth
 import google.auth.transport.requests
 from google.oauth2 import id_token
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 import traceback
 
 # Load environment variables from .env file
@@ -118,6 +118,7 @@ async def verify_firebase_token(request: Request, call_next):
     if not auth_header or not auth_header.startswith("Bearer "):
         request.state.company_id = None
         request.state.company_storage_id = None
+        request.state.translation_language = ""
         return await call_next(request)
 
     id_token = auth_header.replace("Bearer ", "")
@@ -129,13 +130,16 @@ async def verify_firebase_token(request: Request, call_next):
         
         request.state.company_id = decoded_token.get("company_id")
         request.state.company_storage_id = decoded_token.get("company_storage_id")
-        print(f"✅ Authenticated: Company {request.state.company_id}")
+        request.state.translation_language = decoded_token.get("translation_language", "")
+        # ToDo : Remove the log entry later
+        print(f"✅ Authenticated: Company {request.state.company_id}, Storage {request.state.company_storage_id}, Language {request.state.translation_language}")
         token_ctx = firebase_token_var.set(id_token)
         
     except Exception as e:
         print(f"❌ Token verification failed: {e}")
         request.state.company_id = None
         request.state.company_storage_id = None
+        request.state.translation_language = ""
         
     return await call_next(request)
 
@@ -227,6 +231,12 @@ class UIUploadIncidentRequest(BaseModel):
     inspector_id: int
     file_url: str
     blob_name: Optional[str] = None
+    translation_language: Optional[str] = ""
+
+
+    def fill_default_data(self, request: Request):
+        self.inspector_id = 1  # ToDo : This also shall be filled using firebase custom claim
+        self.translation_language = getattr(request.state, "translation_language", "")
 
 # ============ Health Check ============
 
@@ -810,8 +820,24 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
             print(f"Error generating signed URL: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     else:
-        # Local paths are returned directly
-        return {"status": "success", "data": {"url": path}}
+        # Local paths are proxied through our streaming endpoint
+        stream_url = f"{str(request.base_url).rstrip('/')}/api/video/stream?path={quote(path)}"
+        return {"status": "success", "data": {"url": stream_url}}
+
+@app.get("/api/video/stream")
+async def stream_local_video(request: Request, path: str = Query(..., description="Local path of the video")):
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    owns_video = await repository.verify_video_ownership(company_id, path)
+    if not owns_video:
+        raise HTTPException(status_code=403, detail="Access denied to the requested resource.")
+
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    return FileResponse(path)
 
 @app.get("/api/get-upload-url")
 async def get_upload_url(request: Request, fileName: str = Query(..., description="Name of the file")):
@@ -838,6 +864,32 @@ async def get_upload_url(request: Request, fileName: str = Query(..., descriptio
         print(f"Error calling Executor: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
 
+@app.post("/api/upload-local")
+async def upload_local(
+    request: Request,
+    file: UploadFile = File(...),
+    filePath: str = Form(...)
+):
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        if ENV_MODE != "local":
+            raise HTTPException(status_code=400, detail="Local upload only allowed in local environment mode")
+
+        # Ensure the directory exists
+        os.makedirs(os.path.dirname(filePath), exist_ok=True)
+
+        with open(filePath, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        print(f"✅ Local file uploaded successfully to: {filePath}")
+        return {"status": "success", "message": f"Successfully uploaded to {filePath}"}
+    except Exception as e:
+        print(f"Error saving local file: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/api/inspections/{inspection_id}/upload-incident")
 async def upload_incident(
     request: Request,           # Request Object (Mandatory)
@@ -848,6 +900,8 @@ async def upload_incident(
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
+    data.fill_default_data(request)
+
     try:
         headers = {}
         headers = fill_auth_headers(request, headers)
@@ -855,7 +909,8 @@ async def upload_incident(
         file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{data.blob_name}" if ENV_MODE != "local" and data.blob_name else data.file_url
         payload = {
             "inspector_id": data.inspector_id,
-            "file_url": file_url_payload
+            "file_url": file_url_payload,
+            "translation_language": data.translation_language
         }
         resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
         incident_id = resp_data.get("incident_id")

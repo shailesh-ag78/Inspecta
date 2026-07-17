@@ -29,8 +29,7 @@ logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)
 # Detect operating system: use '/tmp' for Linux (GCP Cloud Run), and Windows path locally
-default_root = "/tmp" if os.name != "nt" else r"g:\code\Inspecta\Data"
-LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", default_root))
+LOCAL_STORAGE_ROOT = os.path.abspath(os.getenv("LOCAL_STORAGE_ROOT", r"g:\code\Inspecta\Data"))
 LOCAL_TEMP_FOLDER = os.path.join(LOCAL_STORAGE_ROOT, "temp")
 if not os.path.exists(LOCAL_TEMP_FOLDER):
     os.makedirs(LOCAL_TEMP_FOLDER)
@@ -58,8 +57,6 @@ async def lifespan(app: FastAPI):
     # Startup code
     logger.info("🔧 Initializing resources...")
     
-    # Initialize GCS client if in non-local mode
-    print(f"ENV_MODE: {ENV_MODE}")
     # Initialize GCS client if in non-local mode
     global gcs_client
     if ENV_MODE.startswith("local"):

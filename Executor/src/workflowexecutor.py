@@ -13,6 +13,9 @@ from typing import cast
 import operator
 import httpx
 from google.cloud import storage
+from google import genai
+from google.genai import types
+from pydantic import BaseModel, Field
 from typing import Tuple
 from urllib.parse import urlparse
 import dotenv
@@ -173,6 +176,7 @@ class IncidentState(TypedDict):
     audio_url: str
     transcript: str
     transcript_segments_json_url: str
+    translation_language: str
     # 'operator.add' allows nodes to append to this list without overwriting
     generated_tasks: Annotated[List[dict], operator.add]
 
@@ -212,7 +216,6 @@ class WorkflowExecutor:
         self._manager = manager # We store this to close the connection later
 
         # 4. Proxies and Graph
-        # TODO: Replace with actual external http links
         self.extract_audio_agent = ExternalAgentProxy("extract_audio", extract_audio_agent_url)
         self.transcribe_agent = ExternalAgentProxy("transcribe", transcribe_agent_url)
         self.task_generator_agent = ExternalAgentProxy("generate_tasks", task_generator_agent_url)
@@ -259,7 +262,8 @@ class WorkflowExecutor:
         inspector_id: int, 
         file_url: str,
         existing_incident_id: str | None, # Optional: if re-uploading for an ID
-        gps_coordinates: Optional[tuple] = None,  # (lat, long)
+        translation_language: str = "",
+        gps_coordinates: Optional[tuple] = None,  # (lat, long),
     ) -> str:
         # 1. VERIFY OWNERSHIP FIRST
         # Check if this inspection_id belongs to this company_id
@@ -301,7 +305,8 @@ class WorkflowExecutor:
             "audio_url": "",          # Will be populated by extract_audio node
             "transcript": "",         # Initialize as empty string
             "transcript_segments_json_url": "", # Initialize as empty string
-            "generated_tasks": []     # Initialize the list for operator.add
+            "generated_tasks": [],     # Initialize the list for operator.add
+            "translation_language": translation_language
         })
         
         # We do NOT 'await' this so the UI response is instant
@@ -474,7 +479,7 @@ class WorkflowExecutor:
         node_name = GENERATE_TASKS_NODE
         start_time = time.time()
         tasks = []
-        
+
         try:
             transcript = state.get("transcript", "")
             if not transcript:
@@ -520,7 +525,10 @@ class WorkflowExecutor:
             metadata = result.get("metadata", {})
             env_mode = metadata.get("ENV_MODE", "LOCAL")
             tasks_json_url = result.get("tasks_json_url", "")
-            summary, tasks = get_tasklist_from_url(tasks_json_url, video_url=state.get("video_url", ""), env_mode=env_mode)
+            summary, tasks = get_tasklist_from_url(tasks_json_url, 
+                                                video_url=state.get("video_url", ""), 
+                                                translation_language = state["translation_language"],
+                                                env_mode=env_mode)
             logger.info(f"Extracted summary: {summary}, from tasks JSON URL: {tasks_json_url}")
                 
             # PERSISTENCE: Bulk insert final tasks
@@ -632,8 +640,113 @@ class WorkflowExecutor:
                 friendly_name=friendly_name
             )
             return inspection_id
+            
+def translate_tasks(tasks: List[dict], translation_language: str) -> List[dict]:
+    """
+    Translates task titles and descriptions using Gemini 1.5 Flash.
+    """
+    if not tasks:
+        return tasks
+
+    api_key = os.getenv("GEMINI_TRANSLATION_API_KEY")
+    if not api_key:
+        logger.warning("GEMINI_TRANSLATION_API_KEY environment variable is not set. Skipping translation.")
+        return tasks
+
+    # The input to the function will be a json of up to tasks_snippet objects,
+    # containing `task index`, `title`, and `description` (all in English).
+    tasks_snippet = []
+    for i, task in enumerate(tasks):
+        tasks_snippet.append({
+            "task index": i,
+            "title": task.get("task_title", ""),
+            "description": task.get("task_description", "")
+        })
+
+    # 2. RUNTIME CONTENTS (Isolate all dynamic variables here)
+    runtime_payload = {
+        "tasks_to_translate": tasks_snippet, 
+        "target_language": translation_language
+    }
+    # input_json_str = json.dumps(tasks_snippet)
+    input_json_str = contents=json.dumps(runtime_payload),
+
+    try:
+        client = genai.Client(api_key=api_key)
+        system_instruction = (
+            "You are a stateless localization engine. "
+            "Translate the provided array of task objects from English into the requested target language. "
+            "Maintain strict accuracy and conciseness without adding unnecessary details. "
+            "No conversational greetings, and no commentary. Return only raw JSON."
+            "Ensure the index in the output perfectly matches the input index.")
         
-def get_tasklist_from_url(tasks_json_url: str, video_url : str, env_mode: str = "LOCAL") -> tuple[str, List[dict]]:
+        # system_instruction = (
+        #     "You are a stateless localization engine. "
+        #     "Translate the provided list array of task objects from English into 'Trasnlation Language' mentioned below. "
+        #     "You must return a raw JSON array matching this exact schema:"
+        #     "["
+        #     "  {"
+        #     "    index: original_task_index"
+        #     "    translated_title: Translated Title String"
+        #     "    translated_description: Translated Description String"
+        #     "  }"
+        #     "]"
+        #     "Strict rules for translaation:"
+        #     "1. Do not use markdown formatting blocks (e.g., do not wrap in ```json or ```)."
+        #     "2. No conversational greetings, and no commentary. Return only raw JSON."
+        #     "3. The field 'index' in the output must match the 'task index' from the input."
+        #     "4. Translation must be accurate and concise. Do not add unnecessary details."
+        #     "5. Translation must be in the 'Trasnlation Language' mentioned below."
+        #     "Trasnlation Language: " + translation_language    
+        # # )
+
+        # Define your desired output structure using Pydantic
+        class TranslationItem(BaseModel):
+            index: int = Field(description="The original task index from the input")
+            translated_title: str = Field(description="Translated Title String")
+            translated_description: str = Field(description="Translated Description String")
+
+        # ToDo : use industry specific terms for translation -- Use cached context for cost optimization
+        GEMINI_MODEL = "gemini-3.5-flash"
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=input_json_str,
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                temperature=0.2,
+                response_mime_type="application/json",
+                response_schema=list[TranslationItem]
+            )
+        )
+        
+        response_text = response.text.strip()
+        # # Clean markdown wraps if any
+        # if response_text.startswith("```"):
+        #     lines = response_text.splitlines()
+        #     if lines[0].startswith("```"):
+        #         lines = lines[1:]
+        #     if lines and lines[-1].startswith("```"):
+        #         lines = lines[:-1]
+        #     response_text = "\n".join(lines).strip()
+            
+        translated_data = json.loads(response_text)
+        if isinstance(translated_data, list):
+            for item in translated_data:
+                idx = item.get("index")
+                if idx is not None:
+                    try:
+                        idx_int = int(idx)
+                        if 0 <= idx_int < len(tasks):
+                            tasks[idx_int]["task_translated_title"] = item.get("translated_title", "")
+                            tasks[idx_int]["task_translated_description"] = item.get("translated_description", "")
+                    except ValueError:
+                        pass
+    except Exception as e:
+        logger.error(f"Error during Gemini task translation: {e}", exc_info=True)
+
+    return tasks
+         
+def get_tasklist_from_url(tasks_json_url: str, video_url : str, translation_language: str, env_mode: str = "LOCAL") -> tuple[str, List[dict]]:
     """
     Utility function to fetch the generated tasks JSON from a URL.
     This can be a local file path or a GCS URL depending on the environment.
@@ -643,53 +756,61 @@ def get_tasklist_from_url(tasks_json_url: str, video_url : str, env_mode: str = 
     tasks = []
     
     if(env_mode != "local"):
-        logger.info(f"Fetching tasks JSON from {tasks_json_url} in {env_mode} environment...")
-        if env_mode == "local":
-            datastore_path = Path(__file__).parent.parent.parent / "DataStore"
-            gcp_key_file = (datastore_path / "gcp-key.json").resolve()
-            gcs_client = storage.Client.from_service_account_json(gcp_key_file)
-        else:
-            gcs_client = storage.Client()
-        
-        if not gcs_client:
-            raise RuntimeError("GCS client not initialized")
-
-        # File name example : "gs://inspecta-file-bucket/<company_storage>/uploads/a1b2-c3d4.json"
-        bucket_name, blob_name = extract_bucket_and_blob_from_gs(tasks_json_url)
-        bucket = gcs_client.bucket(bucket_name)
-        blob = bucket.get_blob(blob_name)
-
-        if blob and blob.exists():
-            # Downloads directly and parses into a Python dict
-            data = json.loads(blob.download_as_text())
-        else:
-            raise FileNotFoundError(f"The blob {blob_name} was not found.")
+         logger.info(f"Fetching tasks JSON from {tasks_json_url} in {env_mode} environment...")
+         if env_mode == "local":
+             datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+             gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+             gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+         else:
+             gcs_client = storage.Client()
+         
+         if not gcs_client:
+             raise RuntimeError("GCS client not initialized")
+ 
+         # File name example : "gs://inspecta-file-bucket/<company_storage>/uploads/a1b2-c3d4.json"
+         bucket_name, blob_name = extract_bucket_and_blob_from_gs(tasks_json_url)
+         bucket = gcs_client.bucket(bucket_name)
+         blob = bucket.get_blob(blob_name)
+ 
+         if blob and blob.exists():
+             # Downloads directly and parses into a Python dict
+             data = json.loads(blob.download_as_text())
+         else:
+             raise FileNotFoundError(f"The blob {blob_name} was not found.")
     else:
-        # if not os.path.exists(tasks_json_url):
-        #     raise HTTPException(status_code=400, detail=f"Tasks file not found at: {tasks_json_url}")
-    
-        with open(tasks_json_url, "r") as f:
-            data = json.load(f)
-        
+         # if not os.path.exists(tasks_json_url):
+         #     raise HTTPException(status_code=400, detail=f"Tasks file not found at: {tasks_json_url}")
+     
+         with open(tasks_json_url, "r") as f:
+             data = json.load(f)
+         
     # 2. Extract the Summary
     summary = data.get("summary", "No summary available.")
-    
+     
     # 3. Extract the Task List array
     tasks = [
-        {
-            "task_title": t.get('task_title'),
-            "task_description": t.get('task_description'),
-            "task_original_description": "",
-            "video_url": t.get('video_url', video_url), 
-            "video_start_ms": t.get('start_time', 0),
-            "video_end_ms": t.get('end_time', 0),
-            "task_artifacts": [],
-            "status_id": t.get('status_id', TaskStatus.PENDING),
-            "severity_id": t.get('severity_id', TaskSeverity.REGULAR),
-            "task_type_id": t.get('task_type', TaskType.VERIFY)
-        } for t in data.get("tasks", [])
+         {
+             "task_title": t.get('task_title'),
+             "task_description": t.get('task_description'),
+             "task_original_description": t.get('task_description'),
+ 
+             "task_translated_title": "",
+             "task_translated_description": "",
+             
+             "video_url": t.get('video_url', video_url), 
+             "video_start_ms": t.get('start_time', 0),
+             "video_end_ms": t.get('end_time', 0),
+             "task_artifacts": [],
+             "status_id": t.get('status_id', TaskStatus.PENDING),
+             "severity_id": t.get('severity_id', TaskSeverity.REGULAR),
+             "task_type_id": t.get('task_type', TaskType.VERIFY)
+         } for t in data.get("tasks", [])
     ]
-    
-    #4 ToDo : Handle Clarification Needed element  
-    #      
+ 
+    #4 DO the translation of task title and description
+    if translation_language and isinstance(translation_language, str) and translation_language.strip().lower() != "english":
+        tasks = translate_tasks(tasks, translation_language)
+     
+    #5 ToDo : Handle Clarification Needed element  
+          
     return summary, tasks

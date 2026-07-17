@@ -80,6 +80,8 @@ CREATE TABLE incident_tasks (
     task_title TEXT NOT NULL,
     task_description TEXT,
     task_original_description TEXT,
+    task_translated_title TEXT NOT NULL DEFAULT '',
+    task_translated_description TEXT NOT NULL DEFAULT '',
     task_review_comments TEXT,
     task_notes TEXT,
 

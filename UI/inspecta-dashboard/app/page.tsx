@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut, Upload, Plus, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Play, User, AlertCircle, Loader, LogOut, Upload, Plus, RotateCcw, Globe } from 'lucide-react';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 import { auth, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
@@ -37,6 +37,9 @@ interface Task {
   id: string;
   task_title: string;
   task_description: string;
+  task_translated_title?: string;
+  task_translated_description?: string;
+  task_original_description?: string;
   severity_id: number;
   status_id: number;
   task_type_id: number;
@@ -56,6 +59,9 @@ export default function ReviewerDashboard() {
   const [user, setUser] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [flippedTitles, setFlippedTitles] = useState<Set<string>>(new Set());
+  const [flippedDescriptions, setFlippedDescriptions] = useState<Set<string>>(new Set());
+  const [isGlobalTranslationEnabled, setIsGlobalTranslationEnabled] = useState(false);
 
   // State management
   const [siteInspections, setSiteInspections] = useState<SiteInspection[]>([]);
@@ -159,23 +165,35 @@ export default function ReviewerDashboard() {
           if (!gcsResponse.ok) {
             throw new Error(`Failed to upload to GCS: ${gcsResponse.status}`);
           }
+        } else if (storageType === 'local') {
+          // 'local' storage exists when backend runs on dev machine.
+          // Send the file to our local upload endpoint so the backend saves it.
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('filePath', uploadUrl);
+
+          const localResponse = await authenticatedFetch('/api/upload-local', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!localResponse.ok) {
+            throw new Error(`Failed to upload to local storage: ${localResponse.status}`);
+          }
         } else {
-          // 'local' storage only exists when the backend runs on a dev machine;
-          // a static browser client cannot write to that filesystem.
           throw new Error(`Unsupported storage type for browser upload: ${storageType}`);
         }
 
         // 3. Register the incident (kicks off backend processing).
-        const inspectorId = 1; // TODO: derive from Firebase token claims
         const registerResp = await authenticatedFetch(
           `/api/inspections/${selectedInspection}/upload-incident`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              inspector_id: inspectorId,
+              inspector_id: 0,          // Default value is being sent
               file_url: uploadUrl,
               blob_name: blobName,
+              translation_language: "" // Default value is being sent
             }),
           }
         );
@@ -421,6 +439,8 @@ export default function ReviewerDashboard() {
 
   // Fetch incidents/tasks when inspection changes
   useEffect(() => {
+    if (authLoading || !user) return;
+
     const fetchCompanyWideData = async () => {
       try {
         setIncidentsLoading(true);
@@ -519,7 +539,7 @@ export default function ReviewerDashboard() {
     };
 
     fetchIncidents();
-  }, [selectedInspection, siteInspections]);
+  }, [selectedInspection, siteInspections, user, authLoading]);
 
   // Helper function to fetch tasks for an incident
   const fetchTasksForIncident = useCallback(async (incidentId: string) => {
@@ -1264,8 +1284,8 @@ export default function ReviewerDashboard() {
               <div className="p-3 bg-slate-50/50">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 justify-center items-center">
                   {/* KPI Tile 1 */}
-                  <div className="p-2.5 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between aspect-square w-full max-w-[145px] mx-auto">
-                    <div className="text-[11px] text-slate-700 space-y-1">
+                  <div className="p-2 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[110px] w-[110px] max-w-[110px] mx-auto">
+                    <div className="text-[10px] text-slate-700 space-y-0.5">
                       <div className="flex flex-col border-b border-slate-100 pb-0.5">
                         <span className="font-bold text-slate-900 truncate">
                           {kpiSelectedItem ? kpiSelectedItem.inspection_id ? kpiSelectedItem.site_name : 'No Inspection' : 'All Sites'}
@@ -1280,7 +1300,7 @@ export default function ReviewerDashboard() {
                         <span className="font-bold text-slate-900">{activeIncidentsCount}</span>
                       </div>
                     </div>
-                    <div className="text-[8.5px] text-slate-500 font-semibold bg-blue-50 border border-blue-100 rounded py-0.5 text-center leading-tight">
+                    <div className="text-[8px] text-slate-500 font-semibold bg-blue-50 border border-blue-100 rounded py-0.5 text-center leading-tight">
                       {kpiWeeklyInspections} weekly company-wide
                     </div>
                   </div>
@@ -1288,50 +1308,50 @@ export default function ReviewerDashboard() {
                   {/* KPI Tile 2: Flippable Tile */}
                   <div
                     onClick={() => setIsKpiFlipped(!isKpiFlipped)}
-                    className="relative aspect-square w-full max-w-[145px] mx-auto cursor-pointer [perspective:1000px] group select-none"
+                    className="relative h-[110px] w-[110px] max-w-[110px] mx-auto cursor-pointer [perspective:1000px] group select-none"
                     title="Click to flip tile"
                   >
                     <div className={`relative w-full h-full duration-500 [transform-style:preserve-3d] ${isKpiFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
                       {/* Front Side - Statuses in 4 Corners */}
-                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-gradient-to-br from-slate-50 to-indigo-50/70 border border-indigo-200/50 rounded-xl p-2 shadow-sm flex flex-col justify-between">
-                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[9px] text-slate-700 p-0.5">
+                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-gradient-to-br from-slate-50 to-indigo-50/70 border border-indigo-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
+                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[8.5px] text-slate-700 p-0.5">
                           <div className="aspect-square flex flex-col items-center justify-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Pending</span>
-                            <span className="text-[15px] font-black text-slate-700 leading-none">{kpiStatusCounts.pending}</span>
+                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Pending</span>
+                            <span className="text-[12px] font-black text-slate-700 leading-none">{kpiStatusCounts.pending}</span>
                           </div>
                           <div className="aspect-square flex flex-col items-center justify-center bg-blue-50/60 border border-blue-100 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Active</span>
-                            <span className="text-[15px] font-black text-blue-700 leading-none">{kpiStatusCounts.in_progress}</span>
+                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Active</span>
+                            <span className="text-[12px] font-black text-blue-700 leading-none">{kpiStatusCounts.in_progress}</span>
                           </div>
                           <div className="aspect-square flex flex-col items-center justify-center bg-purple-50/60 border border-purple-100 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Review</span>
-                            <span className="text-[15px] font-black text-purple-700 leading-none">{kpiStatusCounts.review}</span>
+                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Review</span>
+                            <span className="text-[12px] font-black text-purple-700 leading-none">{kpiStatusCounts.review}</span>
                           </div>
                           <div className="aspect-square flex flex-col items-center justify-center bg-green-50/60 border border-green-100 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Done</span>
-                            <span className="text-[15px] font-black text-green-700 leading-none">{kpiStatusCounts.completed}</span>
+                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Done</span>
+                            <span className="text-[12px] font-black text-green-700 leading-none">{kpiStatusCounts.completed}</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Back Side - Severities */}
-                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] bg-gradient-to-br from-slate-50 to-rose-50/50 border border-rose-200/50 rounded-xl p-2 shadow-sm flex flex-col justify-between">
-                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[9px] text-slate-700 p-0.5">
+                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] bg-gradient-to-br from-slate-50 to-rose-50/50 border border-rose-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
+                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[8.5px] text-slate-700 p-0.5">
                           <div className="aspect-square flex flex-col items-center justify-center bg-red-50/60 border border-red-100 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-red-500/80 font-bold uppercase leading-none mb-2.5">Severe</span>
-                            <span className="text-[15px] font-black text-red-700 leading-none">{kpiSeverityCounts.severe}</span>
+                            <span className="text-[8px] text-red-500/80 font-bold uppercase leading-none mb-0.5">Severe</span>
+                            <span className="text-[12px] font-black text-red-700 leading-none">{kpiSeverityCounts.severe}</span>
                           </div>
                           <div className="aspect-square flex flex-col items-center justify-center bg-yellow-50/60 border border-yellow-100 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-yellow-600/80 font-bold uppercase leading-none mb-2.5">Regular</span>
-                            <span className="text-[15px] font-black text-yellow-800 leading-none">{kpiSeverityCounts.regular}</span>
+                            <span className="text-[8px] text-yellow-600/80 font-bold uppercase leading-none mb-0.5">Regular</span>
+                            <span className="text-[12px] font-black text-yellow-800 leading-none">{kpiSeverityCounts.regular}</span>
                           </div>
                           <div className="aspect-square flex flex-col items-center justify-center bg-green-50/60 border border-green-100 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-green-600/80 font-bold uppercase leading-none mb-2.5">Low</span>
-                            <span className="text-[15px] font-black text-green-700 leading-none">{kpiSeverityCounts.low}</span>
+                            <span className="text-[8px] text-green-600/80 font-bold uppercase leading-none mb-0.5">Low</span>
+                            <span className="text-[12px] font-black text-green-700 leading-none">{kpiSeverityCounts.low}</span>
                           </div>
                           <div className="aspect-square flex flex-col items-center justify-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
-                            <span className="text-[8.5px] text-slate-400 font-bold uppercase leading-none mb-2.5">Total</span>
-                            <span className="text-[15px] font-black text-slate-800 leading-none">{kpiTotalTasks}</span>
+                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Total</span>
+                            <span className="text-[12px] font-black text-slate-800 leading-none">{kpiTotalTasks}</span>
                           </div>
                         </div>
                       </div>
@@ -1339,31 +1359,31 @@ export default function ReviewerDashboard() {
                   </div>
 
                   {/* KPI Tile 3: Resolution & Backlog */}
-                  <div className="p-2.5 bg-gradient-to-br from-slate-50 to-emerald-50/70 border border-emerald-200/50 rounded-xl shadow-sm flex flex-col justify-between aspect-square w-full max-w-[145px] mx-auto">
-                    <div className="space-y-1 mt-1">
-                      <div className="flex justify-between text-[11px] font-medium text-slate-700">
+                  <div className="p-2 bg-gradient-to-br from-slate-50 to-emerald-50/70 border border-emerald-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[110px] w-[110px] max-w-[110px] mx-auto">
+                    <div className="space-y-1 mt-0.5">
+                      <div className="flex justify-between text-[10px] font-medium text-slate-700">
                         <span>Done Rate:</span>
                         <span className="font-bold text-slate-900">{kpiCompletionRate}%</span>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                      <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
                         <div
                           className={`h-full rounded-full bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} transition-all duration-500`}
                           style={{ width: `${kpiCompletionRate}%` }}
                         ></div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-[9px] font-bold bg-amber-50 border border-amber-100 rounded p-1 leading-none mb-1">
-                      <span className="text-amber-800">⚠️ Severe Tasks:</span>
-                      <span className={`px-1.5 py-0.5 rounded-full text-[9px] text-white font-extrabold ${kpiActiveSevere > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`}>
+                    <div className="flex items-center justify-between text-[8px] font-bold bg-amber-50 border border-amber-100 rounded p-1 leading-none">
+                      <span className="text-amber-800">⚠️ Severe:</span>
+                      <span className={`px-1 py-0.5 rounded text-[8px] text-white font-extrabold ${kpiActiveSevere > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`}>
                         {kpiActiveSevere}
                       </span>
                     </div>
                   </div>
 
                   {/* KPI Tile 4 (Placeholder) */}
-                  <div className="p-2.5 bg-gradient-to-br from-white to-slate-100/40 border border-dashed border-slate-300 rounded-xl shadow-sm flex flex-col justify-center items-center aspect-square w-full max-w-[145px] mx-auto opacity-60">
-                    <Plus className="w-5 h-5 text-slate-400 mb-1" />
-                    <span className="text-[10px] font-semibold text-slate-400">Add Metric</span>
+                  <div className="p-2 bg-gradient-to-br from-white to-slate-100/40 border border-dashed border-slate-300 rounded-xl shadow-sm flex flex-col justify-center items-center h-[110px] w-[110px] max-w-[110px] mx-auto opacity-60">
+                    <Plus className="w-4 h-4 text-slate-400 mb-1" />
+                    <span className="text-[9px] font-semibold text-slate-400">Add Metric</span>
                   </div>
                 </div>
               </div>
@@ -1375,7 +1395,19 @@ export default function ReviewerDashboard() {
             <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200/70 bg-slate-200/80">
               <h3 className="text-base font-semibold text-slate-900 flex items-center gap-3">
                 <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
-                Task Filters
+                <span>Task Filters</span>
+                <button
+                  onClick={() => {
+                    const nextGlobal = !isGlobalTranslationEnabled;
+                    setIsGlobalTranslationEnabled(nextGlobal);
+                    setFlippedTitles(new Set());
+                    setFlippedDescriptions(new Set());
+                  }}
+                  className={`p-1 rounded-lg border transition-all ${isGlobalTranslationEnabled ? 'bg-blue-100 border-blue-200 shadow-sm' : 'hover:bg-slate-100 border-transparent'}`}
+                  title="Toggle default translation for all tasks"
+                >
+                  <img src="/trasnlation_icon.png" alt="Translate" className="w-4 h-4 object-contain scale-[1.25]" />
+                </button>
               </h3>
               <div className="flex items-center gap-2">
                 <button
@@ -1640,28 +1672,59 @@ export default function ReviewerDashboard() {
                       }`}
                   >
                     {/* Task Header - Always Visible */}
-                    <div className="space-y-2 p-2.5">
+                    <div className="space-y-1.5 p-2">
                       {/* First Row: Icon, Title on Left; Severity, Status, Chevron on Right */}
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className={`w-[29px] h-[29px] rounded-lg flex items-center justify-center shadow-lg text-white shrink-0 ${task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600' :
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <div className={`w-[26px] h-[26px] rounded-lg flex items-center justify-center shadow-md text-white shrink-0 ${task.severity_id === 1 ? 'bg-gradient-to-br from-red-500 to-pink-600' :
                             task.severity_id === 2 ? 'bg-gradient-to-br from-yellow-400 to-orange-500' :
                               task.severity_id === 3 ? 'bg-gradient-to-br from-green-400 to-green-600' :
                                 'bg-gradient-to-br from-yellow-400 to-orange-500'
                             }`}>
-                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[12.5px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
+                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[11.5px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
                           </div>
                           {editingTaskId === task.id ? (
                             <input
                               value={editingTitle}
                               onChange={(e) => setEditingTitle(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
-                              className="flex-1 min-w-0 pr-2 rounded-2xl border border-slate-300/80 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                              className="flex-1 min-w-0 pr-2 rounded-xl border border-slate-300/80 bg-slate-50 px-2 py-1 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
                             />
                           ) : (
-                            <h3 className="font-semibold text-slate-900 text-sm break-words min-w-0 flex-1">
-                              {task.task_title}
-                            </h3>
+                            (() => {
+                              const isTitleFlipped = flippedTitles.has(task.id);
+                              const showTranslatedTitle = isGlobalTranslationEnabled ? !isTitleFlipped : isTitleFlipped;
+                              const displayTitle = (showTranslatedTitle && task.task_translated_title) ? task.task_translated_title : task.task_title;
+                              const isCurrentlyTranslated = (showTranslatedTitle && !!task.task_translated_title);
+                              return (
+                                <h3 className="font-semibold text-slate-900 text-sm break-words min-w-0 flex-1 flex items-center gap-3 select-none">
+                                  <span>{displayTitle}</span>
+                                  {task.task_translated_title && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setFlippedTitles(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(task.id)) next.delete(task.id);
+                                          else next.add(task.id);
+                                          return next;
+                                        });
+                                        setFlippedDescriptions(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(task.id)) next.delete(task.id);
+                                          else next.add(task.id);
+                                          return next;
+                                        });
+                                      }}
+                                      className={`p-0.5 rounded transition-colors shrink-0 ${isCurrentlyTranslated ? 'bg-blue-100 border border-blue-200 shadow-sm' : 'hover:bg-slate-100 border-transparent'}`}
+                                      title={isCurrentlyTranslated ? "Show original English" : "Show translation"}
+                                    >
+                                      <img src="/trasnlation_icon.png" alt="Translate" className="w-4 h-4 object-contain scale-[1.25]" />
+                                    </button>
+                                  )}
+                                </h3>
+                              );
+                            })()
                           )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
@@ -1752,12 +1815,40 @@ export default function ReviewerDashboard() {
                               </div>
                             </div>
                           ) : (
-                            <p className={`text-black text-sm font-normal ${isExpanded ? 'whitespace-pre-wrap' : 'truncate'}`}>
-                              {task.task_description}
-                            </p>
+                            (() => {
+                              const isDescFlipped = flippedDescriptions.has(task.id);
+                              const showTranslatedDesc = isGlobalTranslationEnabled ? !isDescFlipped : isDescFlipped;
+                              const displayDesc = (showTranslatedDesc && task.task_translated_description) ? task.task_translated_description : task.task_description;
+                              return (
+                                <div className="flex flex-col min-w-0 flex-1">
+                                  <p
+                                    onClick={(e) => {
+                                      if (task.task_translated_description) {
+                                        e.stopPropagation();
+                                        setFlippedTitles(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(task.id)) next.delete(task.id);
+                                          else next.add(task.id);
+                                          return next;
+                                        });
+                                        setFlippedDescriptions(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(task.id)) next.delete(task.id);
+                                          else next.add(task.id);
+                                          return next;
+                                        });
+                                      }
+                                    }}
+                                    className={`text-black text-sm font-normal ${isExpanded ? 'whitespace-pre-wrap' : 'truncate'} ${task.task_translated_description ? 'cursor-pointer hover:text-blue-600 transition-colors select-none' : ''}`}
+                                  >
+                                    {displayDesc}
+                                  </p>
+                                </div>
+                              );
+                            })()
                           )}
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           {editingTaskId !== task.id && (
                             <>
                               <button
@@ -1766,9 +1857,9 @@ export default function ReviewerDashboard() {
                                   handleTaskClick(task, true);
                                 }}
                                 title="Play video"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
                               >
-                                <i className="fa-solid fa-play text-[11px]" />
+                                <i className="fa-solid fa-play text-[10px]" />
                               </button>
                               <button
                                 onClick={(e) => {
@@ -1776,9 +1867,9 @@ export default function ReviewerDashboard() {
                                   openTaskForEditing(task);
                                 }}
                                 title="Modify task"
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
                               >
-                                <i className="fa-solid fa-pen text-[11px]" />
+                                <i className="fa-solid fa-pen text-[10px]" />
                               </button>
                             </>
                           )}
@@ -1787,9 +1878,9 @@ export default function ReviewerDashboard() {
                               e.stopPropagation();
                               toggleTaskExpansion(task.id);
                             }}
-                            className="text-slate-500 hover:text-blue-600 transition-colors p-2 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
+                            className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
                           >
-                            <ChevronLeft className={`w-5 h-5 transform transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
+                            <ChevronLeft className={`w-4.5 h-4.5 transform transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
                           </button>
                         </div>
                       </div>

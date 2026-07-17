@@ -1,3 +1,4 @@
+from asyncio import transports
 import asyncio
 import os
 import logging
@@ -148,7 +149,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # Initialize Firebase Admin SDK
-target_ui_project = os.getenv("UI_PROJECT_ID", "inspecta-360")
+target_ui_project = os.getenv("UI_PROJECT_ID", "inspecta-ai")
 print(f"🎯 Initializing UI Firebase for project: {target_ui_project}")
 try:
     if not firebase_admin._apps:
@@ -173,20 +174,15 @@ async def verify_firebase_token(request: Request, call_next):
     # Extract Firebase Token strictly from X-Firebase-Token header
     firebase_token = request.headers.get("X-Firebase-Token")
     token_ctx_token = firebase_token_var.set(firebase_token)
-    print("firebase_token", firebase_token) 
 
     try:
         try:
             # Verify with Firebase
-            print("Verify with Firebase")
             decoded_token = auth.verify_id_token(firebase_token)
-            print("decoded_token", decoded_token)
             
             # Extract the SECURE company_id and company_storage_id from token claims
             request.state.company_id = decoded_token.get("company_id")
-            print("company_id", request.state.company_id)
             request.state.company_storage_id = decoded_token.get("company_storage_id")
-            print("company_storage_id", request.state.company_storage_id)
         except Exception as e:
             # If token is fake or expired, we don't set the company_id
             request.state.company_id = None
@@ -223,10 +219,10 @@ async def create_inspection_endpoint(
     The company_id is pulled from the authenticated session/state.
     """
     # Extract company_id (Grab the Token from the 'Authorization' Header)
-    print("Creating inspection")
-    print("data", data)
-    print(f"Company ID: {getattr(request.state, 'company_id', 'N/A')}")
-    print(f"Company Storage ID: {getattr(request.state, 'company_storage_id', 'N/A')}")
+    # print("Creating inspection")
+    # print("data", data)
+    # print(f"Company ID: {getattr(request.state, 'company_id', 'N/A')}")
+    # print(f"Company Storage ID: {getattr(request.state, 'company_storage_id', 'N/A')}")
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -256,6 +252,7 @@ class IncidentUploadRequest(BaseModel):
     inspector_id: int
     file_url: str = Field(..., description="Full GCS path, e.g., gs://<bucket_name>/f83k-92js/uploads/file.mp4")
     gps_coordinates: Optional[Tuple[float, float]] = None # (lat, long)
+    translation_language: Optional[str] = Field(None, description="Language to be used for translation of title and description of tasks, e.g., hindi, marathi")
 
 @app.post("/inspections/{inspection_id}/upload-incident")
 async def upload_incident_endpoint(
@@ -290,8 +287,6 @@ async def upload_incident_endpoint(
         #if not data.file_url.startswith(f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"):
         allowed_prefix =  f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"
 
-    print(f"allowed_prefix : {allowed_prefix}")
-    print(f"data.file_url : {data.file_url}")
     if not data.file_url.startswith(allowed_prefix):
         raise HTTPException(status_code=403, detail="Security Violation: Invalid storage path.")
 
@@ -329,6 +324,7 @@ async def upload_incident_endpoint(
         inspector_id=data.inspector_id,
         file_url=data.file_url,
         existing_incident_id = None,
+        translation_language=data.translation_language,
         gps_coordinates=data.gps_coordinates
     )
 
@@ -379,7 +375,7 @@ async def get_upload_url(request: Request, fileType: Optional[str] = Query(None)
     # This is the "relative" path inside the bucket or root folder
     blob_name = f"{company_storage_id}/{UPLOADS_FOLDER}/{unique_name}"
 
-    print("in executor class /get-upload-url blob_name",blob_name)
+    # print("in executor class /get-upload-url blob_name",blob_name)
 
     if ENV_MODE == "local":
         # 2. Local Logic: Return the absolute path on your hard drive

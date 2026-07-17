@@ -106,11 +106,13 @@ class IncidentRepository:
                 t.get('task_title'),
                 t.get('task_description'),
                 t.get('task_original_description'),
+                t.get('task_translated_title', ''),
+                t.get('task_translated_description', ''),
                 t.get('video_url'),
                 t.get('video_start_ms', 0),
                 t.get('video_end_ms', 0),
                 t.get('task_artifacts', []),
-                t.get('status_id', TaskStatus.PENDING),
+                t.get('status_id', TaskStatus.PENDING), 
                 t.get('severity_id', TaskSeverity.REGULAR),
                 t.get('task_type_id', TaskType.VERIFY)
             )
@@ -120,9 +122,9 @@ class IncidentRepository:
         query = """
             INSERT INTO incident_tasks (
                 incident_id, company_id, inspection_id, task_title, task_description, 
-                task_original_description, video_url, video_start_ms, video_end_ms,
+                task_original_description, task_translated_title, task_translated_description, video_url, video_start_ms, video_end_ms,
                 task_artifacts, status_id, severity_id, task_type_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
 
         async with self.session(company_id) as conn:
