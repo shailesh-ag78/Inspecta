@@ -284,6 +284,37 @@ foreach ($Svc in $Services) {
 Set-Location $OriginalDir
 
 # -------------------------------------------------------------
+# 5.5 Grant Secret Manager Permissions
+# -------------------------------------------------------------
+# We must grant secretAccessor permissions before deploying services to Cloud Run,
+# otherwise revision creation will fail with permission denied errors.
+Write-Host "`n[5.5/7] Granting Secret Manager Access permissions..." -ForegroundColor Yellow
+
+Write-Host "Granting secretAccessor permissions for GROQ_API_KEY to transcribe-service-sa..."
+gcloud secrets add-iam-policy-binding GROQ_API_KEY `
+    --member="serviceAccount:transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+Write-Host "Granting secretAccessor permissions for OPENAI_API_KEY to taskgen-service-sa..."
+gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
+    --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to executor-service-sa..."
+gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
+    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to ui-service-sa..."
+gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
+    --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+# -------------------------------------------------------------
 # 6. Deploy Services to Cloud Run
 # -------------------------------------------------------------
 Write-Host "`n[6/7] Deploying microservices to Cloud Run..." -ForegroundColor Yellow
@@ -456,30 +487,7 @@ Add-InvokerPolicy -ServiceName "agent-audioextract" -ServiceAccount "executor-se
 Add-InvokerPolicy -ServiceName "agent-transcribe" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
 Add-InvokerPolicy -ServiceName "agent-taskgenerator" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
 
-# 7.2.1 Enable Agent service SAs to read secrets from Secret Manager
-Write-Host "Granting secretAccessor permissions for GROQ_API_KEY to transcribe-service-sa..."
-gcloud secrets add-iam-policy-binding GROQ_API_KEY `
-    --member="serviceAccount:transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --role="roles/secretmanager.secretAccessor" `
-    --quiet
-
-Write-Host "Granting secretAccessor permissions for OPENAI_API_KEY to taskgen-service-sa..."
-gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
-    --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --role="roles/secretmanager.secretAccessor" `
-    --quiet
-
-Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to executor-service-sa..."
-gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
-    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --role="roles/secretmanager.secretAccessor" `
-    --quiet
-
-Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to ui-service-sa..."
-gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
-    --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-    --role="roles/secretmanager.secretAccessor" `
-    --quiet
+# (Secret Manager permissions granted in Step 5.5 before deployment)
 
 # 7.3 Enable UI Service SA to verify Firebase auth tokens (Option A)
 # Write-Host "Granting firebaseauth.admin role to ui-service-sa..."
