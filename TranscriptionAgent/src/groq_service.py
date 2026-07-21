@@ -7,11 +7,14 @@ from pathlib import Path
 import dotenv
 from pydub import AudioSegment
 from groq import Groq
+from openai import OpenAI
 from datetime import datetime
 
 # Constants
-#MODEL = "whisper-large-v3-turbo"
 MODEL = "whisper-large-v3"
+#TRANSLATION_MODEL="meta-llama/llama-3.1-8b-instruct"
+TRANSLATION_MODEL = "qwen/qwen-2.5-7b-instruct"
+
 MAX_FILE_SIZE_MB = 25
 OVERLAP_SEC = 5
 
@@ -20,32 +23,69 @@ env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 class GroqService:
     def __init__(self):
-        self.api_key = GROQ_API_KEY # Use the constant value defined above
+        self.api_key = GROQ_API_KEY
         if not self.api_key:
             msg = f"GROQ_API_KEY is missing from the environment/ .env file. Please set it before running the service. Looked for .env at: {env_path}"
             raise ValueError(msg)
         self.client = Groq(api_key=GROQ_API_KEY)
 
-    def process_incident_audio(self, audio_url_path: str, prompt: str) -> Dict[str, Any]:
+        self.translation_api_key = OPENROUTER_API_KEY
+        if not self.translation_api_key:
+            msg = f"OPENROUTER_API_KEY is missing from the environment/ .env file. Please set it before running the service. Looked for .env at: {env_path}"
+            raise ValueError(msg)
+        self.openrouter_client = OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=OPENROUTER_API_KEY,
+        )
+
+    def generate_translation_prompt(self, metadata: dict):
+        prompt_header = (
+            "You are an expert technical translator of company {metadata['company_name']} specializing in Indian field inspections in industry {metadata['industry']}. "
+            "The input is a raw audio transcript that may contain code-switched phrases in English and other Inidan languages like Hindi or Marathi or other languages.\n"
+            "Your job is to translate the inputted audio transcript into standard, professional site-inspection English."
+        )
+            
+        prompt_footer = (
+            "RULES:\n"
+            "1. ALWAYS use the mapped glossary terms above when the concept appears in the raw text."
+            "2. Translate any remaining non-English verbs/phrases into clear, professional site-inspection English."
+            "3. Do NOT modify correct English technical terms."
+            "4. Output ONLY the final translated English text without preamble, notes, or conversational fluff."
+        )
+
+        # 2. Handle the Dynamic Keywords with Truncation
+        ALLOWED_PROMPT_LENGTH = 2048  # Adjust based on model limits and expected system prompt size
+        available_space = ALLOWED_PROMPT_LENGTH - len(prompt_header) - len(prompt_footer) - 25 # 25 for the label
+        
+        # Truncate the input_prompt to fit the remaining space
+        safe_keywords = metadata.get('input_prompt', '')[:available_space]
+        
+        # 3. Combine using f-string
+        final_prompt = f"{prompt_header}\nDOMAIN GLOSSARY: {safe_keywords}\n{prompt_footer}"
+        
+        return final_prompt
+
+    def process_incident_audio(self, audio_url_path: str, metadata: dict) -> Dict[str, Any]:
         """Main method to process an incident audio file. Handles chunking, processing, and merging."""
         print(f"{datetime.now()} Processing audio from URL: {audio_url_path}")
-        print(f"{datetime.now()} Using prompt: {prompt}")
         
         try:
             # Open the file from the local path
+            prompt=""
             with open(audio_url_path, "rb") as audio_file:
                 # Call Groq Transcription (Whisper Large V3 Turbo) : 
-                # The 'prompt' parameter guides the model's vocabulary and context
                 transcription = self.client.audio.translations.create(
                     file=(os.path.basename(audio_url_path), audio_file.read()),
                     model=MODEL,
                     prompt=prompt,
-                    temperature=0,  # Set to 0 for deterministic output; adjust if you want more creativity
+                    temperature=0.0,  # Set to 0 for deterministic output; adjust if you want more creativity
                     response_format="verbose_json" # verbose_json gives you timestamps if needed
                 )
+                
                 # transcription = self.client.audio.transcriptions.create(
                 #     file=(os.path.basename(audio_url_path), audio_file.read()),
                 #     model=MODEL,
@@ -59,6 +99,10 @@ class GroqService:
             raise RuntimeError(f"An unexpected error occurred: {str(e)}")
         
         data = transcription.model_dump()  # Convert to dict to avoid "Object not iterable" errors
+        print("Data from Groq API : ", data)
+        prompt=self.generate_translation_prompt(metadata)
+
+        print("No. of segments found : ", len(data.get('segments', [])))
         structured_segments = [
             {
             "start": round(seg['start'], 3),
@@ -67,16 +111,44 @@ class GroqService:
             }
             for seg in data.get('segments', [])
         ]
+        
+        combine_segments = self.combine_adjacent_segments(structured_segments)
+        print("No. of combined segments : ", len(combine_segments))
+
+        trasnlated_segments = [
+            {
+            "start": seg['start'],
+            "end": seg['end'],
+            "text": self.translate_text_to_english_llm(seg['text'].strip(), prompt)
+            }
+            for seg in combine_segments
+        ]
 
         transcript_dict = {
-            "text": data.get("text", ""),
-            "segments": structured_segments
+            "text": data.get("text", ""), # Passing o/p text of Groq
+            "segments": trasnlated_segments  #structured_segments
         }
+        #transcript_dict["segments"] = self.combine_adjacent_segments(transcript_dict["segments"])
         
-        transcript_dict["segments"] = self.combine_adjacent_segments(transcript_dict["segments"])
 
         return transcript_dict
-   
+
+    def translate_text_to_english_llm(self,raw_text, prompt:str):
+        """
+        Translate the mixed transcript into standard, professional site-inspection English.
+        """        
+        print("Trasnlating RAW Text : ", raw_text)
+        response = self.openrouter_client.chat.completions.create(
+            model=TRANSLATION_MODEL,
+            messages=[
+                {"role": "system", "content": prompt},
+                {"role": "user", "content": f"Raw Transcript:\n\"{raw_text}\""}
+            ],
+            temperature=0.0
+        )
+        
+        return response.choices[0].message.content.strip()
+
 # Sample dictionary output of the process_incident_audio method
 #     {
 #   "text": "Hello, this is an inspection at Site A. We found a crack in the pipe.",

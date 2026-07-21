@@ -12,7 +12,10 @@ from typing import Tuple
 from urllib.parse import urlparse
 import dotenv
 
-from .groq_service import GroqService
+try:
+    from .groq_service import GroqService
+except ImportError:
+    from src.groq_service import GroqService
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,7 +28,7 @@ env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
 
 ENV_MODE = os.getenv("ENV_MODE", "local").lower()
-logger.info(f"🚀 Starting Executor with ENV_MODE={ENV_MODE}")
+logger.info(f"🚀 Starting Transcription Agent with ENV_MODE={ENV_MODE}")
 
 # Define your local root (where files actually live on your PC)
 # Detect operating system: use '/tmp' for Linux (GCP Cloud Run), and Windows path locally
@@ -164,33 +167,6 @@ async def transcribe_endpoint(request: TranscribeRequest):
         }
     }
     
-def generate_whisper_prompt(metadata):
-    #Whisper prompt as a "style guide" rather than a set of orders.
-
-    # 1. Define the "Fixed" part of your prompt
-    # We use roughly 400-500 characters as a safe buffer for the header/footer
-    header = (
-        f"Technical Site Inspection for {metadata['company_name']}. "
-        f"Subject: {metadata['industry']} audit and assessment. "
-    )
-    
-    footer = (
-        "Observations: The inspector is recording real-time notes on site. "
-        "All Hindi and Marathi comments are translated into professional technical English. "
-        "Every observation, measurement, and actionable item is documented with precision. Transcription: "
-    )
-
-    # 2. Handle the Dynamic Keywords with Truncation
-    ALLOWED_PROMPT_LENGTH = 790  # Adjust based on model limits and expected system prompt size
-    available_space = ALLOWED_PROMPT_LENGTH - len(header) - len(footer) - 25 # 25 for the label
-    
-    # Truncate the input_prompt to fit the remaining space
-    safe_keywords = metadata.get('input_prompt', '')[:available_space]
-    
-    # 3. Combine using f-string
-    final_prompt = f"{header}Technical Vocabulary: {safe_keywords}. {footer}"
-    
-    return final_prompt
 
 def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -> str:
     """ Transcript the Audio file using Groq Service and save the transcript to disk """
@@ -225,10 +201,7 @@ def transcript_extraction(audio_url_path, transcibe_file_path, metadata: dict) -
         # max_user_len = ALLOWED_PROMPT_LENGTH - len(system_prompt) - 1 # 1 for newline separation
         # prompt = f"{system_prompt}\n{user_prompt[:max_user_len]}"
 
-        prompt = generate_whisper_prompt(metadata)
-        logger.info(f"Prompt Length: {len(prompt)} chars")
-
-        transcript_dict = groq_service.process_incident_audio(audio_url_path, prompt)
+        transcript_dict = groq_service.process_incident_audio(audio_url_path, metadata)
         transcript_text = transcript_dict['text'] if isinstance(transcript_dict, dict) else ""
         if not transcript_text:
             logger.warning(f"Transcription resulted in empty text for {audio_url_path}")

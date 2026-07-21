@@ -12,58 +12,65 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Constants
-
-
 # Load environment variables from .env file if it exists
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
+
 ENV_MODE = os.getenv("ENV_MODE", "local").lower()
-MODEL = os.getenv("OPENAI_MODEL", "gpt-4o")
+MODEL = os.getenv("MODEL", "qwen/qwen-2.5-7b-instruct")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+LLM_BASE_URL = os.getenv("LLM_BASE_URL")
 
-MODEL= "gpt-4o" # "gpt-5-nano"
-MODEL_TEMPERATURE= 0.2  #1  
 
 def safe_int(val, default):
     try:
         return int(val)
     except (ValueError, TypeError):
         return default
-class OpenAIService:
-    def __init__(self, logger=None):
-        self.logger = logger
-        if not OPENAI_API_KEY:
-            if self.logger:
-                self.logger.warning("Warning: OPENAI_API_KEY not set.")
-            else:
-                print("Warning: OPENAI_API_KEY not set.")
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
 
-    def generate_tasks_from_transcript(self, transcript: str, user_prompt: str) -> Dict[str, Any]:
-        """
-        Uses OpenAI to extract structured tasks from the inspection transcript.
-        Returns a dictionary compatible with the database schema.
-        """
-        
+
+class OpenAIService:
+    def __init__(self, model: str = None, temperature: float = None, logger=None):
+        self.logger = logger or logging.getLogger(__name__)
+        self.model = model or os.getenv("MODEL", "qwen/qwen-2.5-7b-instruct")
+        self.temperature = temperature if temperature is not None else float(os.getenv("MODEL_TEMPERATURE", "0.2"))
+        self.provider = os.getenv("LLM_PROVIDER", "").lower()
+
+        api_key = os.getenv("OPENAI_API_KEY")
+        base_url = os.getenv("LLM_BASE_URL")
+
+        # Automatically default base_url to OpenRouter if provider is set to openrouter
+        if self.provider.lower() == "openrouter" and not base_url:
+            base_url = "https://openrouter.ai/api/v1"
+
+        if not api_key:
+            self.logger.warning("Warning: OPENAI_API_KEY is not set.")
+
+        client_kwargs = {"api_key": api_key}
+        if base_url:
+            client_kwargs["base_url"] = base_url
+
+        self.client = OpenAI(**client_kwargs)
+
+    def _build_system_prompt(self) -> str:
         header_prompt = (
             f"You are an expert industrial inspector helper."
             f"Your job is to analyze the audio transcript of an incident recorded on site and extract a list of ACTIONABLE TASKS."
             f"The audio transcript may contain observations, issues, and comments made by the inspector while walking around the site."
             f"The audio transcript is referred as 'Inspector Comments'."
             f"The inputted transcript is a JSON text that contains segments of the audio transcription with their corresponding timestamps (start second count and end second count)."
-            f"Each segment is referred here as a 'transcript segment' and has inspector comments. Each segment has Start time and End time in Seconds"   
-            f"Note: The audio transcript is generated using AI translation service. If a sentence is split across two segments, combine the context to ensure the task remains complete." 
+            f"Each segment is referred here as a 'transcript segment' and has inspector comments. Each segment has Start time and End time in Seconds"
+            f"Note: The audio transcript is generated using AI translation service. If a sentence is split across two segments, combine the context to ensure the task remains complete."
         )
-        
+
         ask = (
             f"Ask: Analyze all provided 'Inspector Comments' and generate two specific sections:"
             f"A. Concise Observation Summary: A 2-3 sentence professional overview of the current site status based on the comments."
             f"B. Actionable Task List for each 'transcript segment': "
             f"   A bulleted list of specific, high-priority tasks that need to be completed or corrected. "
         )
-        
+
         instructions = f"""
                 	Instructions for Task Extraction:
                     ○ Each task should be clear and actionable, suitable for assignment to a team member. Focus on the 'what' needs to be done and 'where' it needs to be done."
@@ -77,7 +84,7 @@ class OpenAIService:
                     ○ De-noising: Ignore filler words, personal anecdotes, or irrelevant chatter in the raw text.
                     ○ Consider today's date and the current time of the reference. Whenever you provide days and time, provide date as well with reference of current date and time. Dates shall be outputted in dd-mm-yyyy format.
                     """
-                    
+
         output = f"""
                 Output Guidelines:
                 1. present the output in JSON format that has following sections:
@@ -97,71 +104,93 @@ class OpenAIService:
                     }}
                 }}
                 """
-        system_prompt = header_prompt + "\n" + ask + "\n" + instructions + "\n" + output
-        
-        # task_title TEXT NOT NULL,
-        # task_description TEXT,
-        # task_original_description TEXT,
-        # task_review_comments TEXT,
-        # task_notes TEXT,
+        return header_prompt + "\n" + ask + "\n" + instructions + "\n" + output
 
-        # -- Media & Timestamps
-        # video_url TEXT,           -- Specific GCS video for this task
-        # video_start_ms INTEGER,   -- Start offset in milliseconds
-        # video_end_ms INTEGER,     -- End offset in milliseconds
+    def _strip_markdown_codeblocks(self, content: str) -> str:
+        content = content.strip()
+        if content.startswith("```json"):
+            content = content[7:]
+        if content.startswith("```"):
+            content = content.split('\n', 1)[-1] if '\n' in content else content.lstrip('`')
+            content = content.rsplit('```', 1)[0].strip()
+        if content.endswith("```"):
+            content = content[:-3]
+        return content.strip()
 
-            
-
-        # import tiktoken
-        # encoding = tiktoken.get_encoding("cl100k_base")
-        # num_tokens = len(encoding.encode(your_full_prompt))
-        # print(f"Total tokens: {num_tokens}")
-        
-        logger.info(f"Generating tasks from transcript with prompt length {len(system_prompt) + len(user_prompt)} chars (System Prompt: {len(system_prompt)} chars, User Prompt: {len(user_prompt)} chars)")
+    # =========================================================================
+    #  SEPARATE EXECUTION ROUTE 1: NATIVE OPENAI (GPT Models)
+    # =========================================================================
+    def _execute_openai_route(self, system_prompt: str, user_prompt: str) -> str:
+        """Dedicated execution route for native OpenAI models (e.g. gpt-4o)."""
+        self.logger.info(f"🟢 [OpenAI Route] Executing task generation with OpenAI model '{self.model}'...")
         try:
-            response = self.client.chat.completions.create(
-                model=MODEL,
-                messages=[
+            kwargs = {
+                "model": self.model,
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
-                temperature=MODEL_TEMPERATURE,
-                response_format={ "type": "json_object" }
-            )
-            
-            # Extract total, prompt, and completion tokens
+                "temperature": self.temperature,
+                "response_format": {"type": "json_object"}
+            }
+            response = self.client.chat.completions.create(**kwargs)
             usage = response.usage
-            prompt_tokens = usage.prompt_tokens if usage else 0        # The words you sent (Input)
-            completion_tokens = usage.completion_tokens if usage else 0  # The words AI generated (Output)
-            
-            cached_tokens = 'N/A'
-            if usage and hasattr(usage, 'prompt_tokens_details') and usage.prompt_tokens_details:
-                cached_tokens = getattr(usage.prompt_tokens_details, 'cached_tokens', 'N/A')
-            logger.info(f"OpenAI API Usage - Prompt Tokens: {prompt_tokens}," + 
-                        f" Completion Tokens: {completion_tokens}, " + 
-                        f"Cached Tokens: {cached_tokens}")
+            prompt_tokens = usage.prompt_tokens if usage else 0
+            completion_tokens = usage.completion_tokens if usage else 0
+            self.logger.info(f"OpenAI Route Usage - Prompt Tokens: {prompt_tokens}, Completion Tokens: {completion_tokens}")
 
-            logger.info(f"OpenAI response received for task generation. : {response}")
-            
             content = response.choices[0].message.content.strip()
-            
-            # Remove markdown code blocks if present (despite instructions)
-            if content.startswith("```json"):
-                content = content[7:]
-            if content.startswith("```"):
-                # Remove opening marker (handles ```json or just ```)
-                content = content.split('\n', 1)[-1] if '\n' in content else content.lstrip('`')
-                # Remove closing marker
-                content = content.rsplit('```', 1)[0].strip()
-            if content.endswith("```"):
-                content = content[:-3]
-            
-            cleaned_tasks = safe_transform_tasks(content)                
-            return cleaned_tasks
-
+            return self._strip_markdown_codeblocks(content)
         except Exception as e:
-            logger.error(f"OpenAI Task Generation Error: {e}")
-            raise RuntimeError(f"Failed to generate tasks: {str(e)}")
+            self.logger.error(f"❌ OpenAI Route Error: {e}")
+            raise RuntimeError(f"Failed to generate tasks via OpenAI route: {str(e)}")
+
+    # =========================================================================
+    #  SEPARATE EXECUTION ROUTE 2: QWEN / OPENROUTER
+    # =========================================================================
+    def _execute_qwen_route(self, system_prompt: str, user_prompt: str) -> str:
+        """Dedicated execution route for Qwen models (e.g. qwen/qwen-2.5-7b-instruct via OpenRouter / custom base_url)."""
+        self.logger.info(f"🟣 [Qwen Route] Executing task generation with Qwen model '{self.model}' via OpenRouter...")
+        try:
+            kwargs = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": self.temperature,
+                "response_format": {"type": "json_object"}
+            }
+
+            response = self.client.chat.completions.create(**kwargs)
+            usage = response.usage
+            prompt_tokens = usage.prompt_tokens if usage else 0
+            completion_tokens = usage.completion_tokens if usage else 0
+            self.logger.info(f"Qwen Route Usage - Prompt Tokens: {prompt_tokens}, Completion Tokens: {completion_tokens}")
+
+            content = response.choices[0].message.content.strip()
+            return self._strip_markdown_codeblocks(content)
+        except Exception as e:
+            self.logger.error(f"❌ Qwen Route Error: {e}")
+            raise RuntimeError(f"Failed to generate tasks via Qwen route: {str(e)}")
+
+    def generate_tasks_from_transcript(self, transcript: str, user_prompt: str) -> Dict[str, Any]:
+        """
+        Uses OpenAI / Qwen LLMs to extract structured tasks from the inspection transcript.
+        Dispatches request to dedicated execution routes based on model family and provider.
+        """
+        system_prompt = self._build_system_prompt()
+        model_name_lower = self.model.lower()
+
+        # Route execution based on model family / provider
+        if "qwen" in model_name_lower or self.provider in ["qwen", "openrouter"]:
+            self.logger.info(f"🔀 Dispatching to Qwen Route (Model: {self.model})")
+            raw_content = self._execute_qwen_route(system_prompt, user_prompt)
+        else:
+            self.logger.info(f"🔀 Dispatching to OpenAI Route (Model: {self.model})")
+            raw_content = self._execute_openai_route(system_prompt, user_prompt)
+
+        return safe_transform_tasks(raw_content)
 
 
 def safe_transform_tasks(raw_input) -> Dict[str, Any]:
@@ -185,7 +214,7 @@ def safe_transform_tasks(raw_input) -> Dict[str, Any]:
             return {
                 "summary": "Error: AI returned non-JSON text.",
                 "tasks": [],
-                "metadata": {"raw_response": raw_input} # Keep raw text for debugging
+                "metadata": {"raw_response": raw_input}  # Keep raw text for debugging
             }
     elif isinstance(raw_input, dict):
         processed_data = raw_input
@@ -202,16 +231,18 @@ def safe_transform_tasks(raw_input) -> Dict[str, Any]:
 
     # Extract Summary
     summary = processed_data.get("Summary") or processed_data.get("summary") or "No summary extracted."
-    
+
     # Extract Task Lists (Handle nested TaskList or flat structure)
     task_container = processed_data.get("TaskList", processed_data)
-    
+
     raw_tasks = task_container.get("Task", []) if isinstance(task_container, dict) else []
     raw_clarifications = task_container.get("Clarification Needed", []) if isinstance(task_container, dict) else []
 
     # Ensure we are iterating over a list even if AI returned a single dict
-    if isinstance(raw_tasks, dict): raw_tasks = [raw_tasks]
-    if isinstance(raw_clarifications, dict): raw_clarifications = [raw_clarifications]
+    if isinstance(raw_tasks, dict):
+        raw_tasks = [raw_tasks]
+    if isinstance(raw_clarifications, dict):
+        raw_clarifications = [raw_clarifications]
 
     cleaned_tasks = {
         "summary": summary,

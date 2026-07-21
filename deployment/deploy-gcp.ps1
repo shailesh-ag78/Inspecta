@@ -296,6 +296,12 @@ gcloud secrets add-iam-policy-binding GROQ_API_KEY `
     --role="roles/secretmanager.secretAccessor" `
     --quiet
 
+Write-Host "Granting secretAccessor permissions for OPENROUTER_API_KEY to transcribe-service-sa..."
+gcloud secrets add-iam-policy-binding OPENROUTER_API_KEY `
+    --member="serviceAccount:transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
 Write-Host "Granting secretAccessor permissions for OPENAI_API_KEY to taskgen-service-sa..."
 gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
     --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
@@ -353,7 +359,7 @@ if ($DeployAgents) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="transcribe-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest" `
+        --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest,OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE"

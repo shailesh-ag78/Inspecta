@@ -2,7 +2,7 @@
 INSERT INTO industries_lookup (id, name, industry_keywords) VALUES 
 (1, 'Construction', '["site", "concrete", "beam", "steel", "scaffold", "plaster", "granite"]'), 
 (2, 'Manufacturing', '["assembly", "factory", "machinery", "assembly line", "quality control"]'), 
-(3, 'Interior Design', '["granite", "bathroom", "kitchen", "plywood", "electric point", "paint", "pop", "curtain", "wall cladding", "false ceiling", "handle", "door", "window", "flooring", "wallpaper", "tile", "cabinet", "countertop", "lighting", "sofa", "chair"]'),
+(3, 'Interior Design', '["granite", "bathroom", "kitchen", "plywood", "electric point", "paint", "pop", "curtain", "wall cladding", "false ceiling", "handle", "door", "window", "flooring", "wallpaper", "tile", "cabinet", "countertop", "lighting", "sofa", "chair", "bedsheet"]'),
 (4, 'Farming', '["crop", "harvest", "field", "tractor", "irrigation", "pipe", "fertilizer", "water"]')
 
 ON CONFLICT (id) DO NOTHING;
