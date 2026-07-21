@@ -99,10 +99,8 @@ class GroqService:
             raise RuntimeError(f"An unexpected error occurred: {str(e)}")
         
         data = transcription.model_dump()  # Convert to dict to avoid "Object not iterable" errors
-        print("Data from Groq API : ", data)
         prompt=self.generate_translation_prompt(metadata)
 
-        print("No. of segments found : ", len(data.get('segments', [])))
         structured_segments = [
             {
             "start": round(seg['start'], 3),
@@ -113,7 +111,6 @@ class GroqService:
         ]
         
         combine_segments = self.combine_adjacent_segments(structured_segments)
-        print("No. of combined segments : ", len(combine_segments))
 
         trasnlated_segments = [
             {
@@ -134,10 +131,9 @@ class GroqService:
         return transcript_dict
 
     def translate_text_to_english_llm(self,raw_text, prompt:str):
-        """
+        """`
         Translate the mixed transcript into standard, professional site-inspection English.
         """        
-        print("Trasnlating RAW Text : ", raw_text)
         response = self.openrouter_client.chat.completions.create(
             model=TRANSLATION_MODEL,
             messages=[
