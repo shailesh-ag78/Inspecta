@@ -1,6 +1,6 @@
 # deploy-ui.ps1
 # PowerShell script to deploy UI: installs firebase tools, configures GCP/Firebase services, and logs in using JSON key.
-
+# PS G:\code\Inspecta\UI\inspecta-dashboard> G:\code\Inspecta\deployment\deploy-ui.ps1 -firebaseprojectid "inspecta-ai" -jsonkeyfile "G:\code\Inspecta\deployment\inspecta-ai-firebase-adminsdk-fbsvc-895e11e210.json"
 [CmdletBinding(DefaultParameterSetName = "DeploySet")]
 param (
     [Parameter(Mandatory = $true, ParameterSetName = "HelpSet")]
@@ -280,7 +280,8 @@ if (-not $SkipGcpSetup) {
         }
     }
     Write-Host "`n[+] Service account roles assigned successfully." -ForegroundColor Green
-} else {
+}
+else {
     Write-Host "`n[*] -SkipGcpSetup flag passed. Skipping GCP Service enablement and role bindings." -ForegroundColor Yellow
 }
 
@@ -310,10 +311,20 @@ $env:NEXT_PUBLIC_FIREBASE_PROJECT_ID = "inspecta-ai"
 $env:NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET = "inspecta-ai.firebasestorage.app"
 $env:NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID = "809906015149"
 $env:NEXT_PUBLIC_FIREBASE_APP_ID = "1:809906015149:web:49dbd61c0cb1b688c16f24"
+$env:NEXT_PUBLIC_BACKEND_URL = "https://ui-backend-service-860462670211.us-central1.run.app"
+
+# Copy .env.production to .env.production.local so production config takes precedence over .env.local during build
+# $CreatedProdLocal = $false
+# if (Test-Path ".env.production") {
+#     Write-Host "[*] Copying .env.production to .env.production.local..." -ForegroundColor Yellow
+#     Copy-Item -Path ".env.production" -Destination ".env.production.local" -Force
+#     $CreatedProdLocal = $true
+# }
 
 npx firebase-tools use inspecta-ai
- 
+    
 # Build Next.js project to generate the static export (out/ folder)
+$env:NODE_ENV = "production"    
 Write-Host "`n[*] Building Next.js application (generating static export)..." -ForegroundColor Cyan
 & npm run build
 if ($LASTEXITCODE -ne 0) {
@@ -363,22 +374,6 @@ if (-not (Test-Path $FirebasercPath)) {
     Set-Content -Path $FirebasercPath -Value $FirebasercContent
 }
 
-# # Create new service account key after updating all required roles
-# $NewKeyName = "$GcpProjectId-uideployment.json"
-# $DeploymentFolder = "G:\code\Inspecta\deployment"
-# $DestKeyPath = Join-Path $DeploymentFolder $NewKeyName
-
-# Add-Type -AssemblyName PresentationFramework
-# Write-Host "[*] Showing Popup for srvice account creation, please press OK to continue..." -ForegroundColor Yellow
-# $PopupMessage = "Please create a new service account key JSON file named '$NewKeyName' for service account '$SaEmail', and copy it into the deployment folder:`n$([System.IO.Path]::GetFullPath($DeploymentFolder))`n`nPress OK once the file has been placed there."
-# [System.Windows.MessageBox]::Show($PopupMessage, "Action Required: Copy Service Account Key", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Information) | Out-Null
-
-# if (-not (Test-Path $DestKeyPath)) {
-#     [System.Windows.MessageBox]::Show("Error: Key file '$NewKeyName' not found in '$DeploymentFolder'. Deployment cannot proceed.", "Key File Missing", [System.Windows.MessageBoxButton]::OK, [System.Windows.MessageBoxImage]::Error) | Out-Null
-#     Write-Error "Required key file '$NewKeyName' was not found in the deployment directory."
-#     exit 1
-# }
-
 $AbsNewKeyPath = [System.IO.Path]::GetFullPath($JsonKeyFile)
 $env:GOOGLE_APPLICATION_CREDENTIALS = $AbsNewKeyPath
 [Environment]::SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", $AbsNewKeyPath, "User")
@@ -390,8 +385,6 @@ if ($LASTEXITCODE -ne 0) {
     Write-Error "Firebase deployment failed."
     exit 1
 }
-
-# npm audit fix --force (Commented out to optimize deployment speed and prevent dependency updates during deployment)
 
 Write-Host "`n[+] Next.js application deployed successfully to Firebase!" -ForegroundColor Green
 Write-Host "🎉 Setup and deployment completed successfully!" -ForegroundColor Green

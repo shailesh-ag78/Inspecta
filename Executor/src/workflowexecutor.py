@@ -519,7 +519,7 @@ class WorkflowExecutor:
                 raise ValueError(
                     f"External agent at {self.task_generator_agent.url} returned empty response. "
                 )
-            task_count = int(result.get("tasks_count", "0"))
+            task_count = result.get("tasks", [])
             logger.info(f"Received {task_count} tasks from agent.")
             
             metadata = result.get("metadata", {})
