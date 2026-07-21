@@ -113,15 +113,20 @@ async def verify_firebase_token(request: Request, call_next):
     if request.method == "OPTIONS" or request.url.path == "/health":
         return await call_next(request)
 
-    # Extract the Firebase token from the standard Bearer authorization header
+    # Extract the Firebase token from the standard Bearer authorization header or query parameter
     auth_header = request.headers.get("Authorization", "")
-    if not auth_header or not auth_header.startswith("Bearer "):
+    id_token = None
+    if auth_header and auth_header.startswith("Bearer "):
+        id_token = auth_header.replace("Bearer ", "")
+    else:
+        # Fallback to query parameter (e.g. for video streaming)
+        id_token = request.query_params.get("token")
+
+    if not id_token:
         request.state.company_id = None
         request.state.company_storage_id = None
         request.state.translation_language = ""
         return await call_next(request)
-
-    id_token = auth_header.replace("Bearer ", "")
     #token_ctx = firebase_token_var.set(id_token)
 
     try:
@@ -820,8 +825,15 @@ async def get_video_url(request: Request, path: str = Query(..., description="GC
             print(f"Error generating signed URL: {e}")
             raise HTTPException(status_code=500, detail=str(e))
     else:
+        # Extract Bearer token from request headers to forward to the stream endpoint as a query parameter
+        auth_header = request.headers.get("Authorization", "")
+        token_param = ""
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.replace("Bearer ", "")
+            token_param = f"&token={quote(token)}"
+
         # Local paths are proxied through our streaming endpoint
-        stream_url = f"{str(request.base_url).rstrip('/')}/api/video/stream?path={quote(path)}"
+        stream_url = f"{str(request.base_url).rstrip('/')}/api/video/stream?path={quote(path)}{token_param}"
         return {"status": "success", "data": {"url": stream_url}}
 
 @app.get("/api/video/stream")
