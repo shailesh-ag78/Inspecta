@@ -12,8 +12,6 @@ from datetime import datetime
 
 # Constants
 MODEL = "whisper-large-v3"
-#TRANSLATION_MODEL="meta-llama/llama-3.1-8b-instruct"
-TRANSLATION_MODEL = "qwen/qwen-2.5-7b-instruct"
 
 MAX_FILE_SIZE_MB = 25
 OVERLAP_SEC = 5
@@ -24,6 +22,7 @@ dotenv.load_dotenv(dotenv_path=env_path)
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+TRANSLATION_MODEL = os.getenv("TRANSLATION_MODEL", "qwen/qwen-2.5-7b-instruct")
 
 class GroqService:
     def __init__(self):

@@ -5,6 +5,7 @@
 # ====================================================
 
 
+from importlib import metadata
 from google.cloud import storage
 import asyncio
 import os
@@ -37,6 +38,8 @@ SITE_ID = "1"
 INSPECTION_ID = "95a1e321-08c1-4aac-a9f1-1ce4304109fd"
 ENV_MODE = "production"
 
+from src.main import tasks_generation
+
 def extract_bucket_and_blob(http_url: str) -> Tuple[str, str]:
     """
     Parses a GCS HTTP URL and returns a tuple of (bucket_name, blob_name).
@@ -57,6 +60,38 @@ def extract_bucket_and_blob(http_url: str) -> Tuple[str, str]:
     
     return bucket_name, blob_name
 
+def generating_tasks():
+    transcript_segments_json_url = f"G:\code\Inspecta\data\test_data\test_videos\test_audio_transcribe.json"
+    tasks_file_path = f"G:\code\Inspecta\data\test_data\test_videos\test_audio_transcribe_tasks.json"
+    metadata = {
+        "company_name": "Test Company",
+        "industry": "interior",
+        "input_prompt": [
+            "granite",
+            "bathroom",
+            "kitchen",
+            "plywood",
+            "electric point",
+            "paint",
+            "pop",
+            "curtain",
+            "wall cladding",
+            "false ceiling",
+            "handle",
+            "door",
+            "window",
+            "flooring",
+            "wallpaper",
+            "tile",
+            "cabinet",
+            "countertop",
+            "lighting",
+            "sofa",
+            "chair",
+            "bedsheet"
+        ]
+    }
+    tasks_generation(transcript_segments_json_url, tasks_file_path, metadata)
 
 def test_full_workflow_integration():
     """
@@ -82,6 +117,9 @@ def test_full_workflow_integration():
         else:
             inspection_id = INSPECTION_ID
             print(f"✅ Using Existing Inspection: {inspection_id}")
+
+        generating_tasks()
+        return
 
         incident_ids = {}
         # Use rglob("*") to recursively find all files and directories

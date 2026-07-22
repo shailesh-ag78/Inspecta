@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from typing import Tuple
 from urllib.parse import urlparse
 import dotenv
+from openai import OpenAI
 
 # Add the project root to sys.path so we can import from the 'datastore' package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -647,12 +648,6 @@ def translate_tasks(tasks: List[dict], translation_language: str) -> List[dict]:
     """
     if not tasks:
         return tasks
-
-    api_key = os.getenv("GEMINI_TRANSLATION_API_KEY")
-    if not api_key:
-        logger.warning("GEMINI_TRANSLATION_API_KEY environment variable is not set. Skipping translation.")
-        return tasks
-
     # The input to the function will be a json of up to tasks_snippet objects,
     # containing `task index`, `title`, and `description` (all in English).
     tasks_snippet = []
@@ -665,73 +660,69 @@ def translate_tasks(tasks: List[dict], translation_language: str) -> List[dict]:
 
     # 2. RUNTIME CONTENTS (Isolate all dynamic variables here)
     runtime_payload = {
-        "tasks_to_translate": tasks_snippet, 
+        "tasks_to_translate": tasks_snippet,
         "target_language": translation_language
     }
-    # input_json_str = json.dumps(tasks_snippet)
-    input_json_str = contents=json.dumps(runtime_payload),
+    input_json_str = json.dumps(runtime_payload)
 
     try:
-        client = genai.Client(api_key=api_key)
+        TRANSLATION_MODEL = os.getenv("TRANSLATION_MODEL", "qwen/qwen-2.5-7b-instruct")
+        openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
+        openrouter_url = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1")
+        client_kwargs = {"api_key": openrouter_api_key, "base_url": openrouter_url}
+
+        openai_client = OpenAI(**client_kwargs)
+
         system_instruction = (
             "You are a stateless localization engine. "
-            "Translate the provided array of task objects from English into the requested target language. "
-            "Maintain strict accuracy and conciseness without adding unnecessary details. "
-            "No conversational greetings, and no commentary. Return only raw JSON."
-            "Ensure the index in the output perfectly matches the input index.")
-        
-        # system_instruction = (
-        #     "You are a stateless localization engine. "
-        #     "Translate the provided list array of task objects from English into 'Trasnlation Language' mentioned below. "
-        #     "You must return a raw JSON array matching this exact schema:"
-        #     "["
-        #     "  {"
-        #     "    index: original_task_index"
-        #     "    translated_title: Translated Title String"
-        #     "    translated_description: Translated Description String"
-        #     "  }"
-        #     "]"
-        #     "Strict rules for translaation:"
-        #     "1. Do not use markdown formatting blocks (e.g., do not wrap in ```json or ```)."
-        #     "2. No conversational greetings, and no commentary. Return only raw JSON."
-        #     "3. The field 'index' in the output must match the 'task index' from the input."
-        #     "4. Translation must be accurate and concise. Do not add unnecessary details."
-        #     "5. Translation must be in the 'Trasnlation Language' mentioned below."
-        #     "Trasnlation Language: " + translation_language    
-        # # )
-
-        # Define your desired output structure using Pydantic
-        class TranslationItem(BaseModel):
-            index: int = Field(description="The original task index from the input")
-            translated_title: str = Field(description="Translated Title String")
-            translated_description: str = Field(description="Translated Description String")
-
-        # ToDo : use industry specific terms for translation -- Use cached context for cost optimization
-        GEMINI_MODEL = "gemini-3.5-flash"
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=input_json_str,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                temperature=0.2,
-                response_mime_type="application/json",
-                response_schema=list[TranslationItem]
-            )
+            "Translate the provided list array of task objects from English into 'Trasnlation Language' mentioned below. "
+            "You must return a raw JSON array matching this exact schema:"
+            "["
+            "  {"
+            "    index: original_task_index"
+            "    translated_title: Translated Title String"
+            "    translated_description: Translated Description String"
+            "  }"
+            "]"
+            "Strict rules for translaation:"
+            "1. Do not use markdown formatting blocks (e.g., do not wrap in ```json or ```)."
+            "2. No conversational greetings, and no commentary. Return only raw JSON."
+            "3. The field 'index' in the output must match the 'task index' from the input."
+            "4. Translation must be accurate and concise. Do not add unnecessary details."
+            "5. Translation must be in the 'Trasnlation Language' mentioned below."
+            "Trasnlation Language: " + translation_language    
         )
-        
-        response_text = response.text.strip()
-        # # Clean markdown wraps if any
-        # if response_text.startswith("```"):
-        #     lines = response_text.splitlines()
-        #     if lines[0].startswith("```"):
-        #         lines = lines[1:]
-        #     if lines and lines[-1].startswith("```"):
-        #         lines = lines[:-1]
-        #     response_text = "\n".join(lines).strip()
-            
+
+        response = openai_client.chat.completions.create(
+            model=TRANSLATION_MODEL,
+            messages=[
+                {"role": "system", "content": system_instruction},
+                {"role": "user", "content": input_json_str}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+
+        response_text = response.choices[0].message.content.strip()
         translated_data = json.loads(response_text)
+
+        translations_list = []
         if isinstance(translated_data, list):
-            for item in translated_data:
+            translations_list = translated_data
+        elif isinstance(translated_data, dict):
+            # Covert Dictionary object to List
+            print("translated data : ", translated_data)
+            translations_list = translated_data.get("translated_tasks", [])
+            if not translations_list:
+                for val in translated_data.values():
+                    if isinstance(val, list):
+                        translations_list = val
+                        break
+        else :
+            print("Trasnlation task Output is not in the form of list or dictionary")
+
+        if isinstance(translations_list, list):
+            for item in translations_list:
                 idx = item.get("index")
                 if idx is not None:
                     try:
@@ -742,7 +733,7 @@ def translate_tasks(tasks: List[dict], translation_language: str) -> List[dict]:
                     except ValueError:
                         pass
     except Exception as e:
-        logger.error(f"Error during Gemini task translation: {e}", exc_info=True)
+        logger.error(f"Error during Qwen task translation: {e}", exc_info=True)
 
     return tasks
          

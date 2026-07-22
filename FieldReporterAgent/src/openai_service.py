@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Load environment variables from .env file if it exists
+# Load environment variables from .env file if it exists (Updated config)
 env_path = Path(__file__).parent.parent / ".env"
 dotenv.load_dotenv(dotenv_path=env_path)
 
@@ -20,7 +20,7 @@ ENV_MODE = os.getenv("ENV_MODE", "local").lower()
 MODEL = os.getenv("MODEL", "qwen/qwen-2.5-7b-instruct")
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0.2"))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-LLM_BASE_URL = os.getenv("LLM_BASE_URL")
+OPENROUTER_URL = os.getenv("OPENROUTER_URL")
 
 
 def safe_int(val, default):
@@ -35,22 +35,25 @@ class OpenAIService:
         self.logger = logger or logging.getLogger(__name__)
         self.model = model or os.getenv("MODEL", "qwen/qwen-2.5-7b-instruct")
         self.temperature = temperature if temperature is not None else float(os.getenv("MODEL_TEMPERATURE", "0.2"))
+
         self.provider = os.getenv("LLM_PROVIDER", "").lower()
+        if(self.provider == "openrouter"):
+            # Openrouter setup
+            api_key = os.getenv("OPENROUTER_API_KEY")
+            if not api_key:
+                self.logger.warning("Warning: OPENROUTER_API_KEY is not set.")
 
-        api_key = os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("LLM_BASE_URL")
-
-        # Automatically default base_url to OpenRouter if provider is set to openrouter
-        if self.provider.lower() == "openrouter" and not base_url:
-            base_url = "https://openrouter.ai/api/v1"
-
-        if not api_key:
-            self.logger.warning("Warning: OPENAI_API_KEY is not set.")
-
-        client_kwargs = {"api_key": api_key}
-        if base_url:
-            client_kwargs["base_url"] = base_url
-
+            base_url = os.getenv("OPENROUTER_URL")
+            if not base_url:
+                self.logger.warning("Warning: OPENROUTER_URL is not set.")
+            client_kwargs = {"api_key": api_key, "base_url": base_url}
+        else:
+            # Open AI API Setup
+            api_key = os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                self.logger.warning("Warning: OPENAI_API_KEY is not set.")
+            client_kwargs = {"api_key": api_key}
+        
         self.client = OpenAI(**client_kwargs)
 
     def _build_system_prompt(self) -> str:
@@ -75,12 +78,12 @@ class OpenAIService:
                 	Instructions for Task Extraction:
                     ○ Each task should be clear and actionable, suitable for assignment to a team member. Focus on the 'what' needs to be done and 'where' it needs to be done."
                     ○ Inspector Comments may contain technical, industry specific terms. Use them appropriately while generating tasks.
-                    ○ Inspector comments may have some sentences or words in Hindi or Marathi. Generate output in English only.
+                    ○ Inspector comments may have some sentences or words in Indian local languages. Generate output in English only.
                     ○ Tone: Professional, objective, and urgent regarding safety.
                     ○ Technical Accuracy: Maintain any specific measurements, floor numbers, or trade-specific terminology (e.g., HVAC, MEP, Grade).
                     ○ The task dscription shall be accurate and summarizd. Do not add stuff on your own. Do not become too creative here.
                     ○ Handling Ambiguity: If a comment is unclear, list it under a 'Clarification Needed' section rather than guessing the task." 
-                    ○ Safety First: Prioritize any observations related to OSHA/safety violations at the top of the task list.
+                    ○ Safety First: Pay attention to observations related to OSHA/safety violations.
                     ○ De-noising: Ignore filler words, personal anecdotes, or irrelevant chatter in the raw text.
                     ○ Consider today's date and the current time of the reference. Whenever you provide days and time, provide date as well with reference of current date and time. Dates shall be outputted in dd-mm-yyyy format.
                     """
@@ -246,7 +249,7 @@ def safe_transform_tasks(raw_input) -> Dict[str, Any]:
 
     cleaned_tasks = {
         "summary": summary,
-        "tasks": [
+        "tasks": sorted([
             {
                 "task_title": t.get("task_title", "Untitled Task"),
                 "task_description": t.get("task_description", ""),
@@ -255,7 +258,7 @@ def safe_transform_tasks(raw_input) -> Dict[str, Any]:
                 "start_time": get_int(t.get("segment_start_time"), 0),
                 "end_time": get_int(t.get("segment_end_time"), 0)
             } for t in raw_tasks if isinstance(t, dict)
-        ],
+        ], key=lambda x: x["start_time"]),
         "clarification_needed": [
             {
                 "task_title": c.get("task_title", "Clarification"),

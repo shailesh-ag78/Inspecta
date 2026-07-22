@@ -184,13 +184,7 @@ def tasks_generation(transcript_url_path, tasks_file_path, metadata: dict) -> di
             f"{metadata['input_prompt']}. "
             f"\n\nHere is the transcript in json format:\n\n{transcript_content}"
         )
-        
-        # original_prompt = f"{system_prompt}\n{user_prompt}"
-        # ALLOWED_PROMPT_LENGTH = 790  # Adjust based on model limits and expected system prompt size
-        # logger.info(f"Original Prompt and Length: {original_prompt} : {len(original_prompt)} chars. Using {ALLOWED_PROMPT_LENGTH} characters only")
-        # max_user_len = ALLOWED_PROMPT_LENGTH - len(system_prompt) - 1 # 1 for newline separation
-        # prompt = f"{system_prompt}\n{user_prompt[:max_user_len]}"
-        
+                
         op_tasks = openai_service.generate_tasks_from_transcript(transcript_url_path, user_prompt=user_prompt)
         if not op_tasks:
             logger.warning(f"Task generation resulted in empty dictionary for {transcript_url_path}")            
