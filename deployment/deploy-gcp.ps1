@@ -62,6 +62,21 @@ param(
 
 $OPENAI_MODEL = "gpt-4o"
 $MODEL_TEMPERATURE = "0.2"
+$TRANSLATION_MODEL = "qwen/qwen-2.5-7b-instruct"
+$LLM_PROVIDER = "openrouter"
+$OPENROUTER_URL = "https://openrouter.ai/api/v1"
+
+# Environment variables to be injected
+$EnvVars = @{
+    "ENV_MODE"          = "$ENV_MODE"
+    "OPENAI_API_KEY"    = "OPENAI_API_KEY"
+    "OPENAI_BASE_URL"   = "$OPENAI_BASE_URL"
+    "OPENAI_MODEL"      = "$OPENAI_MODEL"
+    "MODEL_TEMPERATURE" = "$MODEL_TEMPERATURE"
+    "TRANSLATION_MODEL" = "$TRANSLATION_MODEL"
+    "LLM_PROVIDER"      = "$LLM_PROVIDER"
+    "OPENROUTER_URL"    = "$OPENROUTER_URL"
+}
 
 $ErrorActionPreference = "Stop"
 
@@ -308,17 +323,38 @@ gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
     --role="roles/secretmanager.secretAccessor" `
     --quiet
 
+Write-Host "Granting secretAccessor permissions for OPENROUTER_API_KEY to taskgen-service-sa..."
+gcloud secrets add-iam-policy-binding OPENROUTER_API_KEY `
+    --member="serviceAccount:taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+
 Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to executor-service-sa..."
 gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/secretmanager.secretAccessor" `
     --quiet
 
+Write-Host "Granting secretAccessor permissions for OPENROUTER_API_KEY to executor-service-sa..."
+gcloud secrets add-iam-policy-binding OPENROUTER_API_KEY `
+    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
+
 Write-Host "Granting secretAccessor permissions for GEMINI_TRANSLATION_API_KEY to ui-service-sa..."
 gcloud secrets add-iam-policy-binding GEMINI_TRANSLATION_API_KEY `
     --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/secretmanager.secretAccessor" `
     --quiet
+
+Write-Host "Granting secretAccessor permissions for OPENROUTER_API_KEY to ui-service-sa..."
+gcloud secrets add-iam-policy-binding OPENROUTER_API_KEY `
+    --member="serviceAccount:ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/secretmanager.secretAccessor" `
+    --quiet
+
 
 # -------------------------------------------------------------
 # 6. Deploy Services to Cloud Run
@@ -362,7 +398,7 @@ if ($DeployAgents) {
         --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest,OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE"
+        --set-env-vars="ENV_MODE=$ENV_MODE,TRANSLATION_MODEL=$TRANSLATION_MODEL"
 
     Write-Host "Deploying agent-taskgenerator (FieldReporter)..." -ForegroundColor Cyan
     gcloud run deploy agent-taskgenerator `
@@ -375,10 +411,10 @@ if ($DeployAgents) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="taskgen-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest" `
+        --set-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest,OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE,OPENAI_MODEL=$OPENAI_MODEL,MODEL_TEMPERATURE=$MODEL_TEMPERATURE"
+        --set-env-vars="ENV_MODE=$ENV_MODE,OPENAI_MODEL=$OPENAI_MODEL,MODEL_TEMPERATURE=$MODEL_TEMPERATURE,LLM_PROVIDER=$LLM_PROVIDER,OPENROUTER_URL=$OPENROUTER_URL"
 
 
     # Fetch Agent URLs
@@ -411,11 +447,11 @@ if ($DeployAgents) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest" `
+        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest,OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,UI_PROJECT_ID=$UiProjectId"
-        
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,UI_PROJECT_ID=$UiProjectId,TRANSLATION_MODEL=$TRANSLATION_MODEL,OPENROUTER_URL=$OPENROUTER_URL"
+            
     # Fetch Executor URL
     Write-Host "Retrieving executor endpoint..."
     $ExecutorUrl = (gcloud run services list --filter="metadata.name=executor-service" --format="value(URL)")
@@ -440,10 +476,10 @@ if ($DeployUI) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest" `
+        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest,OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl,UI_PROJECT_ID=$UiProjectId"
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl,UI_PROJECT_ID=$UiProjectId,TRANSLATION_MODEL=$TRANSLATION_MODEL,OPENROUTER_URL=$OPENROUTER_URL"
 
 
     #$UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
