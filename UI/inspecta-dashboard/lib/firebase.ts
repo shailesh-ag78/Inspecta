@@ -10,8 +10,12 @@ import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 //   appId: "1:724532306322:web:c7bb16a6b055db23c1a14b"
 // };
 
+// Initialize Firebase safely for SSR/prerendering
+const isBrowser = typeof window !== 'undefined';
+const hasApiKey = !!process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "dummy-api-key-for-build",
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
@@ -19,9 +23,8 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// Initialize Firebase
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-const auth = getAuth(app);
+const app = (isBrowser || hasApiKey) ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()) : null;
+const auth = app ? getAuth(app) : ({} as any);
 const googleProvider = new GoogleAuthProvider();
 
 export { app, auth, googleProvider };
