@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useDashboard } from "@/lib/context";
-import { 
-  Plus, 
-  Video, 
-  Mic, 
-  Camera, 
-  Upload, 
-  Square, 
-  CheckCircle2, 
-  Loader2, 
+import {
+  Plus,
+  Video,
+  Mic,
+  Camera,
+  Upload,
+  Square,
+  CheckCircle2,
+  Loader2,
   AlertCircle,
   FileImage,
   FileAudio,
@@ -32,7 +32,7 @@ interface SessionIncident {
 }
 
 export default function InspectionPage() {
-  const { 
+  const {
     backendSites,
     siteInspections,
     handleAddInspectionSubmit,
@@ -192,11 +192,11 @@ export default function InspectionPage() {
         const fileExtension = activeOverlay === "video" ? "webm" : "wav";
         const mimeType = activeOverlay === "video" ? "video/webm" : "audio/wav";
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-        
+
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
         const filename = `recorded_${overlayCategory}_${timestamp}.${fileExtension}`;
         const file = new File([blob], filename, { type: mimeType });
-        
+
         cleanUpMedia();
         await uploadMediaFile(file, activeOverlay === "video" ? "video" : "audio", overlayCategory);
       };
@@ -243,7 +243,7 @@ export default function InspectionPage() {
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const filename = `snapshot_${overlayCategory}_${timestamp}.jpg`;
     const file = new File([photoBlob], filename, { type: "image/jpeg" });
-    
+
     cleanUpMedia();
     await uploadMediaFile(file, "image", overlayCategory);
   };
@@ -360,7 +360,7 @@ export default function InspectionPage() {
     try {
       setIsCreatingInspection(true);
       setInspectionError(null);
-      
+
       await handleAddInspectionSubmit({
         siteId: selectedSiteId,
         friendlyName: newInspectionTitle.trim()
@@ -400,13 +400,13 @@ export default function InspectionPage() {
   const hyperlinkStyle = "text-base font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-slate-50 dropdown-scrollbar flex flex-col">
-      <div className="p-6 flex flex-col items-start justify-start w-full min-h-full">
+    <div className="h-full w-full overflow-y-auto bg-slate-50 dropdown-scrollbar">
+      <div className="p-6 flex flex-col items-start justify-start w-full">
         <div className="w-full bg-pane-bg/98 rounded-2xl border border-slate-200/70 shadow-md overflow-hidden flex flex-col">
-          
+
           {/* Configuration Body Content */}
           <div className="p-5 flex flex-col gap-6">
-            
+
             {/* Site Selector (Bounded/fixed width) */}
             <div className="flex flex-col gap-2 w-full max-w-[485px]">
               <label className={labelHeaderStyle}>
@@ -470,7 +470,7 @@ export default function InspectionPage() {
                 ) : (
                   <form onSubmit={handleCreateInspection} className="flex flex-col gap-3.5 bg-slate-50 p-4 rounded-lg border border-slate-200/80 animate-fadeIn">
                     <span className="text-xs text-slate-600 font-bold uppercase">Adding New Inspection</span>
-                    
+
                     <div className="flex flex-col gap-1">
                       <label className="text-[11px] text-slate-500 font-bold">Inspection Title</label>
                       <input
@@ -500,7 +500,7 @@ export default function InspectionPage() {
                         className="px-3.5 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition-colors"
                       >
                         Cancel
-                    </button>
+                      </button>
                       <button
                         type="submit"
                         disabled={isCreatingInspection || !newInspectionTitle.trim()}
@@ -531,8 +531,12 @@ export default function InspectionPage() {
                   onClick={() => openRecordingOverlay("audio", "incident")}
                   className={hyperlinkStyle}
                 >
-                  <Mic className="w-5 h-5 text-red-500 shrink-0" />
-                  <span>Record Audio</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Mic className="w-5 h-5 text-red-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Record Audio</span>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -540,8 +544,12 @@ export default function InspectionPage() {
                   onClick={() => openRecordingOverlay("video", "incident")}
                   className={hyperlinkStyle}
                 >
-                  <Video className="w-5 h-5 text-blue-500 shrink-0" />
-                  <span>Record Video</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Video className="w-5 h-5 text-blue-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Record Video</span>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -549,8 +557,12 @@ export default function InspectionPage() {
                   onClick={() => openRecordingOverlay("image", "incident")}
                   className={hyperlinkStyle}
                 >
-                  <Camera className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>Take Picture</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Camera className="w-5 h-5 text-green-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Picture</span>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -558,8 +570,12 @@ export default function InspectionPage() {
                   onClick={() => triggerFileUpload("incident")}
                   className={hyperlinkStyle}
                 >
-                  <Upload className="w-5 h-5 text-purple-600 shrink-0" />
-                  <span>Upload File</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Upload className="w-5 h-5 text-purple-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Upload File</span>
+                  </div>
                 </button>
               </div>
             </div>
@@ -574,8 +590,12 @@ export default function InspectionPage() {
                   onClick={() => openRecordingOverlay("audio", "field_note")}
                   className={hyperlinkStyle}
                 >
-                  <Mic className="w-5 h-5 text-red-500 shrink-0" />
-                  <span>Record Audio</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Mic className="w-5 h-5 text-red-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Record Audio</span>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -583,8 +603,12 @@ export default function InspectionPage() {
                   onClick={() => openRecordingOverlay("video", "field_note")}
                   className={hyperlinkStyle}
                 >
-                  <Video className="w-5 h-5 text-blue-500 shrink-0" />
-                  <span>Record Video</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Video className="w-5 h-5 text-blue-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Record Video</span>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -592,8 +616,12 @@ export default function InspectionPage() {
                   onClick={() => openRecordingOverlay("image", "field_note")}
                   className={hyperlinkStyle}
                 >
-                  <Camera className="w-5 h-5 text-emerald-600 shrink-0" />
-                  <span>Take Picture</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Camera className="w-5 h-5 text-green-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Picture</span>
+                  </div>
                 </button>
                 <button
                   type="button"
@@ -601,8 +629,12 @@ export default function InspectionPage() {
                   onClick={() => triggerFileUpload("field_note")}
                   className={hyperlinkStyle}
                 >
-                  <Upload className="w-5 h-5 text-purple-600 shrink-0" />
-                  <span>Upload File</span>
+                  <div className="flex items-center">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
+                      <Upload className="w-5 h-5 text-purple-600 shrink-0" />
+                    </div>
+                    <span className="ml-3">Upload File</span>
+                  </div>
                 </button>
               </div>
             </div>
@@ -633,7 +665,7 @@ export default function InspectionPage() {
             {/* Session Queue List */}
             <div className="flex flex-col gap-3 mt-2 border-t border-slate-200/70 pt-4">
               <h3 className={labelHeaderStyle}>Session Queue</h3>
-              
+
               {sessionIncidents.length === 0 ? (
                 <div className="text-slate-400 text-sm italic">
                   No incidents in this session yet.
@@ -641,8 +673,8 @@ export default function InspectionPage() {
               ) : (
                 <div className="flex flex-col gap-2.5 max-w-[560px]">
                   {sessionIncidents.map((incident) => (
-                    <div 
-                      key={incident.id} 
+                    <div
+                      key={incident.id}
                       className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm hover:border-slate-350 transition-colors"
                     >
                       <div className="flex items-center gap-3.5 min-w-0">
@@ -666,12 +698,11 @@ export default function InspectionPage() {
                         </div>
                       </div>
 
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                        incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
                         incident.status === "Processing" ? "bg-amber-50 text-amber-600 border border-amber-200/50 animate-pulse" :
-                        incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
-                        "bg-rose-50 text-rose-600 border border-rose-200/50"
-                      }`}>
+                          incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
+                            "bg-rose-50 text-rose-600 border border-rose-200/50"
+                        }`}>
                         {incident.status === "Uploading" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
                         {incident.status === "Processing" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
                         {incident.status === "Completed" ? "Complete" : incident.status}
@@ -697,7 +728,7 @@ export default function InspectionPage() {
                 {activeOverlay === "image" && <Camera className="w-4 h-4 text-emerald-400" />}
                 <span>Record {activeOverlay} ({overlayCategory === "incident" ? "Incident" : "Field Note"})</span>
               </h4>
-              <button 
+              <button
                 onClick={cleanUpMedia}
                 className="text-slate-400 hover:text-white p-1 transition-colors"
               >
