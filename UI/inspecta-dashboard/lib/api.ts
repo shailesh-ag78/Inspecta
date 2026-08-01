@@ -87,8 +87,10 @@ export function formatTasks(tasks: any[]): any[] {
 }
 
 export function formatIncidents(incidents: any[]): any[] {
-  return (incidents || []).map((incident) => {
-    const status = incident.has_pending
+  return (incidents || [])
+    .filter(incident => incident.inspection_id)
+    .map((incident) => {
+      const status = incident.has_pending
       ? 'pending'
       : incident.has_in_progress
         ? 'active'
@@ -119,17 +121,17 @@ export function formatIncidents(incidents: any[]): any[] {
 }
 
 export function formatSiteInspections(combinations: any[]): any[] {
-  return (combinations || []).map((combo) => ({
-    site_id: String(combo.site_id),
-    site_name: combo.site_name,
-    address: combo.address || null,
-    city: combo.city || null,
-    state: combo.state || null,
-    zip: combo.zip || null,
-    inspection_id: combo.inspection_id ? String(combo.inspection_id) : null,
-    inspection_created_at: combo.inspection_created_at || null,
-    label: combo.inspection_id
-      ? `${combo.site_name?.substring(0, 20) || `Site ${combo.site_id}`} :: ${combo.inspection_friendly_name?.substring(0, 25) || combo.inspection_id?.substring(0, 8)}`
-      : `${combo.site_name?.substring(0, 20) || `Site ${combo.site_id}`} :: No Inspection`,
-  }));
+  return (combinations || [])
+    .filter(combo => combo.inspection_id)
+    .map((combo) => ({
+      site_id: String(combo.site_id),
+      site_name: combo.site_name,
+      address: combo.address || null,
+      city: combo.city || null,
+      state: combo.state || null,
+      zip: combo.zip || null,
+      inspection_id: String(combo.inspection_id),
+      inspection_created_at: combo.inspection_created_at || null,
+      label: combo.inspection_friendly_name?.substring(0, 25) || `Inspection ${combo.inspection_id?.substring(0, 8)}`,
+    }));
 }

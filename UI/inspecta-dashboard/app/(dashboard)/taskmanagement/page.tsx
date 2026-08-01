@@ -54,6 +54,11 @@ export default function TaskManagementPage() {
     uniqueSites,
     handleAddInspectionSubmit,
     uploadIncidentVideo,
+    selectedMillerSites,
+    backendSites,
+    selectedMillerInspections,
+    selectedMillerIncidents,
+    millerIncidents,
   } = useDashboard();
 
   // Local UI States
@@ -431,16 +436,13 @@ export default function TaskManagementPage() {
     (item) => (item.inspection_id || item.site_id) === selectedInspection
   );
 
-  const hasActiveInspection = kpiSelectedItem && kpiSelectedItem.inspection_id;
+  const kpiInspectionsForSiteCount = selectedMillerInspections.length;
 
-  const kpiInspectionsForSiteCount = hasActiveInspection
-    ? siteInspections.filter(item => item.site_id === kpiSelectedItem.site_id && item.inspection_id).length
-    : siteInspections.filter(item => item.inspection_id).length;
-
-  const activeIncidentsCount = incidents.length;
+  const activeIncidentsCount = selectedMillerIncidents.length;
 
   const kpiOneWeekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
   const kpiWeeklyInspections = siteInspections.filter(item => {
+    if (!selectedMillerInspections.includes(String(item.inspection_id || item.site_id))) return false;
     if (!item.inspection_created_at) return false;
     const createdTime = new Date(item.inspection_created_at).getTime();
     return createdTime >= kpiOneWeekAgo;
@@ -467,7 +469,7 @@ export default function TaskManagementPage() {
   const kpiActiveSevere = tasks.filter(t => t.severity_id === 1 && t.task_status !== 'completed').length;
 
   const kpiLastInspectionObj = [...siteInspections]
-    .filter(item => !kpiSelectedItem || item.site_id === kpiSelectedItem.site_id)
+    .filter(item => selectedMillerInspections.includes(String(item.inspection_id || item.site_id)))
     .filter(item => item.inspection_created_at)
     .sort((a, b) => {
       const aTime = a.inspection_created_at ? new Date(a.inspection_created_at).getTime() : 0;
@@ -542,7 +544,7 @@ export default function TaskManagementPage() {
               </div>
             </div>
             {!isFiltersCollapsed && (
-              <div className="h-[180px] px-3 py-4 bg-slate-50/50 overflow-y-auto dropdown-scrollbar">
+              <div className="h-auto px-3 py-4 bg-slate-50/50">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Types Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
@@ -741,9 +743,9 @@ export default function TaskManagementPage() {
               <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
                 <i className="fa-solid fa-chart-line text-slate-600 text-lg mr-2"></i>
                 <span className="tracking-wide select-none flex items-center flex-wrap gap-x-1">
-                  Completion {kpiCompletionRate}%
+                  Completion : {kpiCompletionRate}%
                   <span className="mx-4 text-slate-500"></span>
-                  Open Severe {kpiActiveSevere}
+                  Open Severe : {kpiActiveSevere}
                   <span className="mx-4 text-slate-500"></span>
                   Last inspection : {kpiLastInspectionDate}
                 </span>
@@ -767,7 +769,13 @@ export default function TaskManagementPage() {
                       <div>
                         <div className="flex flex-col border-b border-slate-300/80 pb-2 mb-2">
                           <span className="font-bold text-slate-900 truncate">
-                            {kpiSelectedItem ? kpiSelectedItem.inspection_id ? kpiSelectedItem.site_name : 'No Inspection' : 'All Sites'}
+                            {selectedMillerSites.length === 0
+                              ? "None"
+                              : selectedMillerSites.length === backendSites.length
+                                ? "All Sites"
+                                : selectedMillerSites.length === 1
+                                  ? selectedMillerSites[0]
+                                  : `${selectedMillerSites.length} Selected`}
                           </span>
                         </div>
                         <div className="flex justify-between mb-1.5">
@@ -933,49 +941,30 @@ export default function TaskManagementPage() {
                             })()
                           )}
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {editingTaskId === task.id ? (
-                            <select
-                              value={editingSeverity}
-                              onChange={(e) => setEditingSeverity(parseInt(e.target.value))}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-gradient-to-br from-slate-50 to-blue-50/70 text-slate-700"
-                            >
-                              <option value={1}>🔴 Severe</option>
-                              <option value={2}>🟡 Regular</option>
-                              <option value={3}>🟢 Low</option>
-                            </select>
-                          ) : null}
-
-                          {editingTaskId === task.id ? (
-                            <select
-                              value={editingStatus}
-                              onChange={(e) => setEditingStatus(parseInt(e.target.value))}
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-gradient-to-br from-slate-50 to-blue-50/70 text-slate-700"
-                            >
-                              <option value={1}>🕒 Pending</option>
-                              <option value={2}>🔄 In Progress</option>
-                              <option value={3}>👁️ Review</option>
-                              <option value={4}>✅ Completed</option>
-                              <option value={5}>❌ Failed</option>
-                            </select>
-                          ) : (
-                            task.status_label && (
-                              <>
-                                <div className="hidden sm:flex items-center gap-1.5 text-xs capitalize text-slate-500 border border-slate-200 rounded px-2 py-0.5 bg-slate-50/50">
-                                  <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} ${getTaskStatusColor(task.task_status)} text-[11px]`} />
-                                  <span>{task.status_label}</span>
-                                </div>
-                                <span className="inline sm:hidden text-sm" title={task.status_label}>
-                                  {task.task_status === 'pending' ? '🕒' :
-                                    task.task_status === 'in_progress' ? '🔄' :
-                                      task.task_status === 'review' ? '👁️' :
-                                        task.task_status === 'completed' ? '✅' :
-                                          task.task_status === 'failed' ? '❌' : '❓'}
-                                </span>
-                              </>
-                            )
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {editingTaskId !== task.id && (
+                            <>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openTaskForEditing(task);
+                                }}
+                                title="Modify task"
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                              >
+                                <i className="fa-solid fa-pen text-[10px]" />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTaskClick(task, true);
+                                }}
+                                title="Play video"
+                                className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
+                              >
+                                <i className="fa-solid fa-play text-[10px]" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -1050,37 +1039,56 @@ export default function TaskManagementPage() {
                             })()
                           )}
                         </div>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {editingTaskId !== task.id && (
-                            <>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleTaskClick(task, true);
-                                }}
-                                title="Play video"
-                                className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
-                              >
-                                <i className="fa-solid fa-play text-[10px]" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  openTaskForEditing(task);
-                                }}
-                                title="Modify task"
-                                className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:text-slate-900 hover:bg-slate-200 transition-colors"
-                              >
-                                <i className="fa-solid fa-pen text-[10px]" />
-                              </button>
-                            </>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {editingTaskId === task.id ? (
+                            <select
+                              value={editingSeverity}
+                              onChange={(e) => setEditingSeverity(parseInt(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-1 bg-gradient-to-br from-slate-50 to-blue-50/70 text-slate-700 h-[26px]"
+                            >
+                              <option value={1}>🔴 Severe</option>
+                              <option value={2}>🟡 Regular</option>
+                              <option value={3}>🟢 Low</option>
+                            </select>
+                          ) : null}
+
+                          {editingTaskId === task.id ? (
+                            <select
+                              value={editingStatus}
+                              onChange={(e) => setEditingStatus(parseInt(e.target.value))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-1 bg-gradient-to-br from-slate-50 to-blue-50/70 text-slate-700 h-[26px]"
+                            >
+                              <option value={1}>🕒 Pending</option>
+                              <option value={2}>🔄 In Progress</option>
+                              <option value={3}>👁️ Review</option>
+                              <option value={4}>✅ Completed</option>
+                              <option value={5}>❌ Failed</option>
+                            </select>
+                          ) : (
+                            task.status_label && (
+                              <>
+                                <div className="hidden sm:flex items-center gap-1.5 text-xs capitalize text-slate-500 border border-slate-200 rounded px-2 py-0.5 bg-slate-50/50">
+                                  <i className={`fa-solid ${getTaskStatusIcon(task.task_status)} ${getTaskStatusColor(task.task_status)} text-[11px]`} />
+                                  <span>{task.status_label}</span>
+                                </div>
+                                <span className="inline sm:hidden text-sm" title={task.status_label}>
+                                  {task.task_status === 'pending' ? '🕒' :
+                                    task.task_status === 'in_progress' ? '🔄' :
+                                      task.task_status === 'review' ? '👁️' :
+                                        task.task_status === 'completed' ? '✅' :
+                                          task.task_status === 'failed' ? '❌' : '❓'}
+                                </span>
+                              </>
+                            )
                           )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
                               toggleTaskExpansion(task.id);
                             }}
-                            className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center"
+                            className="text-slate-500 hover:text-blue-600 transition-colors p-1 hover:bg-blue-50 rounded-lg border border-transparent hover:border-blue-200 flex items-center justify-center ml-1.5"
                           >
                             <ChevronLeft className={`w-4.5 h-4.5 transform transition-transform ${isExpanded ? 'rotate-90' : '-rotate-90'}`} />
                           </button>
