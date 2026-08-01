@@ -480,132 +480,13 @@ export default function TaskManagementPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Controls Bar for Inspection and Incident selections */}
-      <div className="bg-slate-100 border-b border-slate-200/70 px-3 py-1 shadow-sm sticky top-0 z-30 shrink-0">
-        <div className="max-w-[1600px] w-full mx-auto flex flex-wrap items-center justify-start gap-4 sm:gap-6">
-          <div className="flex flex-wrap items-center gap-8 justify-start flex-1">
-            {/* Inspection Dropdown Group */}
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div ref={inspectionDropdownRef} className="relative w-full sm:w-[305px] shrink-0">
-                <button
-                  onClick={() => setIsInspectionDropdownOpen(!isInspectionDropdownOpen)}
-                  className={`w-full relative rounded-2xl border ${theme.id === 'premiumBlue' ? 'border-blue-200 hover:border-blue-400' : 'border-indigo-200 hover:border-indigo-400'} bg-white px-3 py-0.5 text-left text-sm text-slate-800 shadow-sm flex flex-col justify-center min-h-[38px] transition-all hover:bg-slate-50 cursor-pointer`}
-                >
-                  <span className={`text-[9px] uppercase tracking-[0.2em] ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'} block leading-tight`}>Inspection</span>
-                  {siteInspectionsLoading ? (
-                    <Loader className="w-4 h-4 animate-spin text-slate-500 mt-0.5" />
-                  ) : (
-                    <span className="block truncate text-xs text-slate-850 font-semibold pr-6 mt-0.5">
-                      {siteInspections.find(item => (item.inspection_id || item.site_id) === selectedInspection)?.label || 'Select Inspection'}
-                    </span>
-                  )}
-                  <ChevronDown className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${theme.id === 'premiumBlue' ? 'text-blue-500' : 'text-indigo-500'}`} />
-                </button>
-                {isInspectionDropdownOpen && (
-                  <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 py-1.5 dropdown-scrollbar">
-                    <button
-                      onClick={() => {
-                        setSelectedInspection("");
-                        setIsInspectionDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${selectedInspection === "" ? `bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white font-semibold` : 'text-slate-700'
-                        }`}
-                    >
-                      🌍 All Inspections (Company)
-                    </button>
-                    {siteInspections.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-slate-400">No inspections available</div>
-                    ) : (
-                      siteInspections.map(item => {
-                        const val = item.inspection_id || item.site_id;
-                        const isSelected = val === selectedInspection;
-                        return (
-                          <button
-                            key={`${item.site_id}-${item.inspection_id}`}
-                            onClick={() => {
-                              setSelectedInspection(val);
-                              setIsInspectionDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${isSelected ? `bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white font-semibold` : 'text-slate-700'
-                              }`}
-                          >
-                            {item.label}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => setIsAddInspectionOpen(true)}
-                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-50 hover:scale-105 cursor-pointer shrink-0"
-                title="Add Inspection"
-              >
-                <Plus className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Incident Dropdown Group */}
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <div ref={incidentDropdownRef} className="relative w-full sm:w-[277px] shrink-0">
-                <button
-                  onClick={() => setIsIncidentDropdownOpen(!isIncidentDropdownOpen)}
-                  className={`w-full relative rounded-2xl border ${theme.id === 'premiumBlue' ? 'border-blue-200 hover:border-blue-400' : 'border-indigo-200 hover:border-indigo-400'} bg-white px-3 py-0.5 text-left text-sm text-slate-800 shadow-sm flex flex-col justify-center min-h-[38px] transition-all hover:bg-slate-50 cursor-pointer`}
-                >
-                  <span className={`text-[9px] uppercase tracking-[0.2em] ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'} block leading-tight`}>Incident</span>
-                  {incidentsLoading ? (
-                    <Loader className="w-4 h-4 animate-spin text-slate-500 mt-0.5" />
-                  ) : (
-                    <span className="block truncate text-xs text-slate-850 font-semibold pr-6 mt-0.5">
-                      {(() => {
-                        const incident = incidents.find(inc => inc.id === selectedIncidentId);
-                        if (!incident) return 'Select Incident';
-                        return incident.title || `Incident ${incident.id.slice(0, 4)} - ${incident.created ? new Date(incident.created).toLocaleTimeString() : 'Recent'}`;
-                      })()}
-                    </span>
-                  )}
-                  <ChevronDown className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${theme.id === 'premiumBlue' ? 'text-blue-500' : 'text-indigo-500'}`} />
-                </button>
-                {isIncidentDropdownOpen && (
-                  <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 py-1.5 dropdown-scrollbar">
-                    {incidents.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-slate-400">No incidents available</div>
-                    ) : (
-                      incidents.map(incident => {
-                        const isSelected = incident.id === selectedIncidentId;
-                        const label = incident.title || `Incident ${incident.id.slice(0, 4)} - ${incident.created ? new Date(incident.created).toLocaleTimeString() : 'Recent'}`;
-                        return (
-                          <button
-                            key={incident.id}
-                            onClick={() => {
-                              setSelectedIncidentId(incident.id);
-                              setIsIncidentDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${isSelected ? `bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white font-semibold` : 'text-slate-700'
-                              }`}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="hidden lg:flex h-8 w-8 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-600 transition hover:bg-slate-55 hover:scale-105 cursor-pointer shrink-0"
-                title="Upload incident video"
-              >
-                <Upload className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={uploadIncidentVideo}
+        accept="video/*"
+        className="hidden"
+      />
 
       {/* Error Messages */}
       {(siteInspectionsError || incidentsError || tasksError) && (
@@ -626,7 +507,7 @@ export default function TaskManagementPage() {
 
 
           {/* KPIs Section */}
-          <div className="bg-[var(--pane-bg)]/98 border-b border-slate-200/70 mb-2 -mx-1.5 overflow-hidden shadow-md">
+          <div className="bg-pane-bg/98 border-b border-slate-200/70 mb-2 -mx-1.5 overflow-hidden shadow-md">
             <div
               onClick={() => setIsKpisCollapsed(!isKpisCollapsed)}
               className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
@@ -748,7 +629,7 @@ export default function TaskManagementPage() {
             )}
           </div>
 
-          <div className="sticky top-0 z-20 -mx-1.5 bg-[var(--pane-bg)]/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
+          <div className="sticky top-0 z-20 -mx-1.5 bg-pane-bg/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
             <div
               onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
               className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
@@ -992,7 +873,7 @@ export default function TaskManagementPage() {
                   <div
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
-                    className={`cursor-pointer bg-[var(--pane-bg)]/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${activeTask?.id === task.id
+                    className={`cursor-pointer bg-pane-bg/98 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${activeTask?.id === task.id
                       ? `border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20`
                       : `${theme.cardBorder} hover:border-blue-300`
                       }`}
@@ -1012,7 +893,7 @@ export default function TaskManagementPage() {
                               value={editingTitle}
                               onChange={(e) => setEditingTitle(e.target.value)}
                               onClick={(e) => e.stopPropagation()}
-                              className="flex-1 min-w-0 pr-2 rounded-xl border border-slate-300/80 bg-slate-50 px-2 py-1 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none"
+                              className="flex-1 min-w-0 pr-2 rounded-xl border border-slate-300/80 bg-gradient-to-br from-slate-50 to-blue-50/70 px-2 py-1 text-sm font-semibold text-slate-900 focus:border-blue-400 focus:outline-none"
                             />
                           ) : (
                             (() => {
@@ -1057,7 +938,7 @@ export default function TaskManagementPage() {
                               value={editingSeverity}
                               onChange={(e) => setEditingSeverity(parseInt(e.target.value))}
                               onClick={(e) => e.stopPropagation()}
-                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-white text-slate-700"
+                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-gradient-to-br from-slate-50 to-blue-50/70 text-slate-700"
                             >
                               <option value={1}>🔴 Severe</option>
                               <option value={2}>🟡 Regular</option>
@@ -1070,7 +951,7 @@ export default function TaskManagementPage() {
                               value={editingStatus}
                               onChange={(e) => setEditingStatus(parseInt(e.target.value))}
                               onClick={(e) => e.stopPropagation()}
-                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-white text-slate-700"
+                              className="text-[10px] border border-slate-300/80 rounded-lg px-1 py-0.5 bg-gradient-to-br from-slate-50 to-blue-50/70 text-slate-700"
                             >
                               <option value={1}>🕒 Pending</option>
                               <option value={2}>🔄 In Progress</option>
@@ -1107,7 +988,7 @@ export default function TaskManagementPage() {
                                 onChange={(e) => setEditingDescription(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                                 rows={Math.max(2, (task.task_description ? task.task_description.split('\n').length * 2 : 2))}
-                                className="w-full rounded-2xl border border-slate-300/80 bg-slate-50 p-3 text-sm text-slate-900 focus:border-blue-400 focus:outline-none"
+                                className="w-full rounded-2xl border border-slate-300/80 bg-gradient-to-br from-slate-50 to-blue-50/70 p-3 text-sm text-slate-900 focus:border-blue-400 focus:outline-none"
                               />
                               {taskEditError && (
                                 <p className="text-xs text-red-600">{taskEditError}</p>

@@ -299,8 +299,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   <Menu className="w-5 h-5" />
                 </button>
-                <div className="text-sm font-normal text-white truncate leading-normal" title={`${siteName} — ${inspectionName}`}>
-                  {siteName} — {inspectionName}
+                <div className="text-sm font-bold text-white truncate leading-normal" title={companyName || "Inspecta"}>
+                  {companyName || "Inspecta"}
                 </div>
               </div>
 

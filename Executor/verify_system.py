@@ -60,7 +60,7 @@ trans_main.openai_service = mock_openai
 
 # --- DB Setup ---
 # --- DB Setup ---
-DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=localhost port=5432"
+DB_DSN = "dbname=inspection_platform user=dev_user password=dev_password host=localhost port=5433"
 repo = IncidentRepository(DB_DSN)
 
 async def verify():

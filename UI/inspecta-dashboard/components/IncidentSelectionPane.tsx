@@ -49,22 +49,20 @@ export default function IncidentSelectionPane() {
         : `${selectedMillerIncidents.length} Selected`;
 
   return (
-    <div className="bg-[var(--pane-bg)]/98 border-b border-slate-200/70 overflow-hidden shadow-md w-full">
+    <div className="bg-pane-bg/98 border-b border-slate-200/70 overflow-hidden shadow-md w-full">
       <div
         onClick={() => setIsIncidentPaneCollapsed(!isIncidentPaneCollapsed)}
         className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
       >
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
-          <i className="fa-solid fa-building text-slate-600 text-lg mr-2"></i>
-          <span className="tracking-wide select-none flex items-center flex-wrap gap-x-1">
-            <span>Site :</span>
-            <span className="text-amber-800 font-extrabold">{currentSiteName}</span>
-            <span className="mx-4 text-slate-400"></span>
-            <span>Inspection :</span>
-            <span className="text-blue-600 font-extrabold">{currentInspectionName}</span>
-            <span className="mx-4 text-slate-400"></span>
-            <span>Incident :</span>
-            <span className="text-emerald-700 font-extrabold">{currentIncidentName}</span>
+        <div className="flex items-center gap-2 text-[13.5px]">
+          <i className="fa-solid fa-building text-slate-500 text-base mr-2"></i>
+          <span className="select-none flex items-center flex-wrap gap-x-1.5">
+            <span className="font-medium text-slate-500">Site:</span>
+            <span className="text-amber-800 font-bold mr-3.5">{currentSiteName}</span>
+            <span className="font-medium text-slate-500">Inspection:</span>
+            <span className="text-blue-600 font-bold mr-3.5">{currentInspectionName}</span>
+            <span className="font-medium text-slate-500">Incident:</span>
+            <span className="text-emerald-700 font-bold">{currentIncidentName}</span>
           </span>
         </div>
         <button
