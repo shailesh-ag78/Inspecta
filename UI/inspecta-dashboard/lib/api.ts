@@ -91,33 +91,33 @@ export function formatIncidents(incidents: any[]): any[] {
     .filter(incident => incident.inspection_id)
     .map((incident) => {
       const status = incident.has_pending
-      ? 'pending'
-      : incident.has_in_progress
-        ? 'active'
-        : incident.has_completed
-          ? 'completed'
-          : 'pending';
+        ? 'pending'
+        : incident.has_in_progress
+          ? 'active'
+          : incident.has_completed
+            ? 'completed'
+            : 'pending';
 
-    const formattedDate = new Date(incident.created_at)
-      .toLocaleString('en-GB', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true,
-      })
-      .replace(',', '');
+      const formattedDate = new Date(incident.created_at)
+        .toLocaleString('en-GB', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true,
+        })
+        .replace(',', '');
 
-    return {
-      id: String(incident.id),
-      inspection_id: String(incident.inspection_id),
-      title: `(${incident.id?.substring(0, 4) + 'XXX' || 'Unknown'}) -- ${formattedDate}`,
-      status,
-      created: new Date(incident.created_at).toISOString(),
-      task_count: parseInt(incident.task_count),
-    };
-  });
+      return {
+        id: String(incident.id),
+        inspection_id: String(incident.inspection_id),
+        title: `(${incident.id?.substring(0, 4) + 'XXX' || 'Unknown'}) -- ${formattedDate}`,
+        status,
+        created: new Date(incident.created_at).toISOString(),
+        task_count: parseInt(incident.task_count),
+      };
+    });
 }
 
 export function formatSiteInspections(combinations: any[]): any[] {
@@ -135,3 +135,88 @@ export function formatSiteInspections(combinations: any[]): any[] {
       label: combo.inspection_friendly_name?.substring(0, 25) || `Inspection ${combo.inspection_id?.substring(0, 8)}`,
     }));
 }
+
+/**
+ * Uploads a media file (image, audio, video) for a given inspection.
+ * This function handles the entire lifecycle: getting a signed URL, uploading the file,
+ * and registering the incident with the backend.
+ *
+ * @param file The file to upload.
+ * @param inspectionId The ID of the inspection to associate the file with.
+ * @param onProgress A callback function to report the upload progress.
+ * @returns A promise that resolves when the upload is complete.
+ */
+export async function uploadMediaFile(
+  file: File,
+  inspectionId: string,
+  onProgress: (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => void
+): Promise<void> {
+  if (!inspectionId) {
+    onProgress("Failed", "No inspection selected.");
+    return;
+  }
+
+  try {
+    onProgress("Uploading", `Uploading ${file.name}...`);
+
+    const uploadUrlResp = await authenticatedFetch(
+      `/api/get-upload-url?fileName=${encodeURIComponent(file.name)}`
+    );
+    if (!uploadUrlResp.ok) throw new Error("Failed to request upload signature");
+    const uploadUrlJson = await uploadUrlResp.json();
+    const {
+      upload_url: uploadUrl,
+      blob_name: blobName,
+      storage_type: storageType,
+    } = uploadUrlJson.data || {};
+
+    if (storageType === "gcs") {
+      const gcsResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file,
+      });
+      if (!gcsResponse.ok) throw new Error(`Cloud storage upload failed: ${gcsResponse.status}`);
+    } else if (storageType === "local") {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("filePath", uploadUrl);
+
+      const localResponse = await authenticatedFetch("/api/upload-local", {
+        method: "POST",
+        body: formData,
+      });
+      if (!localResponse.ok) throw new Error(`Local storage upload failed: ${localResponse.status}`);
+    } else {
+      throw new Error(`Unsupported storage configuration: ${storageType}`);
+    }
+
+    onProgress("Processing", "File uploaded, registering incident...");
+
+    const registerResp = await authenticatedFetch(
+      `/api/inspections/${inspectionId}/upload-incident`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          inspector_id: 0, // This is filled on the backend
+          file_url: uploadUrl,
+          blob_name: blobName,
+          translation_language: "" // This is filled on the backend
+        }),
+      }
+    );
+    if (!registerResp.ok) throw new Error("Failed to register incident record");
+
+    onProgress("Completed", "Upload complete.");
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "An unknown upload error occurred";
+    onProgress("Failed", errorMessage);
+    console.error("Incident upload failed:", err);
+  }
+}
+
+// Stub implementations for recording and picture taking
+export const recordVideo = async (): Promise<File> => { throw new Error("recordVideo not implemented"); };
+export const recordAudio = async (): Promise<File> => { throw new Error("recordAudio not implemented"); };
+export const takePicture = async (): Promise<File> => { throw new Error("takePicture not implemented"); };

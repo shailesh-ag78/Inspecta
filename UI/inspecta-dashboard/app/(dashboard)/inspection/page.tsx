@@ -18,7 +18,7 @@ import {
   X,
   ChevronRight
 } from "lucide-react";
-import { authenticatedFetch } from "@/lib/api";
+import { authenticatedFetch, uploadMediaFile as apiUploadMediaFile } from "@/lib/api";
 
 interface SessionIncident {
   id: string;
@@ -249,83 +249,42 @@ export default function InspectionPage() {
   };
 
   // Upload Logic
-  const uploadMediaFile = async (file: File, type: "audio" | "video" | "image", category: "incident" | "field_note") => {
+  const uploadMediaFile = async (file: File, fileType: "audio" | "video" | "image", category: "incident" | "field_note") => {
     if (!selectedInspectionId) return;
 
     const newId = `session_${Date.now()}`;
     const newIncident: SessionIncident = {
       id: newId,
       fileName: file.name,
-      fileType: type,
+      fileType: fileType,
       uploadedAt: new Date().toLocaleTimeString(),
       status: "Uploading",
       inspectionName: activeInspection?.label || "Inspection",
       siteName: activeSite?.site_name || activeSite?.name || "Site",
       category
     };
-
     setSessionIncidents(prev => [newIncident, ...prev]);
-    setUploadProgress(`Uploading ${file.name}...`);
     setIncidentError(null);
 
-    try {
-      const uploadUrlResp = await authenticatedFetch(
-        `/api/get-upload-url?fileName=${encodeURIComponent(file.name)}`
-      );
-      if (!uploadUrlResp.ok) throw new Error("Failed to request upload signature");
-      const uploadUrlJson = await uploadUrlResp.json();
-      const {
-        upload_url: uploadUrl,
-        blob_name: blobName,
-        storage_type: storageType,
-      } = uploadUrlJson.data || {};
-
-      if (storageType === "gcs") {
-        const gcsResponse = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type || "video/mp4" },
-          body: file,
-        });
-        if (!gcsResponse.ok) throw new Error(`Cloud storage upload failed: ${gcsResponse.status}`);
-      } else if (storageType === "local") {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("filePath", uploadUrl);
-
-        const localResponse = await authenticatedFetch("/api/upload-local", {
-          method: "POST",
-          body: formData,
-        });
-        if (!localResponse.ok) throw new Error(`Local storage upload failed: ${localResponse.status}`);
+    const onProgress = (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => {
+      if (status === "Uploading" || status === "Processing") {
+        setUploadProgress(message || status);
       } else {
-        throw new Error(`Unsupported storage configuration: ${storageType}`);
+        setUploadProgress(null);
       }
 
-      setSessionIncidents(prev => prev.map(inc => inc.id === newId ? { ...inc, status: "Processing" } : inc));
+      if (status === "Failed") {
+        setIncidentError(message || "Upload failed");
+      }
 
-      const registerResp = await authenticatedFetch(
-        `/api/inspections/${selectedInspectionId}/upload-incident`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            inspector_id: 0,
-            file_url: uploadUrl,
-            blob_name: blobName,
-            translation_language: ""
-          }),
-        }
+      setSessionIncidents(prev =>
+        prev.map(inc => (inc.id === newId ? { ...inc, status } : inc))
       );
-      if (!registerResp.ok) throw new Error("Failed to register incident record");
+    };
 
-      setSessionIncidents(prev => prev.map(inc => inc.id === newId ? { ...inc, status: "Completed" } : inc));
+    await apiUploadMediaFile(file, selectedInspectionId, onProgress).finally(() => {
       setUploadProgress(null);
-    } catch (err) {
-      console.error("Incident upload failed:", err);
-      setIncidentError(err instanceof Error ? err.message : "Upload failed");
-      setSessionIncidents(prev => prev.map(inc => inc.id === newId ? { ...inc, status: "Failed" } : inc));
-      setUploadProgress(null);
-    }
+    });
   };
 
   const triggerFileUpload = (category: "incident" | "field_note") => {
@@ -361,12 +320,17 @@ export default function InspectionPage() {
       setIsCreatingInspection(true);
       setInspectionError(null);
 
-      await handleAddInspectionSubmit({
-        siteId: selectedSiteId,
-        friendlyName: newInspectionTitle.trim()
+      const friendlyName = newInspectionTitle.trim();
+      const url = `/api/inspections?siteId=${selectedSiteId}&friendlyName=${encodeURIComponent(friendlyName)}`;
+
+      const response = await authenticatedFetch(url, {
+        method: "POST",
       });
 
-      await fetchSiteInspections();
+      if (!response.ok) {
+        throw new Error((await response.json()).detail || "Server error");
+      }
+
       setNewInspectionTitle("");
       setNewInspectionDescription("");
       setIsAddingInspectionInline(false);
@@ -375,6 +339,8 @@ export default function InspectionPage() {
       setInspectionError(err instanceof Error ? err.message : "Failed to create inspection");
     } finally {
       setIsCreatingInspection(false);
+      // Refetch inspections to show the new one
+      fetchSiteInspections();
     }
   };
 
@@ -447,7 +413,7 @@ export default function InspectionPage() {
                       const displayLabel = dateStr ? `${ins.label} (${dateStr})` : ins.label;
                       return (
                         <option key={ins.inspection_id} value={ins.inspection_id || ""}>
-                          📋 {displayLabel}
+                          🔍 {displayLabel}
                         </option>
                       );
                     })
@@ -523,7 +489,7 @@ export default function InspectionPage() {
 
             {/* Option A: Add New Incident */}
             <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-              <h4 className={labelHeaderStyle}>Add New Incident</h4>
+              <h4 className={labelHeaderStyle}>📌 Add New Incident</h4>
               <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
                 <button
                   type="button"
@@ -535,7 +501,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Mic className="w-5 h-5 text-red-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Record Audio</span>
+                    <span className="ml-3 text-left">Record Audio</span>
                   </div>
                 </button>
                 <button
@@ -548,7 +514,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Video className="w-5 h-5 text-blue-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Record Video</span>
+                    <span className="ml-3 text-left">Record Video</span>
                   </div>
                 </button>
                 <button
@@ -561,7 +527,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Camera className="w-5 h-5 text-green-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Picture</span>
+                    <span className="ml-3 text-left">Picture</span>
                   </div>
                 </button>
                 <button
@@ -574,7 +540,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Upload className="w-5 h-5 text-purple-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Upload File</span>
+                    <span className="ml-3 text-left">Upload File</span>
                   </div>
                 </button>
               </div>
@@ -582,7 +548,7 @@ export default function InspectionPage() {
 
             {/* Option B: Add Field Note */}
             <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-              <h4 className={labelHeaderStyle}>Add Field Note</h4>
+              <h4 className={labelHeaderStyle}>📋 Add Field Note</h4>
               <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
                 <button
                   type="button"
@@ -594,7 +560,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Mic className="w-5 h-5 text-red-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Record Audio</span>
+                    <span className="ml-3 text-left">Record Audio</span>
                   </div>
                 </button>
                 <button
@@ -607,7 +573,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Video className="w-5 h-5 text-blue-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Record Video</span>
+                    <span className="ml-3 text-left">Record Video</span>
                   </div>
                 </button>
                 <button
@@ -620,7 +586,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Camera className="w-5 h-5 text-green-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Picture</span>
+                    <span className="ml-3 text-left">Picture</span>
                   </div>
                 </button>
                 <button
@@ -633,7 +599,7 @@ export default function InspectionPage() {
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Upload className="w-5 h-5 text-purple-600 shrink-0" />
                     </div>
-                    <span className="ml-3">Upload File</span>
+                    <span className="ml-3 text-left">Upload File</span>
                   </div>
                 </button>
               </div>
@@ -677,22 +643,30 @@ export default function InspectionPage() {
                       key={incident.id}
                       className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm hover:border-slate-350 transition-colors"
                     >
-                      <div className="flex items-center gap-3.5 min-w-0">
+                      <div className="flex items-center justify-center gap-6 min-w-0">
                         <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-slate-400">
                           {incident.fileType === "audio" && <FileAudio className="w-5 h-5 text-red-555" />}
                           {incident.fileType === "video" && <FileVideo className="w-5 h-5 text-blue-555" />}
                           {incident.fileType === "image" && <FileImage className="w-5 h-5 text-emerald-655" />}
                         </div>
-                        <div className="flex flex-col min-w-0">
-                          <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-center text-center min-w-0">
+                          <div className="flex items-center gap-4">
                             <span className="text-sm font-bold text-slate-800 truncate" title={incident.fileName}>
                               {incident.fileName}
                             </span>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-1.5 py-0.5 rounded">
-                              {incident.category === "incident" ? "Incident" : "Field Note"}
+                            <span className="flex items-center text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded gap-1">
+                              {incident.category === "incident" ? (
+                                <>
+                                  <span role="img" aria-label="incident">📌</span> Incident
+                                </>
+                              ) : (
+                                <>
+                                  <span role="img" aria-label="incident">📋</span> Field Note
+                                </>
+                              )}
                             </span>
                           </div>
-                          <span className="text-xs text-slate-505 mt-0.5">
+                          <span className="text-xs text-slate-600 mt-2">
                             {incident.uploadedAt}
                           </span>
                         </div>

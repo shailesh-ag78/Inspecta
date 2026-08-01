@@ -116,7 +116,7 @@ async def lifespan(app: FastAPI):
     # It will stay in memory to handle parallel requests
     #db_dsn = "postgresql://postgres:passwd@localhost:5433/inspecta_db"
     #db_dsn = "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require"
-    db_dsn = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5433/inspecta_db")
+    db_dsn = os.getenv("DATABASE_URL", "postgresql://postgres:passwd@localhost:5432/inspecta_db")
     executor = await WorkflowExecutor.create(db_dsn)
     
     # Attach to app state so routes can access it
