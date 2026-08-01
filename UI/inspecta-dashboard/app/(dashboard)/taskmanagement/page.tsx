@@ -506,6 +506,232 @@ export default function TaskManagementPage() {
         <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-1.5 pb-6 pt-0 ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
 
 
+          {/* Task Filters Section */}
+          <div className="sticky top-0 z-20 -mx-1.5 bg-pane-bg/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
+            <div
+              onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
+              className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
+            >
+              <h3 className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                <i className="fa-solid fa-filter text-slate-600 text-lg mr-2"></i>
+                <span className="tracking-wide">Task Filters</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const nextGlobal = !isGlobalTranslationEnabled;
+                    setIsGlobalTranslationEnabled(nextGlobal);
+                    setFlippedTitles(new Set());
+                    setFlippedDescriptions(new Set());
+                  }}
+                  className={`p-1 rounded-lg border transition-all ${isGlobalTranslationEnabled ? 'bg-blue-100 border-blue-200 shadow-sm' : 'hover:bg-slate-200 border-transparent'}`}
+                  title="Toggle default translation for all tasks"
+                >
+                  <img src="/trasnlation_icon.png" alt="Translate" className="w-4 h-4 object-contain scale-[1.25]" />
+                </button>
+              </h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsFiltersCollapsed(!isFiltersCollapsed);
+                  }}
+                  className={`text-white transition-all p-1 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
+                </button>
+              </div>
+            </div>
+            {!isFiltersCollapsed && (
+              <div className="px-3 py-4 bg-slate-50/50">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Types Filter */}
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Task Type</h4>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { id: 'install', label: '🛠️ Install' },
+                        { id: 'repair', label: '🔧 Repair' },
+                        { id: 'verify', label: '📋 Verify' },
+                        { id: 'clear', label: '🧹 Clear' }
+                      ].map((t) => {
+                        const isChecked = filters.task_types.includes(t.id);
+                        return (
+                          <label key={t.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                const updated = isChecked
+                                  ? filters.task_types.filter(item => item !== t.id)
+                                  : [...filters.task_types, t.id];
+                                setFilters({ ...filters, task_types: updated });
+                              }}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
+                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                              }`}>
+                              {isChecked && (
+                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span>{t.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Severity Filter */}
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Severity</h4>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { id: 1, label: '🔴 Severe' },
+                        { id: 2, label: '🟡 Regular' },
+                        { id: 3, label: '🟢 Low' }
+                      ].map((sev) => {
+                        const isChecked = filters.severities.includes(sev.id);
+                        return (
+                          <label key={sev.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                const updated = isChecked
+                                  ? filters.severities.filter(item => item !== sev.id)
+                                  : [...filters.severities, sev.id];
+                                setFilters({ ...filters, severities: updated });
+                              }}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
+                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                              }`}>
+                              {isChecked && (
+                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span>{sev.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status</h4>
+                    <div className="flex flex-col gap-2">
+                      {[
+                        { id: 'pending', label: '🕒 Pending' },
+                        { id: 'in_progress', label: '🔄 In Progress' },
+                        { id: 'review', label: '👁️ Review' },
+                        { id: 'completed', label: '✅ Completed' },
+                        { id: 'failed', label: '❌ Failed' }
+                      ].map((st) => {
+                        const isChecked = filters.task_statuses.includes(st.id);
+                        return (
+                          <label key={st.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                const updated = isChecked
+                                  ? filters.task_statuses.filter(item => item !== st.id)
+                                  : [...filters.task_statuses, st.id];
+                                setFilters({ ...filters, task_statuses: updated });
+                              }}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
+                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                              }`}>
+                              {isChecked && (
+                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span>{st.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Quick Filters */}
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm flex flex-col justify-between">
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Quick Filters</h4>
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                          <input
+                            type="checkbox"
+                            checked={assignedToMe}
+                            onChange={() => {
+                              setAssignedToMe(!assignedToMe);
+                            }}
+                            className="sr-only"
+                          />
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${assignedToMe
+                            ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                            : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                            }`}>
+                            {assignedToMe && (
+                              <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <span>👤 My Tasks</span>
+                        </label>
+
+                        <div className="relative group flex flex-col gap-0.5">
+                          <span className="text-[11px] font-semibold text-slate-600 select-none">Created in last</span>
+                          <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm w-full">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="XX"
+                              value={daysFilter}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                                setDaysFilter(val);
+                              }}
+                              className="w-12 px-2 py-0.5 text-xs border-r border-slate-200 focus:outline-none text-slate-700 font-semibold"
+                            />
+                            <select
+                              value={daysFilter === '' ? 'custom' : daysFilter}
+                              onChange={(e) => {
+                                const val = e.target.value === 'custom' ? '' : parseInt(e.target.value);
+                                setDaysFilter(val);
+                              }}
+                              className="px-1 py-0.5 text-[11px] bg-slate-50 cursor-pointer focus:outline-none text-slate-600 border-none font-medium flex-1"
+                            >
+                              <option value="custom">Custom</option>
+                              <option value="1">1 day</option>
+                              <option value="5">5 days</option>
+                              <option value="7">7 days</option>
+                              <option value="15">15 days</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* KPIs Section */}
           <div className="bg-pane-bg/98 border-b border-slate-200/70 mb-2 -mx-1.5 overflow-hidden shadow-md">
             <div
@@ -629,231 +855,6 @@ export default function TaskManagementPage() {
             )}
           </div>
 
-          <div className="sticky top-0 z-20 -mx-1.5 bg-pane-bg/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
-            <div
-              onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
-              className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
-            >
-              <h3 className="text-sm font-bold text-slate-500 flex items-center gap-2">
-                <i className="fa-solid fa-filter text-slate-600 text-lg mr-2"></i>
-                <span className="tracking-wide">Task Filters</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const nextGlobal = !isGlobalTranslationEnabled;
-                    setIsGlobalTranslationEnabled(nextGlobal);
-                    setFlippedTitles(new Set());
-                    setFlippedDescriptions(new Set());
-                  }}
-                  className={`p-1 rounded-lg border transition-all ${isGlobalTranslationEnabled ? 'bg-blue-100 border-blue-200 shadow-sm' : 'hover:bg-slate-200 border-transparent'}`}
-                  title="Toggle default translation for all tasks"
-                >
-                  <img src="/trasnlation_icon.png" alt="Translate" className="w-4 h-4 object-contain scale-[1.25]" />
-                </button>
-              </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsFiltersCollapsed(!isFiltersCollapsed);
-                  }}
-                  className={`text-white transition-all p-1 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
-                >
-                  <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
-                </button>
-              </div>
-            </div>
-            {!isFiltersCollapsed && (
-              <div className="px-3 py-4 bg-slate-50/50">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Types Filter */}
-                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Task Type</h4>
-                    <div className="flex flex-col gap-2">
-                      {[
-                        { id: 'install', label: '🛠️ Install' },
-                        { id: 'repair', label: '🔧 Repair' },
-                        { id: 'verify', label: '📋 Verify' },
-                        { id: 'clear', label: '🧹 Clear' }
-                      ].map((t) => {
-                        const isChecked = filters.task_types.includes(t.id);
-                        return (
-                          <label key={t.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {
-                                const updated = isChecked
-                                  ? filters.task_types.filter(item => item !== t.id)
-                                  : [...filters.task_types, t.id];
-                                setFilters({ ...filters, task_types: updated });
-                              }}
-                              className="sr-only"
-                            />
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
-                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
-                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
-                              }`}>
-                              {isChecked && (
-                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                            <span>{t.label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Severity Filter */}
-                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Severity</h4>
-                    <div className="flex flex-col gap-2">
-                      {[
-                        { id: 1, label: '🔴 Severe' },
-                        { id: 2, label: '🟡 Regular' },
-                        { id: 3, label: '🟢 Low' }
-                      ].map((s) => {
-                        const isChecked = filters.severities.includes(s.id);
-                        return (
-                          <label key={s.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {
-                                const updated = isChecked
-                                  ? filters.severities.filter(item => item !== s.id)
-                                  : [...filters.severities, s.id];
-                                setFilters({ ...filters, severities: updated });
-                              }}
-                              className="sr-only"
-                            />
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
-                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
-                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
-                              }`}>
-                              {isChecked && (
-                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                            <span>{s.label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status</h4>
-                    <div className="flex flex-col gap-2">
-                      {[
-                        { id: 'pending', label: '🕒 Pending' },
-                        { id: 'in_progress', label: '🔄 In Progress' },
-                        { id: 'review', label: '👁️ Review' },
-                        { id: 'completed', label: '✅ Completed' },
-                        { id: 'failed', label: '❌ Failed' }
-                      ].map((st) => {
-                        const isChecked = filters.task_statuses.includes(st.id);
-                        return (
-                          <label key={st.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => {
-                                const updated = isChecked
-                                  ? filters.task_statuses.filter(item => item !== st.id)
-                                  : [...filters.task_statuses, st.id];
-                                setFilters({ ...filters, task_statuses: updated });
-                              }}
-                              className="sr-only"
-                            />
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
-                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
-                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
-                              }`}>
-                              {isChecked && (
-                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                            </div>
-                            <span>{st.label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Quick Filters */}
-                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm flex flex-col justify-between">
-                    <div>
-                      <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Quick Filters</h4>
-                      <div className="flex flex-col gap-2">
-                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
-                          <input
-                            type="checkbox"
-                            checked={assignedToMe}
-                            onChange={() => {
-                              setAssignedToMe(!assignedToMe);
-                            }}
-                            className="sr-only"
-                          />
-                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${assignedToMe
-                            ? 'border-slate-600 bg-slate-200/80 shadow-inner'
-                            : 'border-slate-300 bg-white/50 hover:border-slate-400'
-                            }`}>
-                            {assignedToMe && (
-                              <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                          <span>👤 My Tasks</span>
-                        </label>
-
-                        <div className="relative group flex flex-col gap-0.5">
-                          <span className="text-[11px] font-semibold text-slate-600 select-none">Created in last</span>
-                          <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm w-full">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="XX"
-                              value={daysFilter}
-                              onChange={(e) => {
-                                const val = e.target.value === '' ? '' : parseInt(e.target.value);
-                                setDaysFilter(val);
-                              }}
-                              className="w-12 px-2 py-0.5 text-xs border-r border-slate-200 focus:outline-none text-slate-700 font-semibold"
-                            />
-                            <select
-                              value={daysFilter === '' ? 'custom' : daysFilter}
-                              onChange={(e) => {
-                                const val = e.target.value === 'custom' ? '' : parseInt(e.target.value);
-                                setDaysFilter(val);
-                              }}
-                              className="px-1 py-0.5 text-[11px] bg-slate-50 cursor-pointer focus:outline-none text-slate-600 border-none font-medium flex-1"
-                            >
-                              <option value="custom">Custom</option>
-                              <option value="1">1 day</option>
-                              <option value="5">5 days</option>
-                              <option value="7">7 days</option>
-                              <option value="15">15 days</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Tasks Feed */}
           {tasksLoading ? (
             <div className="text-center py-12 text-blue-500">
@@ -866,14 +867,14 @@ export default function TaskManagementPage() {
               <p>No tasks available for this incident.</p>
             </div>
           ) : (
-            <div className="space-y-0.75">
+            <div className="space-y-2">
               {filteredTasks.map((task) => {
                 const isExpanded = expandedTasks.has(task.id);
                 return (
                   <div
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
-                    className={`cursor-pointer bg-pane-bg/98 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${activeTask?.id === task.id
+                    className={`cursor-pointer bg-gradient-to-br from-slate-50 to-blue-50/70 rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${activeTask?.id === task.id
                       ? `border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20`
                       : `${theme.cardBorder} hover:border-blue-300`
                       }`}

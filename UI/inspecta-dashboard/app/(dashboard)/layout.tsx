@@ -64,10 +64,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const renderSettingsMenu = (isMobile: boolean) => {
     return (
       <div className={`${isMobile ? 'flex sm:hidden' : 'hidden sm:flex'} items-center gap-3 shrink-0`}>
-        <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">
-          {companyNameLoading ? <Loader className="w-3 h-3 animate-spin inline-block" /> : companyName}
-        </span>
-
         {/* Notification Bell */}
         <button
           className="text-white/60 hover:text-white transition-colors p-1.5 hover:bg-white/10 rounded-full cursor-pointer relative"
@@ -299,7 +295,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 >
                   <Menu className="w-5 h-5" />
                 </button>
-                <div className="text-sm font-bold text-white truncate leading-normal" title={companyName || "Inspecta"}>
+                <div className="text-base font-black text-white/80 truncate leading-normal " title={companyName || "Inspecta"}>
                   {companyName || "Inspecta"}
                 </div>
               </div>

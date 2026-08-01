@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
@@ -534,10 +535,80 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const [isIncidentPaneCollapsed, setIsIncidentPaneCollapsed] = useState(true);
   const [isSiteColumnCollapsed, setIsSiteColumnCollapsed] = useState(false);
-  const [selectedMillerSites, setSelectedMillerSites] = useState<string[]>([]);
-  const [selectedMillerInspections, setSelectedMillerInspections] = useState<string[]>([]);
-  const [selectedMillerIncidents, setSelectedMillerIncidents] = useState<string[]>([]);
+
+  const pathname = usePathname();
+  const currentPath = pathname || '/';
+
+  const [selectionsByPath, setSelectionsByPath] = useState<Record<string, {
+    sites: string[];
+    inspections: string[];
+    incidents: string[];
+  }>>({});
+
   const [backendSites, setBackendSites] = useState<any[]>([]);
+
+  const selectedMillerSites = selectionsByPath[currentPath]?.sites !== undefined
+    ? selectionsByPath[currentPath].sites
+    : backendSites.map((s: any) => String(s.site_name || s.name || ''));
+
+  const selectedMillerInspections = selectionsByPath[currentPath]?.inspections !== undefined
+    ? selectionsByPath[currentPath].inspections
+    : [];
+
+  const selectedMillerIncidents = selectionsByPath[currentPath]?.incidents !== undefined
+    ? selectionsByPath[currentPath].incidents
+    : [];
+
+  const setSelectedMillerSites = useCallback((val: React.SetStateAction<string[]>) => {
+    setSelectionsByPath(prev => {
+      const currentVal = prev[currentPath]?.sites !== undefined
+        ? prev[currentPath].sites
+        : backendSites.map((s: any) => String(s.site_name || s.name || ''));
+      const next = typeof val === 'function' ? (val as Function)(currentVal) : val;
+      return {
+        ...prev,
+        [currentPath]: {
+          sites: next,
+          inspections: prev[currentPath]?.inspections || [],
+          incidents: prev[currentPath]?.incidents || []
+        }
+      };
+    });
+  }, [currentPath, backendSites]);
+
+  const setSelectedMillerInspections = useCallback((val: React.SetStateAction<string[]>) => {
+    setSelectionsByPath(prev => {
+      const currentVal = prev[currentPath]?.inspections || [];
+      const next = typeof val === 'function' ? (val as Function)(currentVal) : val;
+      return {
+        ...prev,
+        [currentPath]: {
+          sites: prev[currentPath]?.sites !== undefined
+            ? prev[currentPath].sites
+            : backendSites.map((s: any) => String(s.site_name || s.name || '')),
+          inspections: next,
+          incidents: prev[currentPath]?.incidents || []
+        }
+      };
+    });
+  }, [currentPath, backendSites]);
+
+  const setSelectedMillerIncidents = useCallback((val: React.SetStateAction<string[]>) => {
+    setSelectionsByPath(prev => {
+      const currentVal = prev[currentPath]?.incidents || [];
+      const next = typeof val === 'function' ? (val as Function)(currentVal) : val;
+      return {
+        ...prev,
+        [currentPath]: {
+          sites: prev[currentPath]?.sites !== undefined
+            ? prev[currentPath].sites
+            : backendSites.map((s: any) => String(s.site_name || s.name || '')),
+          inspections: prev[currentPath]?.inspections || [],
+          incidents: next
+        }
+      };
+    });
+  }, [currentPath, backendSites]);
 
   useEffect(() => {
     const getSites = async () => {

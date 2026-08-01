@@ -76,8 +76,8 @@ export default function IncidentSelectionPane() {
         </button>
       </div>
       {!isIncidentPaneCollapsed && (
-        <div className="p-3 bg-white">
-          <div className="flex flex-row divide-x divide-slate-200 border border-slate-200 rounded-xl h-[180px] overflow-hidden bg-slate-50/30">
+        <div className="p-3 bg-slate-50/50">
+          <div className="flex flex-row divide-x divide-slate-200 border border-blue-200/50 rounded-xl h-[180px] overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
             {/* Column 1: Sites */}
             {isSiteColumnCollapsed ? (
               <div
@@ -93,7 +93,7 @@ export default function IncidentSelectionPane() {
             ) : (
               <div className="w-48 flex-shrink-0 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin flex flex-col">
                 <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-1">
                     Sites ({selectedMillerSites.length})
                   </span>
                   <button
@@ -105,11 +105,29 @@ export default function IncidentSelectionPane() {
                   </button>
                 </div>
 
+                <div className="flex items-center gap-2 px-1 mb-1.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMillerSites(backendSites.map(s => String(s.site_name || s.name || '')))}
+                    className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMillerSites([])}
+                    className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+
                 {backendSites.map(site => {
                   const siteId = String(site.site_name || site.name || '');
                   const isChecked = selectedMillerSites.includes(siteId);
                   return (
-                    <label key={siteId} className="flex items-center gap-2 text-xs font-semibold text-slate-650 hover:text-slate-900 cursor-pointer select-none py-0.5">
+                    <label key={siteId} className="flex items-center gap-2 text-xs font-normal text-slate-900 hover:text-slate-1000 cursor-pointer select-none py-0.5">
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -132,8 +150,26 @@ export default function IncidentSelectionPane() {
 
             {/* Column 2: Inspections */}
             <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 mb-1.5 border-b border-slate-200 pb-1">
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-1 mb-1.5 border-b border-slate-200 pb-1">
                 Inspections ({selectedMillerInspections.length})
+              </div>
+
+              <div className="flex items-center gap-2 px-1 mb-1.5 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setSelectedMillerInspections(availableInspections.map(item => item.inspection_id || item.site_id).filter(Boolean) as string[])}
+                  className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                >
+                  Select All
+                </button>
+                <span className="text-slate-300">|</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedMillerInspections([])}
+                  className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                >
+                  Deselect All
+                </button>
               </div>
 
               {availableInspections.map(item => {
@@ -141,7 +177,7 @@ export default function IncidentSelectionPane() {
                 if (!val) return null;
                 const isChecked = selectedMillerInspections.includes(val);
                 return (
-                  <label key={val} className="flex items-center gap-2 text-xs font-semibold text-slate-650 hover:text-slate-900 cursor-pointer select-none py-0.5">
+                  <label key={val} className="flex items-center gap-2 text-xs font-normal text-slate-900 hover:text-slate-1000 cursor-pointer select-none py-0.5">
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -163,9 +199,29 @@ export default function IncidentSelectionPane() {
 
             {/* Column 3: Incidents */}
             <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 mb-1.5 border-b border-slate-200 pb-1">
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider px-1 mb-1.5 border-b border-slate-200 pb-1">
                 Incidents ({selectedMillerIncidents.length})
               </div>
+
+              {millerIncidents.length > 0 && (
+                <div className="flex items-center gap-2 px-1 mb-1.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMillerIncidents(millerIncidents.map(inc => inc.id))}
+                    className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMillerIncidents([])}
+                    className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              )}
 
               {millerIncidents.length === 0 ? (
                 <div className="text-xs text-slate-450 italic px-2 py-1">No incidents found</div>
@@ -174,7 +230,7 @@ export default function IncidentSelectionPane() {
                   const isChecked = selectedMillerIncidents.includes(incident.id);
                   const label = incident.title || `Incident ${incident.id.slice(0, 4)}`;
                   return (
-                    <label key={incident.id} className="flex items-center gap-2 text-xs font-semibold text-slate-650 hover:text-slate-900 cursor-pointer select-none py-0.5">
+                    <label key={incident.id} className="flex items-center gap-2 text-xs font-normal text-slate-800 hover:text-slate-950 cursor-pointer select-none py-0.5">
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -188,7 +244,7 @@ export default function IncidentSelectionPane() {
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                         {isChecked && <i className="fa-solid fa-check text-[9px] text-slate-800 font-extrabold" />}
                       </div>
-                      <span className="truncate">⚠️ {label}</span>
+                      <span className="truncate">📱 {label}</span>
                     </label>
                   );
                 })
