@@ -74,20 +74,20 @@ export const themes: Record<string, Theme> = {
     name: "Indigo Slate",
     id: "indigoSlate",
     header: {
-      bg: "bg-gradient-to-r from-indigo-950 via-slate-900 to-indigo-950",
+      bg: "bg-gradient-to-r from-slate-900 via-slate-indigo-600 to-indigo-500 to-purple-900",
       text: "text-white",
     },
     primary: {
       from: "from-indigo-600",
-      to: "to-purple-600",
+      to: "to-purple-500",
     },
     secondary: {
       from: "from-indigo-600",
-      to: "to-indigo-700",
+      to: "to-purple-500",
     },
     logo: {
-      from: "from-indigo-400",
-      to: "to-purple-400",
+      from: "from-indigo-600",
+      to: "to-purple-500",
     },
     cardBorder: "border-indigo-200/40",
     background: {

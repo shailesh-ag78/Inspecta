@@ -202,7 +202,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     : theme.header.bg.replace(/bg-gradient-to-r/g, 'bg-gradient-to-b');
 
   return (
-    <div className={`h-screen flex ${theme.background.gradient} overflow-hidden`}>
+    <div className={`h-screen flex bg-gradient-to-br ${theme.background.gradient} overflow-hidden`}>
       {/* Collapsible Left Sidebar */}
       <aside className={`hidden sm:flex h-full border-r border-slate-300/20 ${sidebarBg} flex-col transition-all duration-300 ${isSidebarCollapsed ? 'w-16' : 'w-52'} shrink-0 relative z-30`}>
         {/* Top Header in Sidebar: Logo and Name */}
@@ -264,9 +264,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               >
                 {isSidebarCollapsed ? (
                   typeof Icon === 'string' ? (
-                    <img src={Icon} alt="" className={`w-8 h-8 object-contain shrink-0 ${isConfig ? 'p-[2px]' : ''}`} />
+                    <img src={Icon} alt="" className={`w-[28px] h-[28px] object-contain shrink-0 ${isConfig ? 'p-[2px]' : ''}`} />
                   ) : (
-                    <Icon className={`w-6 h-6 shrink-0 ${isActive ? "text-blue-400" : "text-white/80"}`} />
+                    <Icon className={`w-[22px] h-[22px] shrink-0 ${isActive ? "text-blue-400" : "text-white/80"}`} />
                   )
                 ) : (
                   <div className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${isActive ? "bg-white/15" : "bg-white/5"}`}>

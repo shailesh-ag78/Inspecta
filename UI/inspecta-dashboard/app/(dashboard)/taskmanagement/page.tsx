@@ -466,6 +466,18 @@ export default function TaskManagementPage() {
     : 0;
   const kpiActiveSevere = tasks.filter(t => t.severity_id === 1 && t.task_status !== 'completed').length;
 
+  const kpiLastInspectionObj = [...siteInspections]
+    .filter(item => !kpiSelectedItem || item.site_id === kpiSelectedItem.site_id)
+    .filter(item => item.inspection_created_at)
+    .sort((a, b) => {
+      const aTime = a.inspection_created_at ? new Date(a.inspection_created_at).getTime() : 0;
+      const bTime = b.inspection_created_at ? new Date(b.inspection_created_at).getTime() : 0;
+      return bTime - aTime;
+    })[0];
+  const kpiLastInspectionDate = kpiLastInspectionObj && kpiLastInspectionObj.inspection_created_at
+    ? new Date(kpiLastInspectionObj.inspection_created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    : 'None';
+
   return (
     <div className="h-full flex flex-col">
       {/* Controls Bar for Inspection and Incident selections */}
@@ -618,9 +630,16 @@ export default function TaskManagementPage() {
         <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-1.5 pb-6 pt-0 ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
           {/* KPIs Section */}
           <div className="bg-[var(--pane-bg)]/98 border-b border-slate-200/70 mb-2 -mx-1.5 overflow-hidden shadow-md">
-            <div className={`flex items-center justify-between px-3 py-2 ${theme.background.section} border-b border-slate-200/70`}>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70">
+              <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
                 <i className={`fa-solid fa-chart-line bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white text-xs p-1.5 rounded-lg border ${theme.cardBorder}`}></i>
+                <span className="tracking-wide select-none flex items-center flex-wrap gap-x-1">
+                  Completion {kpiCompletionRate}%
+                  <span className="mx-4 text-slate-500"></span>
+                  Open Severe {kpiActiveSevere}
+                  <span className="mx-4 text-slate-500"></span>
+                  Last inspection : {kpiLastInspectionDate}
+                </span>
               </div>
               <button
                 onClick={() => setIsKpisCollapsed(!isKpisCollapsed)}
@@ -631,108 +650,95 @@ export default function TaskManagementPage() {
             </div>
             {!isKpisCollapsed && (
               <div className="p-3 bg-slate-50/50">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 justify-center items-center">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 justify-center items-center">
                   {/* KPI Tile 1 */}
-                  <div className="p-2 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[110px] w-[110px] max-w-[110px] mx-auto">
-                    <div className="text-[10px] text-slate-700 space-y-0.5">
-                      <div className="flex flex-col border-b border-slate-100 pb-0.5">
-                        <span className="font-bold text-slate-900 truncate">
-                          {kpiSelectedItem ? kpiSelectedItem.inspection_id ? kpiSelectedItem.site_name : 'No Inspection' : 'All Sites'}
-                        </span>
+                  <div className="p-2.5 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[135px] w-full max-w-[210px] mx-auto">
+                    <div className="text-xs text-slate-700 flex-1 flex flex-col justify-between">
+                      <div>
+                        <div className="flex flex-col border-b border-slate-300/80 pb-2 mb-2">
+                          <span className="font-bold text-slate-900 truncate">
+                            {kpiSelectedItem ? kpiSelectedItem.inspection_id ? kpiSelectedItem.site_name : 'No Inspection' : 'All Sites'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="font-medium text-slate-500">Inspections:</span>
+                          <span className="font-bold text-slate-900">{kpiInspectionsForSiteCount}</span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="font-medium text-slate-500">Incidents:</span>
+                          <span className="font-bold text-slate-900">{activeIncidentsCount}</span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="font-medium text-slate-500">Last Inspection:</span>
+                          <span className="font-bold text-slate-900">{kpiLastInspectionDate}</span>
+                        </div>
+                        <div className="flex justify-between mb-1.5">
+                          <span className="font-medium text-slate-500">Last one week inspections:</span>
+                          <span className="font-bold text-slate-900">{kpiWeeklyInspections}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between border-b border-slate-100 pb-0.5">
-                        <span className="font-medium">Inspections:</span>
-                        <span className="font-bold text-slate-900">{kpiInspectionsForSiteCount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-medium">Incidents:</span>
-                        <span className="font-bold text-slate-900">{activeIncidentsCount}</span>
-                      </div>
-                    </div>
-                    <div className="text-[8px] text-slate-500 font-semibold bg-blue-50 border border-blue-100 rounded py-0.5 text-center leading-tight">
-                      {kpiWeeklyInspections} weekly company-wide
                     </div>
                   </div>
 
                   {/* KPI Tile 2 */}
-                  <div
-                    onClick={() => setIsKpiFlipped(!isKpiFlipped)}
-                    className="relative h-[110px] w-[110px] max-w-[110px] mx-auto cursor-pointer [perspective:1000px] group select-none"
-                    title="Click to flip tile"
-                  >
-                    <div className={`relative w-full h-full duration-500 [transform-style:preserve-3d] ${isKpiFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-                      {/* Front Side */}
-                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
-                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[8.5px] text-slate-700 p-0.5">
-                          <div className="aspect-square flex flex-col items-center justify-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
-                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Pending</span>
-                            <span className="text-[12px] font-black text-slate-700 leading-none">{kpiStatusCounts.pending}</span>
-                          </div>
-                          <div className="aspect-square flex flex-col items-center justify-center bg-blue-50/60 border border-blue-100 rounded-lg p-0.5">
-                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Active</span>
-                            <span className="text-[12px] font-black text-blue-700 leading-none">{kpiStatusCounts.in_progress}</span>
-                          </div>
-                          <div className="aspect-square flex flex-col items-center justify-center bg-purple-50/60 border border-purple-100 rounded-lg p-0.5">
-                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Review</span>
-                            <span className="text-[12px] font-black text-purple-700 leading-none">{kpiStatusCounts.review}</span>
-                          </div>
-                          <div className="aspect-square flex flex-col items-center justify-center bg-green-50/60 border border-green-100 rounded-lg p-0.5">
-                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Done</span>
-                            <span className="text-[12px] font-black text-green-700 leading-none">{kpiStatusCounts.completed}</span>
-                          </div>
+                  <div className="p-2.5 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[135px] w-full max-w-[210px] mx-auto">
+                    <div className="text-xs text-slate-700 space-y-1">
+                      <div className="flex flex-col border-b border-slate-300/80 pb-2 mb-2">
+                        <span className="font-bold text-slate-900 truncate">Site Health</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2.5 text-slate-700 p-0.1">
+                        <div className="aspect-square flex flex-col items-center justify-center bg-amber-100/70 border border-amber-200/80 rounded-lg p-1 shadow-sm hover:shadow-md transition-shadow duration-200">
+                          <span className="text-[8px] sm:text-[9.5px] text-amber-800/90 font-bold uppercase mb-1 truncate w-full text-center">Pending</span>
+                          <span className="text-base sm:text-xl font-black text-amber-950 tracking-tight">{kpiStatusCounts.pending}</span>
+                        </div>
+                        <div className="aspect-square flex flex-col items-center justify-center bg-sky-100/70 border border-sky-200/80 rounded-lg p-1 shadow-sm hover:shadow-md transition-shadow duration-200">
+                          <span className="text-[8px] sm:text-[9.5px] text-sky-800/90 font-bold uppercase mb-1 truncate w-full text-center">Active</span>
+                          <span className="text-base sm:text-xl font-black text-sky-950 tracking-tight">{kpiStatusCounts.in_progress}</span>
+                        </div>
+                        <div className="aspect-square flex flex-col items-center justify-center bg-purple-100/70 border border-purple-200/80 rounded-lg p-1 shadow-sm hover:shadow-md transition-shadow duration-200">
+                          <span className="text-[8px] sm:text-[9.5px] text-purple-800/90 font-bold uppercase mb-1 truncate w-full text-center">Review</span>
+                          <span className="text-base sm:text-xl font-black text-amber-950 tracking-tight">{kpiStatusCounts.review}</span>
                         </div>
                       </div>
-
-                      {/* Back Side */}
-                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
-                        <div className="grid grid-cols-2 gap-1 h-full items-center text-[8.5px] text-slate-700 p-0.5">
-                          <div className="aspect-square flex flex-col items-center justify-center bg-red-50/60 border border-red-100 rounded-lg p-0.5">
-                            <span className="text-[8px] text-red-500/80 font-bold uppercase leading-none mb-0.5">Severe</span>
-                            <span className="text-[12px] font-black text-red-700 leading-none">{kpiSeverityCounts.severe}</span>
-                          </div>
-                          <div className="aspect-square flex flex-col items-center justify-center bg-yellow-50/60 border border-yellow-100 rounded-lg p-0.5">
-                            <span className="text-[8px] text-yellow-600/80 font-bold uppercase leading-none mb-0.5">Regular</span>
-                            <span className="text-[12px] font-black text-yellow-800 leading-none">{kpiSeverityCounts.regular}</span>
-                          </div>
-                          <div className="aspect-square flex flex-col items-center justify-center bg-green-50/60 border border-green-100 rounded-lg p-0.5">
-                            <span className="text-[8px] text-green-600/80 font-bold uppercase leading-none mb-0.5">Low</span>
-                            <span className="text-[12px] font-black text-green-700 leading-none">{kpiSeverityCounts.low}</span>
-                          </div>
-                          <div className="aspect-square flex flex-col items-center justify-center bg-slate-100 border border-slate-200 rounded-lg p-0.5">
-                            <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Total</span>
-                            <span className="text-[12px] font-black text-slate-800 leading-none">{kpiTotalTasks}</span>
-                          </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2.25 mt-2.25">
+                        <div className="flex-1 bg-slate-200 border border-slate-350 rounded-full h-2.5 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} transition-all duration-500`}
+                            style={{ width: `${kpiCompletionRate}%` }}
+                          ></div>
                         </div>
+                        <span className="text-[11px] font-bold text-slate-700 leading-none shrink-0">{kpiCompletionRate}% done</span>
                       </div>
                     </div>
                   </div>
 
                   {/* KPI Tile 3 */}
-                  <div className="p-2 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[110px] w-[110px] max-w-[110px] mx-auto">
-                    <div className="space-y-1 mt-0.5">
-                      <div className="flex justify-between text-[10px] font-medium text-slate-700">
-                        <span>Done Rate:</span>
-                        <span className="font-bold text-slate-900">{kpiCompletionRate}%</span>
+                  <div className="p-2.5 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[135px] w-full max-w-[210px] mx-auto col-span-2 sm:col-span-1">
+                    <div className="text-xs text-slate-700 space-y-1 flex-1">
+                      <div className="flex flex-col border-b border-slate-300/80 pb-2 mb-2">
+                        <span className="font-bold text-slate-900 truncate">Task Severity</span>
                       </div>
-                      <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} transition-all duration-500`}
-                          style={{ width: `${kpiCompletionRate}%` }}
-                        ></div>
+                      <div className="grid grid-cols-2 gap-2.5 p-0.1 text-[8.5px] text-slate-700">
+                        <div className="h-9 w-full flex flex-row items-center justify-center gap-1.5 bg-red-50/70 border border-red-200/60 rounded-lg shadow-sm">
+                          <span className="text-[10px] text-red-600 font-bold uppercase leading-none">Severe:</span>
+                          <span className="text-[13px] font-extrabold text-red-700 leading-none">{kpiSeverityCounts.severe}</span>
+                        </div>
+                        <div className="h-9 w-full flex flex-row items-center justify-center gap-1.5 bg-yellow-50/70 border border-yellow-200/60 rounded-lg shadow-sm">
+                          <span className="text-[10px] text-yellow-600 font-bold uppercase leading-none">Regular:</span>
+                          <span className="text-[13px] font-extrabold text-yellow-800 leading-none">{kpiSeverityCounts.regular}</span>
+                        </div>
+                        <div className="h-9 w-full flex flex-row items-center justify-center gap-1.5 bg-green-50/70 border border-green-200/60 rounded-lg shadow-sm">
+                          <span className="text-[10px] text-green-600 font-bold uppercase leading-none">Low:</span>
+                          <span className="text-[13px] font-extrabold text-green-700 leading-none">{kpiSeverityCounts.low}</span>
+                        </div>
+                        <div className="h-9 w-full flex flex-row items-center justify-center gap-1.5 bg-slate-100/70 border border-slate-200/60 rounded-lg shadow-sm">
+                          <span className="text-[10px] text-slate-500 font-bold uppercase leading-none">Total:</span>
+                          <span className="text-[13px] font-extrabold text-slate-800 leading-none">{kpiTotalTasks}</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between text-[8px] font-bold bg-amber-50 border border-amber-100 rounded p-1 leading-none">
-                      <span className="text-amber-800">⚠️ Severe:</span>
-                      <span className={`px-1 py-0.5 rounded text-[8px] text-white font-extrabold ${kpiActiveSevere > 0 ? 'bg-red-500 animate-pulse' : 'bg-slate-400'}`}>
-                        {kpiActiveSevere}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* KPI Tile 4 */}
-                  <div className="p-2 bg-gradient-to-br from-white to-slate-100/40 border border-dashed border-slate-300 rounded-xl shadow-sm flex flex-col justify-center items-center h-[110px] w-[110px] max-w-[110px] mx-auto opacity-60">
-                    <Plus className="w-4 h-4 text-slate-400 mb-1" />
-                    <span className="text-[9px] font-semibold text-slate-400">Add Metric</span>
                   </div>
                 </div>
               </div>
@@ -761,9 +767,9 @@ export default function TaskManagementPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
-                  className={`text-white transition-all p-2 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
+                  className={`text-white transition-all p-1 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
                 >
-                  <ChevronDown className={`w-2 h-2 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
+                  <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
                 </button>
               </div>
             </div>
@@ -773,84 +779,123 @@ export default function TaskManagementPage() {
                   {/* Types Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
                     <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Task Type</h4>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-2">
                       {[
                         { id: 'install', label: '🛠️ Install' },
                         { id: 'repair', label: '🔧 Repair' },
                         { id: 'verify', label: '📋 Verify' },
                         { id: 'clear', label: '🧹 Clear' }
-                      ].map((t) => (
-                        <label key={t.id} className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={filters.task_types.includes(t.id)}
-                            onChange={() => {
-                              const updated = filters.task_types.includes(t.id)
-                                ? filters.task_types.filter(item => item !== t.id)
-                                : [...filters.task_types, t.id];
-                              setFilters({ ...filters, task_types: updated });
-                            }}
-                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
-                          />
-                          <span>{t.label}</span>
-                        </label>
-                      ))}
+                      ].map((t) => {
+                        const isChecked = filters.task_types.includes(t.id);
+                        return (
+                          <label key={t.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                const updated = isChecked
+                                  ? filters.task_types.filter(item => item !== t.id)
+                                  : [...filters.task_types, t.id];
+                                setFilters({ ...filters, task_types: updated });
+                              }}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
+                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                              }`}>
+                              {isChecked && (
+                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span>{t.label}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Severity Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
                     <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Severity</h4>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-2">
                       {[
                         { id: 1, label: '🔴 Severe' },
                         { id: 2, label: '🟡 Regular' },
                         { id: 3, label: '🟢 Low' }
-                      ].map((s) => (
-                        <label key={s.id} className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={filters.severities.includes(s.id)}
-                            onChange={() => {
-                              const updated = filters.severities.includes(s.id)
-                                ? filters.severities.filter(item => item !== s.id)
-                                : [...filters.severities, s.id];
-                              setFilters({ ...filters, severities: updated });
-                            }}
-                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
-                          />
-                          <span>{s.label}</span>
-                        </label>
-                      ))}
+                      ].map((s) => {
+                        const isChecked = filters.severities.includes(s.id);
+                        return (
+                          <label key={s.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                const updated = isChecked
+                                  ? filters.severities.filter(item => item !== s.id)
+                                  : [...filters.severities, s.id];
+                                setFilters({ ...filters, severities: updated });
+                              }}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
+                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                              }`}>
+                              {isChecked && (
+                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span>{s.label}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 
                   {/* Status Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
                     <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status</h4>
-                    <div className="flex flex-col gap-1">
+                    <div className="flex flex-col gap-2">
                       {[
                         { id: 'pending', label: '🕒 Pending' },
                         { id: 'in_progress', label: '🔄 In Progress' },
                         { id: 'review', label: '👁️ Review' },
                         { id: 'completed', label: '✅ Completed' },
                         { id: 'failed', label: '❌ Failed' }
-                      ].map((st) => (
-                        <label key={st.id} className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={filters.task_statuses.includes(st.id)}
-                            onChange={() => {
-                              const updated = filters.task_statuses.includes(st.id)
-                                ? filters.task_statuses.filter(item => item !== st.id)
-                                : [...filters.task_statuses, st.id];
-                              setFilters({ ...filters, task_statuses: updated });
-                            }}
-                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
-                          />
-                          <span>{st.label}</span>
-                        </label>
-                      ))}
+                      ].map((st) => {
+                        const isChecked = filters.task_statuses.includes(st.id);
+                        return (
+                          <label key={st.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {
+                                const updated = isChecked
+                                  ? filters.task_statuses.filter(item => item !== st.id)
+                                  : [...filters.task_statuses, st.id];
+                                setFilters({ ...filters, task_statuses: updated });
+                              }}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked
+                              ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                              : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                              }`}>
+                              {isChecked && (
+                                <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                </svg>
+                              )}
+                            </div>
+                            <span>{st.label}</span>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -858,7 +903,29 @@ export default function TaskManagementPage() {
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm flex flex-col justify-between">
                     <div>
                       <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Quick Filters</h4>
-                      <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-col gap-2">
+                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                          <input
+                            type="checkbox"
+                            checked={assignedToMe}
+                            onChange={() => {
+                              setAssignedToMe(!assignedToMe);
+                            }}
+                            className="sr-only"
+                          />
+                          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${assignedToMe
+                            ? 'border-slate-600 bg-slate-200/80 shadow-inner'
+                            : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                            }`}>
+                            {assignedToMe && (
+                              <svg className={`w-3 h-3 ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                          <span>👤 My Tasks</span>
+                        </label>
+
                         <div className="relative group flex flex-col gap-0.5">
                           <span className="text-[11px] font-semibold text-slate-600 select-none">Created in last</span>
                           <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm w-full">
@@ -878,7 +945,6 @@ export default function TaskManagementPage() {
                               onChange={(e) => {
                                 const val = e.target.value === 'custom' ? '' : parseInt(e.target.value);
                                 setDaysFilter(val);
-                                setIsFiltersCollapsed(true);
                               }}
                               className="px-1 py-0.5 text-[11px] bg-slate-50 cursor-pointer focus:outline-none text-slate-600 border-none font-medium flex-1"
                             >
@@ -890,19 +956,6 @@ export default function TaskManagementPage() {
                             </select>
                           </div>
                         </div>
-
-                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={assignedToMe}
-                            onChange={() => {
-                              setAssignedToMe(!assignedToMe);
-                              setIsFiltersCollapsed(true);
-                            }}
-                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
-                          />
-                          <span>👤 My Tasks</span>
-                        </label>
                       </div>
                     </div>
                   </div>
@@ -1316,6 +1369,6 @@ export default function TaskManagementPage() {
         sites={uniqueSites}
         onSubmit={handleAddInspectionSubmit}
       />
-    </div>
+    </div >
   );
 }
