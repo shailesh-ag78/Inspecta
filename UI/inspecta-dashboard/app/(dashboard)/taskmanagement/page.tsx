@@ -507,7 +507,7 @@ export default function TaskManagementPage() {
 
 
           {/* Task Filters Section */}
-          <div className="sticky top-0 z-20 -mx-1.5 bg-pane-bg/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
+          <div className="sticky top-0 z-20 -mx-1.5 bg-pane-bg/98 backdrop-blur-sm border-b border-slate-200/70 mb-2 shadow-md">
             <div
               onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
               className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
@@ -542,7 +542,7 @@ export default function TaskManagementPage() {
               </div>
             </div>
             {!isFiltersCollapsed && (
-              <div className="px-3 py-4 bg-slate-50/50">
+              <div className="h-[180px] px-3 py-4 bg-slate-50/50 overflow-y-auto dropdown-scrollbar">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Types Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
@@ -759,7 +759,7 @@ export default function TaskManagementPage() {
               </button>
             </div>
             {!isKpisCollapsed && (
-              <div className="p-3 bg-slate-50/50">
+              <div className="h-[180px] p-3 bg-slate-50/50 overflow-y-auto dropdown-scrollbar">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 justify-center items-center">
                   {/* KPI Tile 1 */}
                   <div className="p-2.5 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[135px] w-full max-w-[210px] mx-auto">
@@ -1098,8 +1098,8 @@ export default function TaskManagementPage() {
         {!isVideoCollapsed && (
           <aside className={`w-full lg:w-2/5 ${theme.header.bg.replace(/bg-gradient-to-r/g, 'bg-gradient-to-b')} flex flex-col shadow-inner relative border-t lg:border-t-0 lg:border-l border-slate-700 mt-4 lg:mt-0`}>
             <div className="absolute inset-0 bg-white/10 pointer-events-none" />
-            <div className="p-5 pb-40 flex-1 overflow-y-auto relative z-10">
-              <div className="flex items-center justify-between mb-5">
+            <div className="px-1.5 py-1 pb-40 flex-1 h-full overflow-y-auto relative z-10 dropdown-scrollbar flex flex-col">
+              <div className="flex items-center justify-between py-1 mb-1 shrink-0">
                 <h3 className="text-white font-bold flex items-center min-w-0">
                   <span className="tracking-tight text-sm truncate" title={activeTask?.task_title || 'No task selected'}>
                     {activeTask ? activeTask.task_title : 'No Task Selected'}
@@ -1114,7 +1114,7 @@ export default function TaskManagementPage() {
                 </button>
               </div>
 
-              <div className={`relative w-full bg-black rounded-2xl overflow-hidden border transition-all duration-500 shadow-2xl ${activeTask?.severity_id === 1 ? 'border-red-500/50 shadow-red-500/10' :
+              <div className={`relative w-full h-[75%] shrink-0 bg-black rounded-2xl overflow-hidden border transition-all duration-500 shadow-2xl flex flex-col ${activeTask?.severity_id === 1 ? 'border-red-500/50 shadow-red-500/10' :
                 activeTask?.severity_id === 2 ? 'border-yellow-500/50 shadow-yellow-500/10' :
                   activeTask?.severity_id === 3 ? 'border-green-500/50 shadow-green-500/10' :
                     'border-slate-700'
@@ -1133,13 +1133,11 @@ export default function TaskManagementPage() {
                     onEnded={() => setIsPlaying(false)}
                   />
                 ) : (
-                  <div className="aspect-video w-full flex flex-col items-center justify-center text-slate-500 gap-3">
-                    <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-3">
-                      <AlertCircle className="w-8 h-8 opacity-20" />
-                      <p className="text-xs font-medium uppercase tracking-widest opacity-40">
-                        {activeTask ? 'Evidence Unavailable' : 'Awaiting Task Selection'}
-                      </p>
-                    </div>
+                  <div className="w-full h-full flex flex-col items-center justify-center text-slate-500 gap-3">
+                    <AlertCircle className="w-8 h-8 opacity-20" />
+                    <p className="text-xs font-medium uppercase tracking-widest opacity-40">
+                      {activeTask ? 'Evidence Unavailable' : 'Awaiting Task Selection'}
+                    </p>
                   </div>
                 )}
 
