@@ -343,7 +343,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          <IncidentSelectionPane />
+          {pathname !== "/inspection" && <IncidentSelectionPane />}
           <div className="flex-1 overflow-hidden">
             {children}
           </div>
