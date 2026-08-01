@@ -39,7 +39,7 @@ export const themes: Record<string, Theme> = {
     name: "Premium Gradient Blue",
     id: "premiumBlue",
     header: {
-      bg: "bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900",
+      bg: "bg-gradient-to-r from-slate-900 via-blue-900 to-cyan-600",
       text: "text-white",
     },
     primary: {
@@ -47,77 +47,7 @@ export const themes: Record<string, Theme> = {
       to: "to-cyan-600",
     },
     secondary: {
-      from: "from-blue-500",
-      to: "to-purple-600",
-    },
-    logo: {
-      from: "from-blue-400",
-      to: "to-purple-400",
-    },
-    cardBorder: "border-blue-300/40",
-    background: {
-      gradient: "from-slate-50 via-blue-50/20 to-slate-50/10",
-      section: "from-white via-blue-50/20 to-purple-50/10",
-    },
-    status: {
-      urgent: "bg-gradient-to-r from-rose-600 to-red-700",
-      medium: "from-amber-500 to-orange-600",
-      success: "from-cyan-500 to-blue-500",
-    },
-    filters: {
-      border: "border-blue-200",
-      focus: "border-blue-500 ring-blue-500/20",
-    },
-  },
-
-  aquaGradient: {
-    name: "Aqua Gradient",
-    id: "aquaGradient",
-    header: {
-      bg: "bg-gradient-to-r from-slate-900 via-teal-900 to-slate-900",
-      text: "text-white",
-    },
-    primary: {
-      from: "from-teal-600",
-      to: "to-cyan-600",
-    },
-    secondary: {
-      from: "from-teal-500",
-      to: "to-emerald-600",
-    },
-    logo: {
-      from: "from-cyan-400",
-      to: "to-teal-400",
-    },
-    cardBorder: "border-teal-300/40",
-    background: {
-      gradient: "from-slate-50 via-teal-50/20 to-slate-50/10",
-      section: "from-white via-teal-50/20 to-cyan-50/10",
-    },
-    status: {
-      urgent: "bg-gradient-to-r from-rose-600 to-red-700",
-      medium: "from-amber-500 to-orange-600",
-      success: "from-emerald-500 to-teal-500",
-    },
-    filters: {
-      border: "border-teal-200",
-      focus: "border-teal-500 ring-teal-500/20",
-    },
-  },
-
-  aquaLightGradient: {
-    name: "Aqua Light Gradient",
-    id: "aquaLightGradient",
-    header: {
-      bg: "bg-gradient-to-r from-slate-900 via-blue-900 to-slate-900",
-      text: "text-white",
-    },
-    primary: {
-      from: "from-blue-600",
-      to: "to-teal-600",
-    },
-    secondary: {
-      from: "from-blue-500",
+      from: "from-blue-900",
       to: "to-cyan-600",
     },
     logo: {
@@ -126,52 +56,17 @@ export const themes: Record<string, Theme> = {
     },
     cardBorder: "border-blue-300/40",
     background: {
-      gradient: "from-slate-50 via-blue-50/20 to-cyan-50/10",
-      section: "from-white via-blue-50/20 to-cyan-50/10",
+      gradient: "bg-[var(--bg)]",
+      section: "bg-[var(--bg)]",
     },
     status: {
       urgent: "bg-gradient-to-r from-rose-600 to-red-700",
       medium: "from-amber-500 to-orange-600",
-      success: "from-cyan-500 to-teal-500",
+      success: "from-cyan-500 to-blue-500",
     },
     filters: {
       border: "border-blue-200",
       focus: "border-blue-500 ring-blue-500/20",
-    },
-  },
-
-  oceanVibrant: {
-    name: "Ocean Vibrant",
-    id: "oceanVibrant",
-    header: {
-      bg: "bg-gradient-to-r from-bank-primary via-bank-primary to-bank-secondary",
-      text: "text-white",
-    },
-    primary: {
-      from: "from-bank-primary",
-      to: "to-bank-secondary",
-    },
-    secondary: {
-      from: "from-bank-accent",
-      to: "to-bank-secondary",
-    },
-    logo: {
-      from: "from-bank-accent",
-      to: "to-bank-secondary",
-    },
-    cardBorder: "border-bank-accent/40",
-    background: {
-      gradient: "from-bank-background via-bank-background to-bank-background",
-      section: "from-bank-background via-bank-background to-bank-background",
-    },
-    status: {
-      urgent: "bg-gradient-to-r from-red-500 to-rose-600",
-      medium: "from-amber-500 to-orange-500",
-      success: "from-cyan-500 to-blue-500",
-    },
-    filters: {
-      border: "border-bank-accent",
-      focus: "border-bank-accent ring-bank-accent/20",
     },
   },
 
@@ -196,8 +91,8 @@ export const themes: Record<string, Theme> = {
     },
     cardBorder: "border-indigo-200/40",
     background: {
-      gradient: "from-slate-50 via-indigo-50/10 to-white",
-      section: "from-white via-indigo-50/10 to-slate-50/5",
+      gradient: "bg-[var(--bg)]",
+      section: "bg-[var(--bg)]",
     },
     status: {
       urgent: "bg-gradient-to-r from-red-600 to-rose-700",

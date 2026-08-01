@@ -7,7 +7,7 @@ export default function InspectionPage() {
   const { theme } = useDashboard();
   
   return (
-    <div className={`h-full flex flex-col items-center justify-center p-6 bg-gradient-to-br ${theme.background.section}`}>
+    <div className={`h-full flex flex-col items-center justify-center p-6 ${theme.background.section}`}>
       <div className="text-center bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-12 max-w-lg shadow-2xl">
         <AlertCircle className="w-16 h-16 text-blue-400 mx-auto mb-6 opacity-80" />
         <h2 className="text-2xl font-black text-white mb-3 tracking-tight">Inspection Management</h2>

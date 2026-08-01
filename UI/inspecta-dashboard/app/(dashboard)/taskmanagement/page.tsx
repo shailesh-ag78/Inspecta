@@ -61,7 +61,7 @@ export default function TaskManagementPage() {
   const [flippedDescriptions, setFlippedDescriptions] = useState<Set<string>>(new Set());
   const [isGlobalTranslationEnabled, setIsGlobalTranslationEnabled] = useState(false);
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
-  
+
   const [filters, setFilters] = useState({
     severities: [1, 2, 3],
     task_types: ['install', 'repair', 'verify', 'clear'],
@@ -73,7 +73,6 @@ export default function TaskManagementPage() {
   const [isKpiFlipped, setIsKpiFlipped] = useState(false);
   const [daysFilter, setDaysFilter] = useState<number | ''>('');
   const [assignedToMe, setAssignedToMe] = useState(false);
-  const [withVideoOnly, setWithVideoOnly] = useState(false);
   const [isVideoCollapsed, setIsVideoCollapsed] = useState(false);
 
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -424,10 +423,6 @@ export default function TaskManagementPage() {
       if (task.task_status === 'completed') return false;
     }
 
-    if (withVideoOnly) {
-      if (!task.video_url) return false;
-    }
-
     return true;
   });
 
@@ -474,7 +469,7 @@ export default function TaskManagementPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Controls Bar for Inspection and Incident selections */}
-      <div className="bg-slate-100/90 border-b border-slate-200/80 px-4 py-3 shadow-sm shrink-0">
+      <div className="bg-[var(--pane-bg)]/90 border-b border-slate-200/80 px-4 py-3 shadow-sm shrink-0">
         <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <div className="text-slate-800 text-sm font-semibold flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
@@ -506,7 +501,7 @@ export default function TaskManagementPage() {
                         setSelectedInspection("");
                         setIsInspectionDropdownOpen(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${selectedInspection === "" ? 'bg-blue-600 text-white font-semibold' : 'text-slate-700'
+                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${selectedInspection === "" ? `bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white font-semibold` : 'text-slate-700'
                         }`}
                     >
                       🌍 All Inspections (Company)
@@ -524,7 +519,7 @@ export default function TaskManagementPage() {
                               setSelectedInspection(val);
                               setIsInspectionDropdownOpen(false);
                             }}
-                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${isSelected ? 'bg-blue-600 text-white font-semibold' : 'text-slate-700'
+                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${isSelected ? `bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white font-semibold` : 'text-slate-700'
                               }`}
                           >
                             {item.label}
@@ -581,7 +576,7 @@ export default function TaskManagementPage() {
                               setSelectedIncidentId(incident.id);
                               setIsIncidentDropdownOpen(false);
                             }}
-                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${isSelected ? 'bg-blue-600 text-white font-semibold' : 'text-slate-700'
+                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors hover:bg-slate-55 block truncate ${isSelected ? `bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white font-semibold` : 'text-slate-700'
                               }`}
                           >
                             {label}
@@ -620,16 +615,16 @@ export default function TaskManagementPage() {
       {/* Main Content */}
       <main className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden max-w-[1600px] mx-auto w-full">
         {/* Left Pane - Task Feed */}
-        <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-1.5 pb-6 pt-0 bg-gradient-to-br ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
+        <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-1.5 pb-6 pt-0 ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
           {/* KPIs Section */}
-          <div className="bg-slate-100/98 border-b border-slate-200/70 mb-2 -mx-1.5 overflow-hidden shadow-md">
-            <div className="flex items-center justify-between px-3 py-2 bg-slate-200/80 border-b border-slate-200/70">
+          <div className="bg-[var(--pane-bg)]/98 border-b border-slate-200/70 mb-2 -mx-1.5 overflow-hidden shadow-md">
+            <div className={`flex items-center justify-between px-3 py-2 ${theme.background.section} border-b border-slate-200/70`}>
               <div className="flex items-center gap-2">
-                <i className={`fa-solid fa-chart-line ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
+                <i className={`fa-solid fa-chart-line bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white text-xs p-1.5 rounded-lg border ${theme.cardBorder}`}></i>
               </div>
               <button
                 onClick={() => setIsKpisCollapsed(!isKpisCollapsed)}
-                className={`text-white transition-all p-1 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
+                className={`text-white transition-all p-1 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
               >
                 <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${isKpisCollapsed ? '' : 'rotate-180'}`} />
               </button>
@@ -667,7 +662,7 @@ export default function TaskManagementPage() {
                   >
                     <div className={`relative w-full h-full duration-500 [transform-style:preserve-3d] ${isKpiFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
                       {/* Front Side */}
-                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-gradient-to-br from-slate-50 to-indigo-50/70 border border-indigo-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
+                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
                         <div className="grid grid-cols-2 gap-1 h-full items-center text-[8.5px] text-slate-700 p-0.5">
                           <div className="aspect-square flex flex-col items-center justify-center bg-slate-50 border border-slate-100 rounded-lg p-0.5">
                             <span className="text-[8px] text-slate-400 font-bold uppercase leading-none mb-0.5">Pending</span>
@@ -689,7 +684,7 @@ export default function TaskManagementPage() {
                       </div>
 
                       {/* Back Side */}
-                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] bg-gradient-to-br from-slate-50 to-rose-50/50 border border-rose-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
+                      <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] [transform:rotateY(180deg)] bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl p-1.5 shadow-sm flex flex-col justify-between">
                         <div className="grid grid-cols-2 gap-1 h-full items-center text-[8.5px] text-slate-700 p-0.5">
                           <div className="aspect-square flex flex-col items-center justify-center bg-red-50/60 border border-red-100 rounded-lg p-0.5">
                             <span className="text-[8px] text-red-500/80 font-bold uppercase leading-none mb-0.5">Severe</span>
@@ -713,7 +708,7 @@ export default function TaskManagementPage() {
                   </div>
 
                   {/* KPI Tile 3 */}
-                  <div className="p-2 bg-gradient-to-br from-slate-50 to-emerald-50/70 border border-emerald-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[110px] w-[110px] max-w-[110px] mx-auto">
+                  <div className="p-2 bg-gradient-to-br from-slate-50 to-blue-50/70 border border-blue-200/50 rounded-xl shadow-sm flex flex-col justify-between h-[110px] w-[110px] max-w-[110px] mx-auto">
                     <div className="space-y-1 mt-0.5">
                       <div className="flex justify-between text-[10px] font-medium text-slate-700">
                         <span>Done Rate:</span>
@@ -745,10 +740,10 @@ export default function TaskManagementPage() {
           </div>
 
           {/* Filters */}
-          <div className="sticky top-0 z-20 -mx-1.5 bg-slate-100/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
-            <div className="flex items-center justify-between px-3 py-3 border-b border-slate-200/70 bg-slate-200/80">
-              <h3 className="text-base font-semibold text-slate-900 flex items-center gap-3">
-                <i className={`fa-solid fa-filter ${theme.primary.from} ${theme.primary.to} bg-gradient-to-r text-white text-xs p-1.5 rounded-lg`}></i>
+          <div className="sticky top-0 z-20 -mx-1.5 bg-[var(--pane-bg)]/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
+            <div className={`flex items-center justify-between px-3 py-3 border-b border-slate-200/70 ${theme.background.section}`}>
+              <h3 className="text-base font-semibold text-slate-800 flex items-center gap-3">
+                <i className={`fa-solid fa-filter bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white text-xs p-1.5 rounded-lg border ${theme.cardBorder}`}></i>
                 <span>Task Filters</span>
                 <button
                   onClick={() => {
@@ -766,19 +761,19 @@ export default function TaskManagementPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
-                  className={`text-white transition-all p-2 rounded-lg border border-transparent bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
+                  className={`text-white transition-all p-2 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
                 >
                   <ChevronDown className={`w-2 h-2 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />
                 </button>
               </div>
             </div>
             {!isFiltersCollapsed && (
-              <div className="px-3 py-4">
+              <div className="px-3 py-4 bg-slate-50/50">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Types Filter */}
-                  <div className="p-3 rounded-xl border border-slate-200/80 bg-white/60 backdrop-blur-sm shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-2.5 uppercase tracking-wider">Task Type</h4>
-                    <div className="flex flex-col gap-2">
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Task Type</h4>
+                    <div className="flex flex-col gap-1">
                       {[
                         { id: 'install', label: '🛠️ Install' },
                         { id: 'repair', label: '🔧 Repair' },
@@ -804,9 +799,9 @@ export default function TaskManagementPage() {
                   </div>
 
                   {/* Severity Filter */}
-                  <div className="p-3 rounded-xl border border-slate-200/80 bg-white/60 backdrop-blur-sm shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-2.5 uppercase tracking-wider">Severity</h4>
-                    <div className="flex flex-col gap-2">
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Severity</h4>
+                    <div className="flex flex-col gap-1">
                       {[
                         { id: 1, label: '🔴 Severe' },
                         { id: 2, label: '🟡 Regular' },
@@ -831,9 +826,9 @@ export default function TaskManagementPage() {
                   </div>
 
                   {/* Status Filter */}
-                  <div className="p-3 rounded-xl border border-slate-200/80 bg-white/60 backdrop-blur-sm shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-2.5 uppercase tracking-wider">Status</h4>
-                    <div className="flex flex-col gap-2">
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
+                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status</h4>
+                    <div className="flex flex-col gap-1">
                       {[
                         { id: 'pending', label: '🕒 Pending' },
                         { id: 'in_progress', label: '🔄 In Progress' },
@@ -860,11 +855,11 @@ export default function TaskManagementPage() {
                   </div>
 
                   {/* Quick Filters */}
-                  <div className="p-3 rounded-xl border border-slate-200/80 bg-white/60 backdrop-blur-sm shadow-sm flex flex-col justify-between">
+                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm flex flex-col justify-between">
                     <div>
-                      <h4 className="text-xs font-bold text-slate-800 mb-2.5 uppercase tracking-wider">Quick Filters</h4>
-                      <div className="flex flex-col gap-3">
-                        <div className="relative group flex flex-col gap-1">
+                      <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Quick Filters</h4>
+                      <div className="flex flex-col gap-1.5">
+                        <div className="relative group flex flex-col gap-0.5">
                           <span className="text-[11px] font-semibold text-slate-600 select-none">Created in last</span>
                           <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm w-full">
                             <input
@@ -876,7 +871,7 @@ export default function TaskManagementPage() {
                                 const val = e.target.value === '' ? '' : parseInt(e.target.value);
                                 setDaysFilter(val);
                               }}
-                              className="w-12 px-2 py-1 text-xs border-r border-slate-200 focus:outline-none text-slate-700 font-semibold"
+                              className="w-12 px-2 py-0.5 text-xs border-r border-slate-200 focus:outline-none text-slate-700 font-semibold"
                             />
                             <select
                               value={daysFilter === '' ? 'custom' : daysFilter}
@@ -885,7 +880,7 @@ export default function TaskManagementPage() {
                                 setDaysFilter(val);
                                 setIsFiltersCollapsed(true);
                               }}
-                              className="px-1 py-1 text-[11px] bg-slate-50 cursor-pointer focus:outline-none text-slate-600 border-none font-medium flex-1"
+                              className="px-1 py-0.5 text-[11px] bg-slate-50 cursor-pointer focus:outline-none text-slate-600 border-none font-medium flex-1"
                             >
                               <option value="custom">Custom</option>
                               <option value="1">1 day</option>
@@ -907,19 +902,6 @@ export default function TaskManagementPage() {
                             className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
                           />
                           <span>👤 My Tasks</span>
-                        </label>
-
-                        <label className="flex items-center gap-2 text-xs font-medium text-slate-600 hover:text-slate-900 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={withVideoOnly}
-                            onChange={() => {
-                              setWithVideoOnly(!withVideoOnly);
-                              setIsFiltersCollapsed(true);
-                            }}
-                            className="rounded border-slate-300 text-blue-400 focus:ring-blue-400/30 w-4 h-4 cursor-pointer transition-all bg-blue-50/50"
-                          />
-                          <span>📹 Tasks with video</span>
                         </label>
                       </div>
                     </div>
@@ -948,7 +930,7 @@ export default function TaskManagementPage() {
                   <div
                     key={task.id}
                     onClick={() => handleTaskClick(task)}
-                    className={`cursor-pointer bg-white/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${activeTask?.id === task.id
+                    className={`cursor-pointer bg-[var(--pane-bg)]/90 backdrop-blur-sm rounded-xl border-2 shadow-lg hover:shadow-xl transition-all duration-300 ${activeTask?.id === task.id
                       ? `border-blue-500 ring-4 ring-blue-500/20 shadow-blue-500/20`
                       : `${theme.cardBorder} hover:border-blue-300`
                       }`}
@@ -1075,7 +1057,7 @@ export default function TaskManagementPage() {
                                     saveTaskEdits(task);
                                   }}
                                   disabled={taskSaveLoading}
-                                  className="px-3 py-1.5 min-w-[72px] bg-blue-600 text-white rounded-xl text-[11px] font-bold shadow-sm hover:bg-blue-700 transition-colors disabled:cursor-not-allowed disabled:bg-blue-300"
+                                  className={`px-3 py-1.5 min-w-[72px] bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} hover:brightness-110 text-white rounded-xl text-[11px] font-bold shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-50`}
                                 >
                                   {taskSaveLoading ? 'Saving...' : 'Save'}
                                 </button>
@@ -1170,7 +1152,7 @@ export default function TaskManagementPage() {
 
         {/* Right Pane - Evidence Vault */}
         {!isVideoCollapsed && (
-          <aside className={`w-full lg:w-2/5 ${theme.header.bg} flex flex-col shadow-inner relative border-t lg:border-t-0 lg:border-l border-slate-700 mt-4 lg:mt-0`}>
+          <aside className={`w-full lg:w-2/5 ${theme.header.bg.replace(/bg-gradient-to-r/g, 'bg-gradient-to-b')} flex flex-col shadow-inner relative border-t lg:border-t-0 lg:border-l border-slate-700 mt-4 lg:mt-0`}>
             <div className="absolute inset-0 bg-white/10 pointer-events-none" />
             <div className="p-5 pb-40 flex-1 overflow-y-auto relative z-10">
               <div className="flex items-center justify-between mb-5">
@@ -1233,7 +1215,7 @@ export default function TaskManagementPage() {
 
                       <button
                         onClick={handleActiveVideoPlay}
-                        className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-full transition-all active:scale-95"
+                        className={`flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} hover:brightness-110 text-white text-xs font-bold rounded-full transition-all active:scale-95`}
                       >
                         <Play className={`w-3.5 h-3.5 fill-current ${isPlaying ? 'animate-pulse' : ''}`} />
                         {isPlaying ? 'Playing Segment' : `Sync : ${activeTask ? `${formatTime(activeTask.start_time)} -- ${formatTime(activeTask.end_time)}` : '00:00'}`}
@@ -1305,7 +1287,7 @@ export default function TaskManagementPage() {
       <div className="lg:hidden shrink-0 bg-slate-900 border-t border-slate-700/50 p-3 flex gap-3 z-30 sticky bottom-0 mobile-action-bar">
         <button
           onClick={() => setIsAddInspectionOpen(true)}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} hover:brightness-110 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95`}
         >
           <Plus className="w-4 h-4" />
           Add Inspection

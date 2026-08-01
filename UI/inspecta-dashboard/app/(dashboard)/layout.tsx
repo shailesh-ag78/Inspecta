@@ -1,7 +1,7 @@
 "use client";
 
 import { DashboardProvider, useDashboard } from "@/lib/context";
-import { ChevronDown, Loader, LogOut, User, Plus, Upload, Gauge, ClipboardList, ListTodo, Menu, ChevronLeft, Bell } from "lucide-react";
+import { ChevronDown, Loader, LogOut, User, Plus, Upload, Gauge, ClipboardList, ListTodo, Menu, ChevronLeft, Bell, Settings } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -102,7 +102,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               <div className="p-2 border-b border-slate-800">
                 <div className="px-3 py-2 text-xs font-medium text-slate-300 uppercase tracking-wider">Theme</div>
                 {Object.values(themes)
-                  .filter(t => !['Aqua Gradient', 'Aqua Light Gradient', 'Ocean Vibrant'].includes(t.name))
                   .map((t) => (
                     <button
                       key={t.id}
@@ -198,10 +197,12 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const siteName = headerSiteName || activeInspectionObj?.site_name || "All Sites";
   const inspectionName = headerInspectionName || activeInspectionObj?.label || "All Inspections";
 
-  const sidebarBg = theme.header.bg.replace(/bg-gradient-to-r/g, 'bg-gradient-to-b');
+  const sidebarBg = theme.id === 'blueTeal'
+    ? theme.header.bg
+    : theme.header.bg.replace(/bg-gradient-to-r/g, 'bg-gradient-to-b');
 
   return (
-    <div className={`h-screen flex bg-gradient-to-br ${theme.background.gradient} overflow-hidden`}>
+    <div className={`h-screen flex ${theme.background.gradient} overflow-hidden`}>
       {/* Collapsible Left Sidebar */}
       <aside className={`hidden sm:flex h-full border-r border-slate-300/20 ${sidebarBg} flex-col transition-all duration-300 ${isSidebarCollapsed ? 'w-16' : 'w-52'} shrink-0 relative z-30`}>
         {/* Top Header in Sidebar: Logo and Name */}
@@ -243,9 +244,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             { path: "/taskmanagement", label: "Task List", icon: "/task-list.ico" as any },
             { path: "/inspection", label: "Inspection", icon: "/Inspection.ico" as any },
             { path: "/reports", label: "Reports", icon: "/reports.ico" as any },
+            { path: "/configuration", label: "Configuration", icon: "/conifguration.ico" as any },
           ].map((tab) => {
             const isActive = pathname === tab.path || (tab.path === "/taskmanagement" && pathname === "/");
             const Icon = tab.icon;
+            const isConfig = tab.path === "/configuration";
             return (
               <Link
                 key={tab.path}
@@ -261,14 +264,14 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
               >
                 {isSidebarCollapsed ? (
                   typeof Icon === 'string' ? (
-                    <img src={Icon} alt="" className="w-8 h-8 object-contain shrink-0" />
+                    <img src={Icon} alt="" className={`w-8 h-8 object-contain shrink-0 ${isConfig ? 'p-[2px]' : ''}`} />
                   ) : (
                     <Icon className={`w-6 h-6 shrink-0 ${isActive ? "text-blue-400" : "text-white/80"}`} />
                   )
                 ) : (
                   <div className={`flex items-center justify-center w-9 h-9 rounded-lg shrink-0 ${isActive ? "bg-white/15" : "bg-white/5"}`}>
                     {typeof Icon === 'string' ? (
-                      <img src={Icon} alt="" className="w-9 h-9 object-contain" />
+                      <img src={Icon} alt="" className={`w-9 h-9 object-contain ${isConfig ? 'p-[3px]' : ''}`} />
                     ) : (
                       <Icon className={`w-7 h-7 ${isActive ? "text-blue-400" : "text-white/80"}`} />
                     )}
@@ -310,7 +313,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 {[
                   { path: "/taskmanagement", label: "Task List", icon: "/task-list.ico" as any },
                   { path: "/inspection", label: "Inspection", icon: "/Inspection.ico" as any },
-                  { path: "/reports", label: "Reports", icon: "/reports.ico" as any },
                 ].map((tab) => {
                   const isActive = pathname === tab.path || (tab.path === "/taskmanagement" && pathname === "/");
                   const Icon = tab.icon;
