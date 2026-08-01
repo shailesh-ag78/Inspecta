@@ -6,6 +6,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import AddInspectionModal from "@/components/AddInspectionModal";
+import IncidentSelectionPane from "@/components/IncidentSelectionPane";
 import { themes } from "@/lib/themes";
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
@@ -345,8 +346,11 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content Area */}
-        <div className="flex-1 overflow-hidden">
-          {children}
+        <div className="flex-1 overflow-hidden flex flex-col">
+          <IncidentSelectionPane />
+          <div className="flex-1 overflow-hidden">
+            {children}
+          </div>
         </div>
       </div>
     </div>

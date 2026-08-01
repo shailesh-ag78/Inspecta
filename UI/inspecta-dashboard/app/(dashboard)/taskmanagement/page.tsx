@@ -481,30 +481,25 @@ export default function TaskManagementPage() {
   return (
     <div className="h-full flex flex-col">
       {/* Controls Bar for Inspection and Incident selections */}
-      <div className="bg-[var(--pane-bg)]/90 border-b border-slate-200/80 px-4 py-3 shadow-sm shrink-0">
-        <div className="max-w-[1600px] mx-auto flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-          <div className="text-slate-800 text-sm font-semibold flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse"></span>
-            Inspection Controls
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 justify-end w-full sm:w-auto">
+      <div className="bg-slate-100 border-b border-slate-200/70 px-3 py-1 shadow-sm sticky top-0 z-30 shrink-0">
+        <div className="max-w-[1600px] w-full mx-auto flex flex-wrap items-center justify-start gap-4 sm:gap-6">
+          <div className="flex flex-wrap items-center gap-8 justify-start flex-1">
             {/* Inspection Dropdown Group */}
             <div className="flex items-center gap-3 w-full sm:w-auto">
               <div ref={inspectionDropdownRef} className="relative w-full sm:w-[305px] shrink-0">
                 <button
                   onClick={() => setIsInspectionDropdownOpen(!isInspectionDropdownOpen)}
-                  className="w-full relative rounded-2xl border border-slate-300 bg-white px-3 py-1.5 text-left text-sm text-slate-800 shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-slate-50 cursor-pointer"
+                  className={`w-full relative rounded-2xl border ${theme.id === 'premiumBlue' ? 'border-blue-200 hover:border-blue-400' : 'border-indigo-200 hover:border-indigo-400'} bg-white px-3 py-0.5 text-left text-sm text-slate-800 shadow-sm flex flex-col justify-center min-h-[38px] transition-all hover:bg-slate-50 cursor-pointer`}
                 >
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 block leading-tight">Inspection</span>
+                  <span className={`text-[9px] uppercase tracking-[0.2em] ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'} block leading-tight`}>Inspection</span>
                   {siteInspectionsLoading ? (
-                    <Loader className="w-4 h-4 animate-spin text-slate-500 mt-1" />
+                    <Loader className="w-4 h-4 animate-spin text-slate-500 mt-0.5" />
                   ) : (
-                    <span className="block truncate text-sm text-slate-800 font-semibold pr-6 mt-0.5">
+                    <span className="block truncate text-xs text-slate-850 font-semibold pr-6 mt-0.5">
                       {siteInspections.find(item => (item.inspection_id || item.site_id) === selectedInspection)?.label || 'Select Inspection'}
                     </span>
                   )}
-                  <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <ChevronDown className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${theme.id === 'premiumBlue' ? 'text-blue-500' : 'text-indigo-500'}`} />
                 </button>
                 {isInspectionDropdownOpen && (
                   <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 py-1.5 dropdown-scrollbar">
@@ -557,13 +552,13 @@ export default function TaskManagementPage() {
               <div ref={incidentDropdownRef} className="relative w-full sm:w-[277px] shrink-0">
                 <button
                   onClick={() => setIsIncidentDropdownOpen(!isIncidentDropdownOpen)}
-                  className="w-full relative rounded-2xl border border-slate-300 bg-white px-3 py-1.5 text-left text-sm text-slate-800 shadow-sm flex flex-col justify-center min-h-[50px] transition-all hover:bg-slate-50 cursor-pointer"
+                  className={`w-full relative rounded-2xl border ${theme.id === 'premiumBlue' ? 'border-blue-200 hover:border-blue-400' : 'border-indigo-200 hover:border-indigo-400'} bg-white px-3 py-0.5 text-left text-sm text-slate-800 shadow-sm flex flex-col justify-center min-h-[38px] transition-all hover:bg-slate-50 cursor-pointer`}
                 >
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500 block leading-tight">Incident</span>
+                  <span className={`text-[9px] uppercase tracking-[0.2em] ${theme.id === 'premiumBlue' ? 'text-blue-600' : 'text-indigo-600'} block leading-tight`}>Incident</span>
                   {incidentsLoading ? (
-                    <Loader className="w-4 h-4 animate-spin text-slate-500 mt-1" />
+                    <Loader className="w-4 h-4 animate-spin text-slate-500 mt-0.5" />
                   ) : (
-                    <span className="block truncate text-sm text-slate-800 font-semibold pr-6 mt-0.5">
+                    <span className="block truncate text-xs text-slate-850 font-semibold pr-6 mt-0.5">
                       {(() => {
                         const incident = incidents.find(inc => inc.id === selectedIncidentId);
                         if (!incident) return 'Select Incident';
@@ -571,7 +566,7 @@ export default function TaskManagementPage() {
                       })()}
                     </span>
                   )}
-                  <ChevronDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                  <ChevronDown className={`absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 ${theme.id === 'premiumBlue' ? 'text-blue-500' : 'text-indigo-500'}`} />
                 </button>
                 {isIncidentDropdownOpen && (
                   <div className="absolute left-0 right-0 mt-2 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl z-50 py-1.5 dropdown-scrollbar">
@@ -628,11 +623,16 @@ export default function TaskManagementPage() {
       <main className="flex flex-col lg:flex-row flex-1 overflow-y-auto lg:overflow-hidden max-w-[1600px] mx-auto w-full">
         {/* Left Pane - Task Feed */}
         <section className={`${isVideoCollapsed ? 'w-full' : 'w-full lg:w-3/5'} overflow-y-visible lg:overflow-y-auto px-1.5 pb-6 pt-0 ${theme.background.section} border border-slate-200/70 transition-all duration-300 relative`}>
+
+
           {/* KPIs Section */}
           <div className="bg-[var(--pane-bg)]/98 border-b border-slate-200/70 mb-2 -mx-1.5 overflow-hidden shadow-md">
-            <div className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
-                <i className={`fa-solid fa-chart-line bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white text-xs p-1.5 rounded-lg border ${theme.cardBorder}`}></i>
+            <div
+              onClick={() => setIsKpisCollapsed(!isKpisCollapsed)}
+              className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
+            >
+              <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
+                <i className="fa-solid fa-chart-line text-slate-600 text-lg mr-2"></i>
                 <span className="tracking-wide select-none flex items-center flex-wrap gap-x-1">
                   Completion {kpiCompletionRate}%
                   <span className="mx-4 text-slate-500"></span>
@@ -642,7 +642,10 @@ export default function TaskManagementPage() {
                 </span>
               </div>
               <button
-                onClick={() => setIsKpisCollapsed(!isKpisCollapsed)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsKpisCollapsed(!isKpisCollapsed);
+                }}
                 className={`text-white transition-all p-1 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
               >
                 <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${isKpisCollapsed ? '' : 'rotate-180'}`} />
@@ -745,20 +748,23 @@ export default function TaskManagementPage() {
             )}
           </div>
 
-          {/* Filters */}
           <div className="sticky top-0 z-20 -mx-1.5 bg-[var(--pane-bg)]/98 backdrop-blur-sm border-b border-slate-200/70 mb-1 shadow-md">
-            <div className={`flex items-center justify-between px-3 py-3 border-b border-slate-200/70 ${theme.background.section}`}>
-              <h3 className="text-base font-semibold text-slate-800 flex items-center gap-3">
-                <i className={`fa-solid fa-filter bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} text-white text-xs p-1.5 rounded-lg border ${theme.cardBorder}`}></i>
-                <span>Task Filters</span>
+            <div
+              onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
+              className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
+            >
+              <h3 className="text-sm font-bold text-slate-500 flex items-center gap-2">
+                <i className="fa-solid fa-filter text-slate-600 text-lg mr-2"></i>
+                <span className="tracking-wide">Task Filters</span>
                 <button
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.stopPropagation();
                     const nextGlobal = !isGlobalTranslationEnabled;
                     setIsGlobalTranslationEnabled(nextGlobal);
                     setFlippedTitles(new Set());
                     setFlippedDescriptions(new Set());
                   }}
-                  className={`p-1 rounded-lg border transition-all ${isGlobalTranslationEnabled ? 'bg-blue-100 border-blue-200 shadow-sm' : 'hover:bg-slate-100 border-transparent'}`}
+                  className={`p-1 rounded-lg border transition-all ${isGlobalTranslationEnabled ? 'bg-blue-100 border-blue-200 shadow-sm' : 'hover:bg-slate-200 border-transparent'}`}
                   title="Toggle default translation for all tasks"
                 >
                   <img src="/trasnlation_icon.png" alt="Translate" className="w-4 h-4 object-contain scale-[1.25]" />
@@ -766,7 +772,10 @@ export default function TaskManagementPage() {
               </h3>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsFiltersCollapsed(!isFiltersCollapsed);
+                  }}
                   className={`text-white transition-all p-1 rounded-lg border ${theme.cardBorder} bg-gradient-to-r ${theme.primary.from} ${theme.primary.to}`}
                 >
                   <ChevronDown className={`w-3.5 h-3.5 transform transition-transform ${isFiltersCollapsed ? '' : 'rotate-180'}`} />

@@ -96,6 +96,21 @@ interface DashboardContextType {
   setHeaderSiteName: (val: string) => void;
   headerInspectionName: string;
   setHeaderInspectionName: (val: string) => void;
+  isIncidentPaneCollapsed: boolean;
+  setIsIncidentPaneCollapsed: (val: boolean) => void;
+  isSiteColumnCollapsed: boolean;
+  setIsSiteColumnCollapsed: (val: boolean) => void;
+  selectedMillerSites: string[];
+  setSelectedMillerSites: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedMillerInspections: string[];
+  setSelectedMillerInspections: React.Dispatch<React.SetStateAction<string[]>>;
+  selectedMillerIncidents: string[];
+  setSelectedMillerIncidents: React.Dispatch<React.SetStateAction<string[]>>;
+  backendSites: any[];
+  setBackendSites: React.Dispatch<React.SetStateAction<any[]>>;
+  millerIncidents: any[];
+  setMillerIncidents: React.Dispatch<React.SetStateAction<any[]>>;
+  millerIncidentsLoading: boolean;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -517,6 +532,103 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const [isIncidentPaneCollapsed, setIsIncidentPaneCollapsed] = useState(true);
+  const [isSiteColumnCollapsed, setIsSiteColumnCollapsed] = useState(false);
+  const [selectedMillerSites, setSelectedMillerSites] = useState<string[]>([]);
+  const [selectedMillerInspections, setSelectedMillerInspections] = useState<string[]>([]);
+  const [selectedMillerIncidents, setSelectedMillerIncidents] = useState<string[]>([]);
+  const [backendSites, setBackendSites] = useState<any[]>([]);
+
+  useEffect(() => {
+    const getSites = async () => {
+      try {
+        const res = await authenticatedFetch('/api/sites');
+        if (res.ok) {
+          const json = await res.json();
+          const list = json.data || json || [];
+          setBackendSites(list);
+          setSelectedMillerSites(list.map((s: any) => String(s.site_name || s.name || '')));
+        }
+      } catch (e) {
+        console.error("Error fetching backend sites:", e);
+      }
+    };
+    if (token) {
+      getSites();
+    }
+  }, [token, token]);
+
+  useEffect(() => {
+    const availableIns = siteInspections.filter(ins => selectedMillerSites.includes(ins.site_name));
+    setSelectedMillerInspections(prev => {
+      const next = prev.filter(id => availableIns.some(ins => String(ins.inspection_id || ins.site_id) === id));
+      if (next.length === 0 && availableIns.length > 0) {
+        return availableIns.map(ins => String(ins.inspection_id || ins.site_id)).filter(Boolean);
+      }
+      return next;
+    });
+  }, [selectedMillerSites, siteInspections]);
+
+  const [millerIncidents, setMillerIncidents] = useState<any[]>([]);
+  const [millerIncidentsLoading, setMillerIncidentsLoading] = useState(false);
+  useEffect(() => {
+    const fetchIncidentsForMiller = async () => {
+      if (selectedMillerInspections.length === 0) {
+        setMillerIncidents([]);
+        setSelectedMillerIncidents([]);
+        return;
+      }
+      try {
+        setMillerIncidentsLoading(true);
+        const promises = selectedMillerInspections.map(async (insId) => {
+          const res = await authenticatedFetch(`/api/incidents?inspectionId=${insId}`);
+          if (!res.ok) return [];
+          const json = await res.json();
+          return formatIncidents(json.data || []);
+        });
+        const results = await Promise.all(promises);
+        const mergedIncidents = results.flat();
+        setMillerIncidents(mergedIncidents);
+        setSelectedMillerIncidents(prev => {
+          const next = prev.filter(id => mergedIncidents.some(inc => inc.id === id));
+          if (next.length === 0 && mergedIncidents.length > 0) {
+            return mergedIncidents.map(i => i.id);
+          }
+          return next;
+        });
+      } catch (e) {
+        console.error("Error fetching incidents for Miller columns:", e);
+      } finally {
+        setMillerIncidentsLoading(false);
+      }
+    };
+    fetchIncidentsForMiller();
+  }, [selectedMillerInspections]);
+
+  useEffect(() => {
+    const fetchTasksForSelectedIncidents = async () => {
+      if (selectedMillerIncidents.length === 0) {
+        setTasks([]);
+        return;
+      }
+      try {
+        const promises = selectedMillerIncidents.map(async (incId) => {
+          const res = await authenticatedFetch(`/api/incidents/${incId}/tasks`);
+          if (!res.ok) return [];
+          const json = await res.json();
+          return formatTasks(Array.isArray(json) ? json : (json.data || []));
+        });
+        const results = await Promise.all(promises);
+        const mergedTasks = results.flat();
+        mergedTasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        setTasks(mergedTasks);
+      } catch (e) {
+        console.error("Error fetching tasks for Miller incidents:", e);
+      }
+    };
+    fetchTasksForSelectedIncidents();
+  }, [selectedMillerIncidents, setTasks]);
+
   const uniqueSites = Array.from(
     new Map(
       siteInspections.map((item) => [
@@ -569,6 +681,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         setHeaderSiteName,
         headerInspectionName,
         setHeaderInspectionName,
+        isIncidentPaneCollapsed,
+        setIsIncidentPaneCollapsed,
+        isSiteColumnCollapsed,
+        setIsSiteColumnCollapsed,
+        selectedMillerSites,
+        setSelectedMillerSites,
+        selectedMillerInspections,
+        setSelectedMillerInspections,
+        selectedMillerIncidents,
+        setSelectedMillerIncidents,
+        backendSites,
+        setBackendSites,
+        millerIncidents,
+        setMillerIncidents,
+        millerIncidentsLoading,
       }}
     >
       {children}
