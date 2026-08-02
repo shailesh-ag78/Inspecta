@@ -680,36 +680,36 @@ export default function InspectionPage() {
                       >
                         {/* Row 1 : Col 1 and Col 2 merged : show Stats */}
                         <div className="col-span-2 flex items-center justify-start">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
-                            incident.status === "Processing" ? "bg-amber-50 text-amber-600 border border-amber-200/50 animate-pulse" :
-                              incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
-                                "bg-rose-50 text-rose-600 border border-rose-200/50"
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider 
+                            ${incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
+                              incident.status === "Processing" ? "bg-amber-50 text-amber-600 border border-amber-200/50 animate-pulse" :
+                                incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
+                                  "bg-rose-50 text-rose-600 border border-rose-200/50"
                             }`}>
                             {incident.status === "Processing" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                            {incident.status === "Completed" ? "Complete" : incident.status}
-                            {incident.status === "Failed" ? "Failed" : incident.status}
+                            {incident.status}
                           </span>
                         </div>
 
                         {/* Row 1 : Col 3 : Show file name */}
                         <div className="col-span-1 text-left min-w-0">
                           <span className="text-sm font-bold text-slate-800 truncate block" title={incident.fileName}>
-                            {incident.incidentId ? incident.incidentId.substring(0, 4) + '...' : ''} - {' '}
+                            {incident.incidentId ? incident.incidentId : ''} - {' '}
                             {incident.fileName}
                           </span>
                         </div>
 
-                        {/* Row 2 : Col 1 : Centrally show icon of Incident or Field Note */}
-                        <div className="col-span-1 flex justify-center items-center">
-                          {incident.category === "incident" ? (
-                            <span className="text-lg" title="Incident" role="img" aria-label="Incident">📌</span>
-                          ) : (
+                        {/* Row 2 : Col 1 : Right-aligned icon of Incident or Field Note */}
+                        <div className="col-span-1 flex justify-end items-center">
+                          {incident.category === "fieldnote" ? (
                             <span className="text-lg" title="Field Note" role="img" aria-label="Field Note">📋</span>
+                          ) : (
+                            <span className="text-lg" title="Incident" role="img" aria-label="Incident">📌</span>
                           )}
                         </div>
 
-                        {/* Row 2 : Col 2 : Icon of media type */}
-                        <div className="col-span-1 flex justify-center items-center">
+                        {/* Row 2 : Col 2 : Left-aligned icon of media type */}
+                        <div className="col-span-1 flex justify-start items-center">
                           {incident.fileType && (
                             <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-slate-400">
                               {incident.fileType === "audio" && <FileAudio className="w-5 h-5 text-red-555" />}
@@ -721,16 +721,16 @@ export default function InspectionPage() {
 
                         {/* Row 2 : Col 3 : Show display message after date time stamp */}
                         <div className="col-span-1 text-left min-w-0 flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
+                          <span className="text-xs text-slate-700 font-semibold whitespace-nowrap">
                             {incident.uploadedAt}
                           </span>
                           {incident.displayMessage && (
                             <>
-                              <span className="text-slate-300 text-xs select-none">•</span>
+                              <span className="text-slate-400 text-xs select-none">•</span>
                               <span
-                                className={`text-xs truncate ${incident.status === "Failed"
-                                  ? "text-rose-600 font-medium"
-                                  : "text-slate-500 italic"
+                                className={`text-xs truncate font-semibold ${incident.status === "Failed"
+                                  ? "text-rose-700"
+                                  : "text-slate-700"
                                   }`}
                                 title={incident.displayMessage}
                               >

@@ -8,7 +8,7 @@ export default function RootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace("/taskmanagement");
+    router.replace("/inspection");
   }, [router]);
 
   return (

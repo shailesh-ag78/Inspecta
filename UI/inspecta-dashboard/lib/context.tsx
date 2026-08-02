@@ -126,6 +126,7 @@ interface DashboardContextType {
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   // Auth state management
   const [user, setUser] = useState<any>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -482,16 +483,20 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         const formattedInc = formatIncidents(incidentsJson.data || []);
         setIncidents(formattedInc);
 
-        // Fetch all tasks
-        const tasksResponse = await authenticatedFetch('/api/tasks');
-        if (!tasksResponse.ok) {
-          throw new Error(`Failed to fetch all tasks: ${tasksResponse.statusText}`);
+        // Fetch all tasks (only on taskmanagement page)
+        if (pathname === '/taskmanagement') {
+          const tasksResponse = await authenticatedFetch('/api/tasks');
+          if (!tasksResponse.ok) {
+            throw new Error(`Failed to fetch all tasks: ${tasksResponse.statusText}`);
+          }
+          const tasksJson = await tasksResponse.json();
+          const formattedTsk = formatTasks(
+            Array.isArray(tasksJson) ? tasksJson : (tasksJson.data || [])
+          );
+          setTasks(formattedTsk);
+        } else {
+          setTasks([]);
         }
-        const tasksJson = await tasksResponse.json();
-        const formattedTsk = formatTasks(
-          Array.isArray(tasksJson) ? tasksJson : (tasksJson.data || [])
-        );
-        setTasks(formattedTsk);
       } catch (error) {
         console.error('Error fetching company wide data:', error);
         setIncidentsError(error instanceof Error ? error.message : 'Failed to fetch company data');
@@ -554,7 +559,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     };
 
     fetchIncidents();
-  }, [selectedInspection, siteInspections, user, authLoading]);
+  }, [selectedInspection, siteInspections, user, authLoading, pathname]);
 
   const fetchTasksForIncident = useCallback(async (incidentId: string) => {
     try {
@@ -581,6 +586,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch tasks when selectedIncidentId changes
   useEffect(() => {
+    if (pathname !== '/taskmanagement') return;
     if (!selectedIncidentId) {
       if (selectedInspection) {
         setTasks([]);
@@ -589,7 +595,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     fetchTasksForIncident(selectedIncidentId);
-  }, [selectedIncidentId, selectedInspection, fetchTasksForIncident]);
+  }, [selectedIncidentId, selectedInspection, fetchTasksForIncident, pathname]);
 
   const uploadIncidentVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -750,7 +756,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [isIncidentPaneCollapsed, setIsIncidentPaneCollapsed] = useState(true);
   const [isSiteColumnCollapsed, setIsSiteColumnCollapsed] = useState(false);
 
-  const pathname = usePathname();
+  // The 'pathname' variable is already declared at the top of the component.
   const currentPath = pathname || '/';
 
   const [selectionsByPath, setSelectionsByPath] = useState<Record<string, {
@@ -911,8 +917,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         console.error("Error fetching tasks for Miller incidents:", e);
       }
     };
+    if (pathname !== '/taskmanagement') return;
     fetchTasksForSelectedIncidents();
-  }, [selectedMillerIncidents, setTasks]);
+  }, [selectedMillerIncidents, setTasks, pathname]);
 
   const uniqueSites = Array.from(
     new Map(

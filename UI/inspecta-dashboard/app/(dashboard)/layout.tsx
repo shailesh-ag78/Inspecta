@@ -243,7 +243,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
             { path: "/reports", label: "Reports", icon: "/reports.ico" as any },
             { path: "/configuration", label: "Configuration", icon: "/conifguration.ico" as any },
           ].map((tab) => {
-            const isActive = pathname === tab.path || (tab.path === "/taskmanagement" && pathname === "/");
+            const isActive = pathname === tab.path || (tab.path === "/inspection" && pathname === "/");
             const Icon = tab.icon;
             const isConfig = tab.path === "/configuration";
             return (
@@ -311,7 +311,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                   { path: "/taskmanagement", label: "Task List", icon: "/task-list.ico" as any },
                   { path: "/inspection", label: "Inspection", icon: "/Inspection.ico" as any },
                 ].map((tab) => {
-                  const isActive = pathname === tab.path || (tab.path === "/taskmanagement" && pathname === "/");
+                  const isActive = pathname === tab.path || (tab.path === "/inspection" && pathname === "/");
                   const Icon = tab.icon;
                   return (
                     <Link
