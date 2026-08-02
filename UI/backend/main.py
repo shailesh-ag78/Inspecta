@@ -984,11 +984,32 @@ async def upload_incident(
 #         print(f"Error calling Executor: {e}")
 #         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
 
+@app.get("/api/incidents/recent")
+async def get_recent_incidents(
+    request: Request,
+    days: int = Query(7, description="Number of days of history to fetch"),
+    limit: int = Query(10, description="Maximum number of incidents to fetch")
+):
+    """Fetch recent incidents with their statuses from the Executor service"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        headers = {}
+        headers = fill_auth_headers(request, headers)
+        executor_service_url = BASE_EXECUTOR_URL + f"/incidents/recent?days={days}&limit={limit}"
+        resp_data = CallExecutorService(executor_service_url, "GET", headers, None)
+        return resp_data
+    except Exception as e:
+        print(f"Error calling Executor for recent incidents: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
+
 @app.get("/api/incidents/{incident_id}/status")
 async def get_status_endpoint(incident_id: str, request: Request):
     """Get incident status from Executor service
-       'is_finished' marked as true when all tasks are completed
-       otherwise 'progress' shows the exact current status of execution
+       status could be one of these values : processing / completed / failed
+       display_message will be in format "Step - [Audio / Transcription / Tasks Generation]:" for each step
     """
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:

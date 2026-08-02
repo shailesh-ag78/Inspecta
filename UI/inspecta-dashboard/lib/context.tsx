@@ -10,6 +10,7 @@ import {
   formatSiteInspections,
   formatIncidents,
   formatTasks,
+  getRecentIncidents,
 } from '@/lib/api';
 
 interface SiteInspection {
@@ -112,6 +113,14 @@ interface DashboardContextType {
   millerIncidents: any[];
   setMillerIncidents: React.Dispatch<React.SetStateAction<any[]>>;
   millerIncidentsLoading: boolean;
+  sessionIncidents: any[];
+  setSessionIncidents: React.Dispatch<React.SetStateAction<any[]>>;
+  notifications: any[];
+  setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
+  isNotificationsOpen: boolean;
+  setIsNotificationsOpen: (val: boolean) => void;
+  pollIncidentStatus: (incidentId: string, monitoringUrl: string, sessionId: string) => Promise<void>;
+  fetchRecentIncidents: () => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -136,6 +145,199 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // Custom header site and inspection name states
   const [headerSiteName, setHeaderSiteName] = useState<string>('');
   const [headerInspectionName, setHeaderInspectionName] = useState<string>('');
+
+  const [sessionIncidents, setSessionIncidents] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
+
+  // Load notifications from local storage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem("inspecta_notifications");
+    if (stored) {
+      try {
+        setNotifications(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse notifications from localStorage", e);
+      }
+    }
+  }, []);
+
+  // Save notifications to local storage
+  useEffect(() => {
+    if (notifications.length > 0) {
+      localStorage.setItem("inspecta_notifications", JSON.stringify(notifications));
+    }
+  }, [notifications]);
+
+  const pollIncidentStatus = useCallback(async (incidentId: string, monitoringUrl: string, sessionId: string) => {
+    const startTime = Date.now();
+    let currentDelay = 5000;
+    let timeoutId: any = null;
+
+    const poll = async () => {
+      if (Date.now() - startTime >= 180000) {
+        setSessionIncidents(prev =>
+          prev.map(inc => inc.id === sessionId ? { ...inc, status: "Failed", displayMessage: "Processing timed out (3 mins)", pollingIntervalId: undefined } : inc)
+        );
+        setNotifications(prev => [
+          {
+            id: `notif_${Date.now()}`,
+            message: `⚠️ Incident ${incidentId.substring(0, 4)}... processing timed out after 3 minutes.`,
+            type: 'error',
+            timestamp: new Date().toLocaleTimeString(),
+            read: false,
+            incidentId
+          },
+          ...prev
+        ]);
+        return;
+      }
+
+      try {
+        const response = await authenticatedFetch(monitoringUrl);
+        if (!response.ok) throw new Error("Failed to fetch status");
+        const statusData = await response.json();
+        const isFinished = statusData.is_finished;
+        const isFailed = statusData.status === "failed" || statusData.status === "Failed";
+        const statusMsg = statusData.display_message || statusData.message || "";
+
+        setSessionIncidents(prev =>
+          prev.map(inc => {
+            if (inc.id === sessionId) {
+              let mappedStatus: "Uploading" | "Processing" | "Completed" | "Failed" = "Processing";
+              if (isFinished) {
+                mappedStatus = isFailed ? "Failed" : "Completed";
+              } else if (isFailed) {
+                mappedStatus = "Failed";
+              }
+              return {
+                ...inc,
+                status: mappedStatus,
+                displayMessage: statusMsg || (isFinished ? "Analysis complete." : "Processing...")
+              };
+            }
+            return inc;
+          })
+        );
+
+        if (isFinished || isFailed) {
+          const type = isFailed ? 'error' : 'success';
+          const prefix = isFailed ? '❌' : '✅';
+          setNotifications(prev => [
+            {
+              id: `notif_${Date.now()}`,
+              message: `${prefix} Incident ${incidentId.substring(0, 4)}... ${statusMsg || (isFailed ? 'failed.' : 'completed.')}`,
+              type,
+              timestamp: new Date().toLocaleTimeString(),
+              read: false,
+              incidentId
+            },
+            ...prev
+          ]);
+          setSessionIncidents(prev =>
+            prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: undefined } : inc)
+          );
+          return;
+        }
+
+        if (currentDelay < 15000) {
+          currentDelay = 15000;
+        } else if (currentDelay < 60000) {
+          currentDelay = 60000;
+        }
+        timeoutId = setTimeout(poll, currentDelay);
+        setSessionIncidents(prev =>
+          prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
+        );
+      } catch (error) {
+        console.error("Error polling in context:", error);
+        if (currentDelay < 15000) {
+          currentDelay = 15000;
+        } else if (currentDelay < 60000) {
+          currentDelay = 60000;
+        }
+        timeoutId = setTimeout(poll, currentDelay);
+        setSessionIncidents(prev =>
+          prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
+        );
+      }
+    };
+
+    timeoutId = setTimeout(poll, currentDelay);
+    setSessionIncidents(prev =>
+      prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
+    );
+  }, []);
+
+  const fetchRecentIncidents = useCallback(async () => {
+    try {
+      const recent = await getRecentIncidents(7, 10);
+      const formattedRecent = recent.map((inc: any) => ({
+        id: inc.id || inc.incidentId,
+        incidentId: inc.incidentId,
+        fileName: inc.fileName || `Incident ${inc.incidentId ? inc.incidentId.substring(0, 4) : ""}`,
+        fileType: inc.fileType,
+        category: inc.category,
+        uploadedAt: inc.uploadedAt ? new Date(inc.uploadedAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+        status: (inc.status === "completed" || inc.status === "Completed" ? "Completed" : 
+                (inc.status === "failed" || inc.status === "Failed" ? "Failed" : "Processing")) as "Uploading" | "Processing" | "Completed" | "Failed",
+        displayMessage: inc.displayMessage || inc.message || "",
+        inspectionName: "Inspection",
+        siteName: "Site"
+      }));
+
+      setSessionIncidents(formattedRecent);
+
+      // Hydrate notifications from the loaded incidents (if they are Completed or Failed)
+      // Only do this if localStorage doesn't have any notifications to prevent duplicates
+      const stored = localStorage.getItem("inspecta_notifications");
+      if (!stored || JSON.parse(stored).length === 0) {
+        const initialNotifications = formattedRecent
+          .filter(inc => inc.status === "Completed" || inc.status === "Failed")
+          .map(inc => {
+            const isFailed = inc.status === "Failed";
+            return {
+              id: `notif_${inc.id}_init`,
+              message: `${isFailed ? '❌' : '✅'} Incident ${inc.incidentId ? inc.incidentId.substring(0, 4) : ""}... ${inc.displayMessage || (isFailed ? 'failed.' : 'completed.')}`,
+              type: isFailed ? 'error' : 'success' as 'success' | 'error',
+              timestamp: inc.uploadedAt,
+              read: true,
+              incidentId: inc.incidentId
+            };
+          });
+        setNotifications(initialNotifications);
+      }
+
+      // Resume polling for any running tasks
+      formattedRecent.forEach(inc => {
+        if (inc.status === "Processing") {
+          pollIncidentStatus(inc.incidentId, `/api/incidents/${inc.incidentId}/status`, inc.id);
+        }
+      });
+    } catch (err) {
+      console.error("Failed to load recent incidents in context:", err);
+    }
+  }, [pollIncidentStatus]);
+
+  // Trigger loading when user successfully logs in
+  useEffect(() => {
+    if (token) {
+      fetchRecentIncidents();
+    } else {
+      // Clear states when logged out
+      setSessionIncidents([]);
+      setNotifications([]);
+    }
+  }, [token, fetchRecentIncidents]);
+
+  // Cleanup polling intervals on unmount
+  useEffect(() => {
+    return () => {
+      sessionIncidents.forEach(inc => {
+        if (inc.pollingIntervalId) clearTimeout(inc.pollingIntervalId);
+      });
+    };
+  }, [sessionIncidents]);
 
   // Loading and error states
   const [siteInspectionsLoading, setSiteInspectionsLoading] = useState(true);
@@ -767,6 +969,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         millerIncidents,
         setMillerIncidents,
         millerIncidentsLoading,
+        sessionIncidents,
+        setSessionIncidents,
+        notifications,
+        setNotifications,
+        isNotificationsOpen,
+        setIsNotificationsOpen,
+        pollIncidentStatus,
+        fetchRecentIncidents,
       }}
     >
       {children}

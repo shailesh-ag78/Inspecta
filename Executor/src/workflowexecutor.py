@@ -593,28 +593,22 @@ class WorkflowExecutor:
             # Graph has reached END node
             if has_tasks:
                 status_key = "completed"
-                message = "✅ Analysis complete! Tasks generated."
-            elif has_transcript:
-                status_key = "processing"
-                message = "Processing tasks generation..."
-            elif has_audio:
-                status_key = "processing"
-                message = "Transcribing audio..."
+                message = "Step - Complete: Analysis complete! Tasks generated."
             else:
-                # Has not started any real work
-                status_key = "queued"
-                message = "⏳ Incident is queued for processing..."
+                # Graph finished but failed to generate tasks
+                status_key = "failed"
+                message = "Step - Failed: Analysis failed: No tasks were generated."
         else:
             # Graph is still running
+            status_key = "processing"
             current_node = state.next[0]
-            status_key = current_node
             
             messages = {
-                EXTRACT_AUDIO_NODE: "🎬 Extracting audio from video...",
-                TRANSCRIBE_NODE: "🎙️ Transcribing audio to text...",
-                GENERATE_TASKS_NODE: "📋 Generating inspection tasks..."
+                EXTRACT_AUDIO_NODE: "Step - Audio: Extracting audio...",
+                TRANSCRIBE_NODE: "Step - Transcription: Transcribing audio...",
+                GENERATE_TASKS_NODE: "Step - Tasks Generation: Generating inspection tasks..."
             }
-            message = messages.get(current_node, f"⚙️  Processing ({current_node})...")
+            message = messages.get(current_node, f"Processing ({current_node})")
 
         logger.debug(f"Status check for {incident_id}: {status_key}")
         
@@ -622,13 +616,23 @@ class WorkflowExecutor:
             "incident_id": incident_id,
             "status": status_key,
             "display_message": message,
-            "is_finished": status_key == "completed",
             "progress": {
                 "audio_extracted": has_audio,
                 "transcribed": has_transcript,
                 "tasks_generated": has_tasks
             }
         }
+
+    async def get_recent_incidents(self, company_id: int, days: int = 7, limit: int = 10) -> List[Dict]:
+        """Fetches recent incidents for a company and enriches them with their inspection IDs."""
+        logger.info("Fetching recent incidents from repository")
+        incidents = await self.repo.get_recent_incidents(company_id, days, limit)
+        logger.info(f"Fetched {len(incidents)} recent incidents")
+
+        if not incidents:
+            return []
+               
+        return incidents
 
     async def create_new_inspection(self, company_id: int, site_id: int, friendly_name : Optional[str] = None ) -> Optional[str]:
             """

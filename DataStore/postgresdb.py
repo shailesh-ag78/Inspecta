@@ -322,7 +322,6 @@ class IncidentRepository:
 
     async def get_incidents_for_site(self, site_id: int, company_id: int) -> List[Dict]:
         """Fetches incidents for a site by joining through inspections table."""
-        print(f"Fetching incidents for site_id={site_id} and company_id={company_id}")
         async with self.session(company_id) as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
@@ -354,10 +353,8 @@ class IncidentRepository:
         """Fetches Site-Inspection combinations for a company. Uses LEFT JOIN to include sites without inspections."""
         async with self.session(company_id) as conn:
             async with conn.cursor() as cur:
-                # Debug: Check if sites exist for this company
                 await cur.execute("SELECT COUNT(*) as count FROM sites WHERE company_id = %s", (company_id,))
                 sites_count = await cur.fetchone()
-                print(f"DEBUG: Found {sites_count.get('count', 0)} sites for company_id={company_id}")
                 
                 # Main query: Get sites with their inspections
                 await cur.execute(
@@ -377,8 +374,38 @@ class IncidentRepository:
                     (company_id, company_id)
                 )
                 rows = [dict(row) for row in await cur.fetchall()]
-                print(f"DEBUG: Query returned {len(rows)} rows for company_id={company_id}")
                 return rows
+
+    async def get_recent_incidents(self, company_id: int, days: int = 7, limit: int = 10) -> List[Dict]:
+        """Fetches incidents created in the last X days for a company, limited by limit."""
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    """
+                    SELECT id, inspection_id, created_at FROM incidents 
+                    WHERE company_id = %s AND created_at >= NOW() - (%s * INTERVAL '1 day') 
+                    ORDER BY created_at DESC 
+                    LIMIT %s
+                    """,
+                    (company_id, days, limit)
+                )
+                return [dict(row) for row in await cur.fetchall()]
+
+    # async def get_inspection_ids_for_incidents(self, company_id: int, incident_ids: List[str]) -> Dict[str, str]:
+    #     """Fetches the inspection IDs for a list of incident IDs, returning a mapping of incident_id -> inspection_id."""
+    #     if not incident_ids:
+    #         return {}
+    #     async with self.session(company_id) as conn:
+    #         async with conn.cursor() as cur:
+    #             await cur.execute(
+    #                 """
+    #                 SELECT id, inspection_id FROM incidents 
+    #                 WHERE company_id = %s AND id = ANY(%s)
+    #                 """,
+    #                 (company_id, incident_ids)
+    #             )
+    #             rows = await cur.fetchall()
+    #             return {str(row["id"]): str(row["inspection_id"]) for row in rows}
 
     async def get_all_incidents_for_company(self, company_id: int) -> List[Dict]:
         """Fetches all incidents for the company, filtered by RLS."""

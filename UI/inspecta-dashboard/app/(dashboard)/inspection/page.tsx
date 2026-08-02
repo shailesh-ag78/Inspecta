@@ -18,10 +18,14 @@ import {
   X,
   ChevronRight
 } from "lucide-react";
-import { authenticatedFetch, uploadMediaFile as apiUploadMediaFile } from "@/lib/api";
+import { authenticatedFetch, uploadMediaFile as apiUploadMediaFile, getRecentIncidents } from "@/lib/api";
+
+const MAX_SESSION_INCIDENTS = 10; // Limit the number of incidents in the session queue
+const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
 
 interface SessionIncident {
   id: string;
+  incidentId?: string; // The actual incident ID from the backend
   fileName: string;
   fileType: "audio" | "video" | "image";
   uploadedAt: string;
@@ -29,6 +33,9 @@ interface SessionIncident {
   inspectionName: string;
   siteName: string;
   category: "incident" | "field_note";
+  pollingIntervalId?: any;
+  displayMessage?: string;
+  monitoringUrl?: string;
 }
 
 export default function InspectionPage() {
@@ -36,7 +43,14 @@ export default function InspectionPage() {
     backendSites,
     siteInspections,
     handleAddInspectionSubmit,
-    fetchSiteInspections
+    fetchSiteInspections,
+    sessionIncidents,
+    setSessionIncidents,
+    notifications,
+    setNotifications,
+    isNotificationsOpen,
+    setIsNotificationsOpen,
+    pollIncidentStatus,
   } = useDashboard();
 
   // Selection states
@@ -69,8 +83,7 @@ export default function InspectionPage() {
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [incidentError, setIncidentError] = useState<string | null>(null);
 
-  // Session queue state
-  const [sessionIncidents, setSessionIncidents] = useState<SessionIncident[]>([]);
+
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -198,6 +211,7 @@ export default function InspectionPage() {
         const file = new File([blob], filename, { type: mimeType });
 
         cleanUpMedia();
+        cleanUpMedia(); // Clean up UI immediately after recording stops
         await uploadMediaFile(file, activeOverlay === "video" ? "video" : "audio", overlayCategory);
       };
 
@@ -248,43 +262,65 @@ export default function InspectionPage() {
     await uploadMediaFile(file, "image", overlayCategory);
   };
 
+
+
   // Upload Logic
   const uploadMediaFile = async (file: File, fileType: "audio" | "video" | "image", category: "incident" | "field_note") => {
     if (!selectedInspectionId) return;
-
     const newId = `session_${Date.now()}`;
-    const newIncident: SessionIncident = {
-      id: newId,
-      fileName: file.name,
-      fileType: fileType,
-      uploadedAt: new Date().toLocaleTimeString(),
-      status: "Uploading",
-      inspectionName: activeInspection?.label || "Inspection",
-      siteName: activeSite?.site_name || activeSite?.name || "Site",
-      category
-    };
-    setSessionIncidents(prev => [newIncident, ...prev]);
     setIncidentError(null);
 
     const onProgress = (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => {
-      if (status === "Uploading" || status === "Processing") {
-        setUploadProgress(message || status);
-      } else {
-        setUploadProgress(null);
-      }
-
+      setSessionIncidents(prev =>
+        prev.map(inc => {
+          if (inc.id === newId) {
+            return { ...inc, status, displayMessage: message };
+          }
+          return inc;
+        })
+      );
       if (status === "Failed") {
         setIncidentError(message || "Upload failed");
       }
+    };
+    // Add to session incidents list (limit to MAX_SESSION_INCIDENTS)
+
+    setSessionIncidents(prev => {
+      const newIncident: SessionIncident = {
+        id: newId,
+        fileName: file.name,
+        fileType: fileType,
+        uploadedAt: new Date().toLocaleTimeString(),
+        status: "Uploading",
+        displayMessage: `Uploading ${file.name}...`,
+        inspectionName: activeInspection?.label || "Inspection",
+        siteName: activeSite?.site_name || activeSite?.name || "Site",
+        category
+      };
+      const updatedList = [newIncident, ...prev];
+      return updatedList.slice(0, MAX_SESSION_INCIDENTS);
+    });
+
+    try {
+      const { incidentId, monitoringUrl } = await apiUploadMediaFile(file, selectedInspectionId, onProgress);
 
       setSessionIncidents(prev =>
-        prev.map(inc => (inc.id === newId ? { ...inc, status } : inc))
+        prev.map(inc => {
+          if (inc.id === newId) {
+            return { ...inc, incidentId, monitoringUrl, status: "Processing", displayMessage: "Processing started..." };
+          }
+          return inc;
+        })
       );
-    };
-
-    await apiUploadMediaFile(file, selectedInspectionId, onProgress).finally(() => {
-      setUploadProgress(null);
-    });
+      await pollIncidentStatus(incidentId, monitoringUrl, newId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown upload error occurred";
+      setIncidentError(errorMessage);
+      setSessionIncidents(prev =>
+        prev.map(inc => inc.id === newId ? { ...inc, status: "Failed", displayMessage: errorMessage } : inc)
+      );
+      console.error("Incident upload failed:", error);
+    }
   };
 
   const triggerFileUpload = (category: "incident" | "field_note") => {
@@ -312,9 +348,28 @@ export default function InspectionPage() {
     e.target.value = "";
   };
 
+  const formatTimer = (sec: number) => {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const isSiteDisabled = !selectedSiteId;
+
+  const formatDate = (isoString?: string) => {
+    if (!isoString) return "";
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) return "";
+    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  };
+
   const handleCreateInspection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newInspectionTitle.trim() || !selectedSiteId) return;
+    if (!newInspectionTitle.trim() || !selectedSiteId) {
+      setInspectionError("Inspection title and selected site are required.");
+      return;
+    }
 
     try {
       setIsCreatingInspection(true);
@@ -334,6 +389,7 @@ export default function InspectionPage() {
       setNewInspectionTitle("");
       setNewInspectionDescription("");
       setIsAddingInspectionInline(false);
+      fetchSiteInspections(); // Refetch inspections to show the new one
     } catch (err) {
       console.error("Create inspection failed:", err);
       setInspectionError(err instanceof Error ? err.message : "Failed to create inspection");
@@ -344,20 +400,6 @@ export default function InspectionPage() {
     }
   };
 
-  const formatTimer = (sec: number) => {
-    const mins = Math.floor(sec / 60);
-    const secs = sec % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  const isSiteDisabled = !selectedSiteId;
-
-  const formatDate = (isoString?: string) => {
-    if (!isoString) return "";
-    const date = new Date(isoString);
-    if (isNaN(date.getTime())) return "";
-    return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-  };
 
   // Increased header/label text size formatting class
   const labelHeaderStyle = "text-base font-bold text-slate-700 tracking-wide";
@@ -368,6 +410,85 @@ export default function InspectionPage() {
   return (
     <div className="h-full w-full overflow-y-auto bg-slate-50 dropdown-scrollbar">
       <div className="p-6 flex flex-col items-start justify-start w-full">
+        {/* Workspace Header with Notification Bell */}
+        <div className="w-full flex items-center justify-between mb-6 relative">
+          <div>
+            <h1 className="text-2xl font-black text-slate-800 tracking-tight">Inspection Workspace</h1>
+            <p className="text-sm text-slate-500 font-medium">Upload media and manage background inspections</p>
+          </div>
+          
+          <div className="relative">
+            <button
+              onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+              className="relative p-2.5 bg-white hover:bg-slate-50 border border-slate-200/80 rounded-xl shadow-sm transition-colors text-slate-600 hover:text-slate-800"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg>
+              {notifications.filter(n => !n.read).length > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-white">
+                  {notifications.filter(n => !n.read).length}
+                </span>
+              )}
+            </button>
+
+            {isNotificationsOpen && (
+              <div className="absolute right-0 mt-2.5 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 overflow-hidden flex flex-col">
+                <div className="px-4 py-3 bg-slate-900 border-b border-slate-800 flex items-center justify-between">
+                  <span className="text-xs font-black text-white uppercase tracking-wider">Notifications</span>
+                  {notifications.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setNotifications([]);
+                      }}
+                      className="text-[10px] font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+                
+                <div className="max-h-72 overflow-y-auto divide-y divide-slate-100 dropdown-scrollbar">
+                  {notifications.length === 0 ? (
+                    <div className="px-4 py-8 text-center text-slate-400 text-xs italic">
+                      No notifications yet.
+                    </div>
+                  ) : (
+                    notifications.map(notif => (
+                      <div
+                        key={notif.id}
+                        className={`p-3 flex items-start gap-2.5 hover:bg-slate-50 transition-colors ${!notif.read ? 'bg-blue-50/20' : ''}`}
+                      >
+                        <span className="mt-0.5 text-base shrink-0">
+                          {notif.type === 'success' ? '✅' : '❌'}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-semibold text-slate-700 leading-normal break-words">
+                            {notif.message}
+                          </p>
+                          <span className="text-[9px] font-bold text-slate-400 mt-1 block">
+                            {notif.timestamp}
+                          </span>
+                        </div>
+                        {!notif.read && (
+                          <button
+                            onClick={() => {
+                              setNotifications(prev =>
+                                prev.map(n => n.id === notif.id ? { ...n, read: true } : n)
+                              );
+                            }}
+                            className="text-[10px] font-bold text-slate-400 hover:text-blue-600 transition-colors shrink-0"
+                          >
+                            Mark Read
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
         <div className="w-full bg-pane-bg/98 rounded-2xl border border-slate-200/70 shadow-md overflow-hidden flex flex-col">
 
           {/* Configuration Body Content */}
@@ -652,6 +773,7 @@ export default function InspectionPage() {
                         <div className="flex flex-col items-center text-center min-w-0">
                           <div className="flex items-center gap-4">
                             <span className="text-sm font-bold text-slate-800 truncate" title={incident.fileName}>
+                              {incident.incidentId ? incident.incidentId.substring(0, 4) + '...' : ''} - {' '}
                               {incident.fileName}
                             </span>
                             <span className="flex items-center text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded gap-1">
@@ -669,6 +791,7 @@ export default function InspectionPage() {
                           <span className="text-xs text-slate-600 mt-2">
                             {incident.uploadedAt}
                           </span>
+                          <span className="text-xs text-slate-500 mt-1 italic">{incident.displayMessage}</span>
                         </div>
                       </div>
 

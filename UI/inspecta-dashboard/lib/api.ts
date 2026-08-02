@@ -150,10 +150,10 @@ export async function uploadMediaFile(
   file: File,
   inspectionId: string,
   onProgress: (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => void
-): Promise<void> {
+): Promise<{ incidentId: string; monitoringUrl: string }> {
   if (!inspectionId) {
     onProgress("Failed", "No inspection selected.");
-    return;
+    throw new Error("No inspection selected.");
   }
 
   try {
@@ -208,11 +208,20 @@ export async function uploadMediaFile(
     );
     if (!registerResp.ok) throw new Error("Failed to register incident record");
 
+    const registerJson = await registerResp.json();
+    const incidentId = registerJson.data?.incident_id;
+    if (!incidentId) throw new Error("No incident ID returned from register");
+
     onProgress("Completed", "Upload complete.");
+    return {
+      incidentId,
+      monitoringUrl: `/api/incidents/${incidentId}/status`
+    };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "An unknown upload error occurred";
     onProgress("Failed", errorMessage);
     console.error("Incident upload failed:", err);
+    throw err;
   }
 }
 
@@ -220,3 +229,13 @@ export async function uploadMediaFile(
 export const recordVideo = async (): Promise<File> => { throw new Error("recordVideo not implemented"); };
 export const recordAudio = async (): Promise<File> => { throw new Error("recordAudio not implemented"); };
 export const takePicture = async (): Promise<File> => { throw new Error("takePicture not implemented"); };
+
+/** Fetches recent incidents for the active company. */
+export async function getRecentIncidents(days: number = 7, limit: number = 10): Promise<any[]> {
+  const response = await authenticatedFetch(`/api/incidents/recent?days=${days}&limit=${limit}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch recent incidents: ${response.statusText}`);
+  }
+  const result = await response.json();
+  return result.data || [];
+}

@@ -260,7 +260,6 @@ async def upload_incident_endpoint(
     request: Request,          # Request Object (Mandatory)
     data: IncidentUploadRequest # JSON Body (Mandatory)
 ):
-    print("In upload_incident_endpoint")
     # Extract company_id (Grab the Token from the 'Authorization' Header)
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
@@ -331,9 +330,62 @@ async def upload_incident_endpoint(
     return {
         "status": "Success",
         "message": "Audio / Video received and processing started.",
-        "incident_id": incident_id,
-        "monitoring_url": f"/incidents/{incident_id}/status"
+        "incident_id": incident_id
     }
+   
+@app.get("/incidents/recent")
+async def get_recent_incidents(
+    request: Request,
+    days: int = Query(7, description="Number of days of history to fetch"),
+    limit: int = Query(10, description="Maximum number of incidents to fetch")
+):
+    logger.info("Fetching recent incidents")
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+        
+    executor: WorkflowExecutor = request.app.state.executor
+    
+    try:
+        # 1. Fetch recent incidents from repository
+        incidents = await executor.get_recent_incidents(company_id, days, limit)
+        logger.info(f"Fetched {len(incidents)} recent incidents")
+        # 2. Get status for each incident
+        results = []
+        for inc in incidents:
+            incident_id = str(inc.get("id"))
+            inspection_id = str(inc.get("inspection_id"))
+
+            try:
+                status_data = await executor.get_status(company_id, incident_id)
+                status = status_data.get("status")
+                display_message = status_data.get("display_message")
+            except Exception as status_err:
+                logger.error(f"Could not get status for recent incident {incident_id}: {status_err}")
+                status = "failed"
+                display_message = "Step - Failed: Failed to process incident"
+            
+            uploaded_at = inc.get("created_at")
+            if isinstance(uploaded_at, (datetime.datetime, datetime.date)):
+                uploaded_at_str = uploaded_at.isoformat()
+            else:
+                uploaded_at_str = str(uploaded_at) if uploaded_at else ""
+
+            results.append({
+                "id": incident_id,
+                "incidentId": incident_id,
+                "inspectionId": inspection_id,
+                "uploadedAt": uploaded_at_str,
+                "status": status,   # Status could be one of these values : processing / completed / failed
+                "displayMessage": display_message
+            })
+        
+        return {"status": "Success", "data": results}
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    except Exception as e:
+        logger.error(f"Error fetching recent incidents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/incidents/{incident_id}/status")
 async def get_status_endpoint(incident_id: str, request: Request):
@@ -346,10 +398,16 @@ async def get_status_endpoint(incident_id: str, request: Request):
     
     try:
         status_data = await executor.get_status(company_id, incident_id)
-        return status_data
+        status = status_data.get("status")
+        display_message = status_data.get("display_message")
+        return {
+            "status": status, # Status could be one of these values : processing / completed / failed
+            "display_message": display_message
+        }
     except PermissionError:
         raise HTTPException(status_code=403, detail="Forbidden")
     except Exception as e:
+        logger.error(f"Error fetching status for incident {incident_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 # UI calls this method to create a new place where to upload the file
