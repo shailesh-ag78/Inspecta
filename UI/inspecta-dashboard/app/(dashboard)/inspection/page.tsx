@@ -35,6 +35,7 @@ interface SessionIncident {
   category: "incident" | "field_note";
   pollingIntervalId?: any;
   displayMessage?: string;
+  timestamp?: number;
 }
 
 export default function InspectionPage() {
@@ -289,9 +290,10 @@ export default function InspectionPage() {
           incidentId,
           fileName: file.name,
           fileType: fileType,
-          uploadedAt: new Date().toLocaleTimeString(),
+          uploadedAt: new Date().toLocaleString(),
+          timestamp: Date.now(),
           status: "Processing",
-          displayMessage: "Processing started...",
+          displayMessage: "Analysis is in progress.",
           inspectionName: activeInspection?.label || "Inspection",
           siteName: activeSite?.site_name || activeSite?.name || "Site",
           category
@@ -665,57 +667,80 @@ export default function InspectionPage() {
                 </div>
               ) : (
                 <div className="flex flex-col gap-2.5 max-w-[560px]">
-                  {sessionIncidents.map((incident) => (
-                    <div
-                      key={incident.id}
-                      className="flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-2.5 shadow-sm hover:border-slate-350 transition-colors"
-                    >
-                      <div className="flex items-center justify-center gap-6 min-w-0">
-                        {incident.fileType && (
-                          <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-slate-400">
-                            {incident.fileType === "audio" && <FileAudio className="w-5 h-5 text-red-555" />}
-                            {incident.fileType === "video" && <FileVideo className="w-5 h-5 text-blue-555" />}
-                            {incident.fileType === "image" && <FileImage className="w-5 h-5 text-emerald-655" />}
-                          </div>
-                        )}
-                        <div className="flex flex-col items-start min-w-0">
-                          <div className="flex items-center gap-4 flex-wrap">
-                            <span className="text-sm font-bold text-slate-800 truncate" title={incident.fileName}>
-                              {incident.incidentId ? incident.incidentId.substring(0, 4) + '...' : ''} - {' '}
-                              {incident.fileName}
-                            </span>
-                            {incident.category && (
-                              <span className="flex items-center text-[10px] font-bold text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded gap-1">
-                                {incident.category === "incident" ? (
-                                  <>
-                                    <span role="img" aria-label="incident">📌</span> Incident
-                                  </>
-                                ) : (
-                                  <>
-                                    <span role="img" aria-label="incident">📋</span> Field Note
-                                  </>
-                                )}
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-xs text-slate-600 mt-2">
+                  {[...sessionIncidents]
+                    .sort((a, b) => {
+                      const timeA = a.timestamp || (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0);
+                      const timeB = b.timestamp || (b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0);
+                      return timeB - timeA;
+                    })
+                    .map((incident) => (
+                      <div
+                        key={incident.id}
+                        className="grid grid-cols-[auto_auto_1fr] gap-y-2 gap-x-4 items-center bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-350 transition-colors"
+                      >
+                        {/* Row 1 : Col 1 and Col 2 merged : show Stats */}
+                        <div className="col-span-2 flex items-center justify-start">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
+                            incident.status === "Processing" ? "bg-amber-50 text-amber-600 border border-amber-200/50 animate-pulse" :
+                              incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
+                                "bg-rose-50 text-rose-600 border border-rose-200/50"
+                            }`}>
+                            {incident.status === "Processing" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
+                            {incident.status === "Completed" ? "Complete" : incident.status}
+                            {incident.status === "Failed" ? "Failed" : incident.status}
+                          </span>
+                        </div>
+
+                        {/* Row 1 : Col 3 : Show file name */}
+                        <div className="col-span-1 text-left min-w-0">
+                          <span className="text-sm font-bold text-slate-800 truncate block" title={incident.fileName}>
+                            {incident.incidentId ? incident.incidentId.substring(0, 4) + '...' : ''} - {' '}
+                            {incident.fileName}
+                          </span>
+                        </div>
+
+                        {/* Row 2 : Col 1 : Centrally show icon of Incident or Field Note */}
+                        <div className="col-span-1 flex justify-center items-center">
+                          {incident.category === "incident" ? (
+                            <span className="text-lg" title="Incident" role="img" aria-label="Incident">📌</span>
+                          ) : (
+                            <span className="text-lg" title="Field Note" role="img" aria-label="Field Note">📋</span>
+                          )}
+                        </div>
+
+                        {/* Row 2 : Col 2 : Icon of media type */}
+                        <div className="col-span-1 flex justify-center items-center">
+                          {incident.fileType && (
+                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-slate-400">
+                              {incident.fileType === "audio" && <FileAudio className="w-5 h-5 text-red-555" />}
+                              {incident.fileType === "video" && <FileVideo className="w-5 h-5 text-blue-555" />}
+                              {incident.fileType === "image" && <FileImage className="w-5 h-5 text-emerald-655" />}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Row 2 : Col 3 : Show display message after date time stamp */}
+                        <div className="col-span-1 text-left min-w-0 flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-slate-500 font-medium whitespace-nowrap">
                             {incident.uploadedAt}
                           </span>
-                          <span className="text-xs text-slate-500 mt-1 italic">{incident.displayMessage}</span>
+                          {incident.displayMessage && (
+                            <>
+                              <span className="text-slate-300 text-xs select-none">•</span>
+                              <span
+                                className={`text-xs truncate ${incident.status === "Failed"
+                                  ? "text-rose-600 font-medium"
+                                  : "text-slate-500 italic"
+                                  }`}
+                                title={incident.displayMessage}
+                              >
+                                {incident.displayMessage}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
-
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
-                        incident.status === "Processing" ? "bg-amber-50 text-amber-600 border border-amber-200/50 animate-pulse" :
-                          incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
-                            "bg-rose-50 text-rose-600 border border-rose-200/50"
-                        }`}>
-                        {incident.status === "Uploading" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                        {incident.status === "Processing" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                        {incident.status === "Completed" ? "Complete" : incident.status}
-                      </span>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               )}
             </div>

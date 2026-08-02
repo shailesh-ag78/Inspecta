@@ -269,17 +269,12 @@ def get_google_oidc_token(audience: str) -> Optional[str]:
 
 def CallExecutorService(executor_service_url, method, headers: dict, payload: Optional[dict]):
     try:
-        print(f"Executor Service URL: {executor_service_url}")
-        print(f"Method: {method}")
-        print(f"Headers: {headers}")
-        print(f"Payload: {payload}")
         # Dynamically generate Google OIDC token for the target executor service URL
         oidc_token = get_google_oidc_token(executor_service_url)
         if oidc_token:
             headers = headers.copy()
             headers["Authorization"] = f"Bearer {oidc_token}"
 
-        print("Received OIDC token")
         data = None
         if(payload != None):
             data = json.dumps(payload).encode("utf-8")
@@ -333,16 +328,12 @@ async def get_incidents_for_site_or_inspection(
 
     try:
         if not siteId and not inspectionId:
-            print(f"Received GET /api/incidents request for ALL incidents under companyId {company_id}")
             incidents = await repository.get_all_incidents_for_company(company_id)
         elif inspectionId:
-            print(f"Received GET /api/incidents request for inspectionId {inspectionId} and companyId {company_id}")
             incidents = await repository.get_incidents_for_inspection(inspectionId, company_id)
         else:
-            print(f"Received GET /api/incidents request for siteId {siteId} and companyId {company_id}")
             incidents = await repository.get_incidents_for_site(siteId, company_id)
         
-        print(f"✅ Fetched {len(incidents)} incidents")
         return {"status": "success", "data": incidents}
     except Exception as e:
         print(f"❌ Error fetching incidents: {e}")
@@ -987,7 +978,7 @@ async def upload_incident(
 #         print(f"Error calling Executor: {e}")
 #         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
 
-@app.get("/api/incidents/recent")
+@app.get("/api/recent_incidents")
 async def get_recent_incidents(
     request: Request,
     days: int = Query(7, description="Number of days of history to fetch"),

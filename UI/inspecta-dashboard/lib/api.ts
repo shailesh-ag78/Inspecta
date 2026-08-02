@@ -232,7 +232,7 @@ export const takePicture = async (): Promise<File> => { throw new Error("takePic
 /** Fetches recent incidents for the active company. */
 export async function getRecentIncidents(days: number = 7, limit: number = 10): Promise<any[]> {
   console.log("Ui :: in getRecentIncidents")
-  const response = await authenticatedFetch(`/api/incidents/recent?days=${days}&limit=${limit}`);
+  const response = await authenticatedFetch(`/api/recent_incidents?days=${days}&limit=${limit}`);
   if (!response.ok) {
     throw new Error(`Failed to fetch recent incidents: ${response.statusText}`);
   }

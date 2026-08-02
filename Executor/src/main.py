@@ -376,7 +376,7 @@ async def get_recent_incidents(
                 "incidentId": incident_id,
                 "inspectionId": inspection_id,
                 "uploadedAt": uploaded_at_str,
-                "status": status,   # Status could be one of these values : processing / completed / failed
+                "incident_status": status,   # Status could be one of these values : processing / completed / failed
                 "displayMessage": display_message
             })
         
@@ -401,7 +401,8 @@ async def get_status_endpoint(incident_id: str, request: Request):
         status = status_data.get("status")
         display_message = status_data.get("display_message")
         return {
-            "status": status, # Status could be one of these values : processing / completed / failed
+            "status": "Success",
+            "incident_status": status, # Status could be one of these values : processing / completed / failed
             "display_message": display_message
         }
     except PermissionError:

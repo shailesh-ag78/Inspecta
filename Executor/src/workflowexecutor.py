@@ -20,6 +20,7 @@ from typing import Tuple
 from urllib.parse import urlparse
 import dotenv
 from openai import OpenAI
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
 # Add the project root to sys.path so we can import from the 'datastore' package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -193,7 +194,13 @@ class WorkflowExecutor:
         
         # 2. Internalize Checkpointer Creation
         # We create the saver but we need to manage the connection context
-        manager = AsyncPostgresSaver.from_conn_string(db_dsn)
+        serde = JsonPlusSerializer(allowed_msgpack_modules=[
+            ('DataStore.postgresdb', 'TaskStatus'),
+            ('DataStore.postgresdb', 'TaskSeverity'),
+            ('DataStore.postgresdb', 'TaskType'),
+            ('DataStore.postgresdb', 'Industry'),
+        ])
+        manager = AsyncPostgresSaver.from_conn_string(db_dsn, serde=serde)
         
         # 3. MANUALLY enter the async context to get the actual saver object
 

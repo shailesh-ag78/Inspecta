@@ -177,12 +177,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     const poll = async () => {
       if (Date.now() - startTime >= 180000) {
         setSessionIncidents(prev =>
-          prev.map(inc => inc.id === sessionId ? { ...inc, status: "Failed", displayMessage: "Processing timed out (3 mins)", pollingIntervalId: undefined } : inc)
+          prev.map(inc => inc.id === sessionId ? { ...inc, status: "Failed", displayMessage: "Analysis failed.", pollingIntervalId: undefined } : inc)
         );
         setNotifications(prev => [
           {
             id: `notif_${Date.now()}`,
-            message: `⚠️ Incident ${incidentId.substring(0, 4)}... processing timed out after 3 minutes.`,
+            message: `❌ Incident ${incidentId.substring(0, 4)}... analysis failed.`,
             type: 'error',
             timestamp: new Date().toLocaleTimeString(),
             read: false,
@@ -197,19 +197,28 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         const response = await authenticatedFetch(`/api/incidents/${incidentId}/status`);
         if (!response.ok) throw new Error("Failed to fetch status");
         const statusData = await response.json();
-        const statusLower = statusData.status.toLowerCase();
+        const statusLower = statusData.incident_status.toLowerCase();
         const isFinished = statusLower === "failed" || statusLower === "completed";
         const isFailed = statusLower === "failed";
         const statusMsg = statusData.display_message || "";
+        console.log("Incident Status : ", statusMsg);
 
         setSessionIncidents(prev =>
           prev.map(inc => {
             if (inc.id === sessionId) {
               const mappedStatus = isFinished ? (isFailed ? "Failed" : "Completed") : "Processing";
+              let mappedDisplayMessage = "";
+              if (mappedStatus === "Completed") {
+                mappedDisplayMessage = " ✅Analysis complete.";
+              } else if (mappedStatus === "Failed") {
+                mappedDisplayMessage = " ❌ Analysis failed.";
+              } else {
+                mappedDisplayMessage = "Analysis is in progress.";
+              }
               return {
                 ...inc,
                 status: mappedStatus,
-                displayMessage: statusMsg || (isFinished ? "Analysis complete." : "Processing...")
+                displayMessage: mappedDisplayMessage
               };
             }
             return inc;
@@ -260,7 +269,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         let mappedStatus: "Processing" | "Completed" | "Failed";
         let mappedDisplayMessage: string;
 
-        const lowerCaseStatus = inc.status.toLowerCase();
+        const lowerCaseStatus = (inc.incident_status || "").toLowerCase();
 
         if (lowerCaseStatus === "completed") {
           mappedStatus = "Completed";
@@ -270,7 +279,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           mappedDisplayMessage = "Analysis failed.";
         } else {
           mappedStatus = "Processing";
-          mappedDisplayMessage = "Processing...";
+          mappedDisplayMessage = "Analysis is in progress.";
         }
 
         return {
@@ -279,9 +288,10 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           fileName: `Incident ${inc.incidentId ? inc.incidentId.substring(0, 4) : ""}`,
           fileType: "",
           category: "",
-          uploadedAt: inc.uploadedAt ? new Date(inc.uploadedAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+          uploadedAt: inc.uploadedAt ? new Date(inc.uploadedAt).toLocaleString() : new Date().toLocaleString(),
+          timestamp: inc.uploadedAt ? new Date(inc.uploadedAt).getTime() : Date.now(),
           status: mappedStatus,
-          displayMessage: inc.displayMessage || inc.message || mappedDisplayMessage,
+          displayMessage: mappedDisplayMessage,
           inspectionName: "Inspection",
           siteName: "Site"
         };
