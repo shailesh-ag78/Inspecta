@@ -13,6 +13,7 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --color-pane-bg: var(--pane-bg);
+  --color-bg: var(--bg);
 }
 
 @media (prefers-color-scheme: dark) {

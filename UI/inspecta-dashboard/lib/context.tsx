@@ -119,7 +119,7 @@ interface DashboardContextType {
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   isNotificationsOpen: boolean;
   setIsNotificationsOpen: (val: boolean) => void;
-  pollIncidentStatus: (incidentId: string, monitoringUrl: string, sessionId: string) => Promise<void>;
+  pollIncidentStatus: (incidentId: string, sessionId: string) => Promise<void>;
   fetchRecentIncidents: () => Promise<void>;
 }
 
@@ -141,7 +141,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
-  
+
   // Custom header site and inspection name states
   const [headerSiteName, setHeaderSiteName] = useState<string>('');
   const [headerInspectionName, setHeaderInspectionName] = useState<string>('');
@@ -169,7 +169,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [notifications]);
 
-  const pollIncidentStatus = useCallback(async (incidentId: string, monitoringUrl: string, sessionId: string) => {
+  const pollIncidentStatus = useCallback(async (incidentId: string, sessionId: string) => {
     const startTime = Date.now();
     let currentDelay = 5000;
     let timeoutId: any = null;
@@ -194,22 +194,18 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const response = await authenticatedFetch(monitoringUrl);
+        const response = await authenticatedFetch(`/api/incidents/${incidentId}/status`);
         if (!response.ok) throw new Error("Failed to fetch status");
         const statusData = await response.json();
-        const isFinished = statusData.is_finished;
-        const isFailed = statusData.status === "failed" || statusData.status === "Failed";
-        const statusMsg = statusData.display_message || statusData.message || "";
+        const statusLower = statusData.status.toLowerCase();
+        const isFinished = statusLower === "failed" || statusLower === "completed";
+        const isFailed = statusLower === "failed";
+        const statusMsg = statusData.display_message || "";
 
         setSessionIncidents(prev =>
           prev.map(inc => {
             if (inc.id === sessionId) {
-              let mappedStatus: "Uploading" | "Processing" | "Completed" | "Failed" = "Processing";
-              if (isFinished) {
-                mappedStatus = isFailed ? "Failed" : "Completed";
-              } else if (isFailed) {
-                mappedStatus = "Failed";
-              }
+              const mappedStatus = isFinished ? (isFailed ? "Failed" : "Completed") : "Processing";
               return {
                 ...inc,
                 status: mappedStatus,
@@ -220,7 +216,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           })
         );
 
-        if (isFinished || isFailed) {
+        if (isFinished) {
           const type = isFailed ? 'error' : 'success';
           const prefix = isFailed ? '❌' : '✅';
           setNotifications(prev => [
@@ -239,28 +235,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           );
           return;
         }
-
-        if (currentDelay < 15000) {
-          currentDelay = 15000;
-        } else if (currentDelay < 60000) {
-          currentDelay = 60000;
-        }
-        timeoutId = setTimeout(poll, currentDelay);
-        setSessionIncidents(prev =>
-          prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
-        );
       } catch (error) {
         console.error("Error polling in context:", error);
-        if (currentDelay < 15000) {
-          currentDelay = 15000;
-        } else if (currentDelay < 60000) {
-          currentDelay = 60000;
-        }
-        timeoutId = setTimeout(poll, currentDelay);
-        setSessionIncidents(prev =>
-          prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
-        );
       }
+
+      // Reschedule next poll
+      currentDelay = currentDelay === 5000 ? 15000 : 60000;
+      timeoutId = setTimeout(poll, currentDelay);
+      setSessionIncidents(prev =>
+        prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
+      );
     };
 
     timeoutId = setTimeout(poll, currentDelay);
@@ -272,19 +256,36 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const fetchRecentIncidents = useCallback(async () => {
     try {
       const recent = await getRecentIncidents(7, 10);
-      const formattedRecent = recent.map((inc: any) => ({
-        id: inc.id || inc.incidentId,
-        incidentId: inc.incidentId,
-        fileName: inc.fileName || `Incident ${inc.incidentId ? inc.incidentId.substring(0, 4) : ""}`,
-        fileType: inc.fileType,
-        category: inc.category,
-        uploadedAt: inc.uploadedAt ? new Date(inc.uploadedAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
-        status: (inc.status === "completed" || inc.status === "Completed" ? "Completed" : 
-                (inc.status === "failed" || inc.status === "Failed" ? "Failed" : "Processing")) as "Uploading" | "Processing" | "Completed" | "Failed",
-        displayMessage: inc.displayMessage || inc.message || "",
-        inspectionName: "Inspection",
-        siteName: "Site"
-      }));
+      const formattedRecent = recent.map((inc: any) => {
+        let mappedStatus: "Processing" | "Completed" | "Failed";
+        let mappedDisplayMessage: string;
+
+        const lowerCaseStatus = inc.status.toLowerCase();
+
+        if (lowerCaseStatus === "completed") {
+          mappedStatus = "Completed";
+          mappedDisplayMessage = "Analysis complete.";
+        } else if (lowerCaseStatus === "failed") {
+          mappedStatus = "Failed";
+          mappedDisplayMessage = "Analysis failed.";
+        } else {
+          mappedStatus = "Processing";
+          mappedDisplayMessage = "Processing...";
+        }
+
+        return {
+          id: inc.id || inc.incidentId,
+          incidentId: inc.incidentId,
+          fileName: `Incident ${inc.incidentId ? inc.incidentId.substring(0, 4) : ""}`,
+          fileType: "",
+          category: "",
+          uploadedAt: inc.uploadedAt ? new Date(inc.uploadedAt).toLocaleTimeString() : new Date().toLocaleTimeString(),
+          status: mappedStatus,
+          displayMessage: inc.displayMessage || inc.message || mappedDisplayMessage,
+          inspectionName: "Inspection",
+          siteName: "Site"
+        };
+      });
 
       setSessionIncidents(formattedRecent);
 
@@ -311,7 +312,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       // Resume polling for any running tasks
       formattedRecent.forEach(inc => {
         if (inc.status === "Processing") {
-          pollIncidentStatus(inc.incidentId, `/api/incidents/${inc.incidentId}/status`, inc.id);
+          pollIncidentStatus(inc.incidentId, inc.id);
         }
       });
     } catch (err) {
@@ -327,6 +328,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       // Clear states when logged out
       setSessionIncidents([]);
       setNotifications([]);
+      localStorage.removeItem("inspecta_notifications");
     }
   }, [token, fetchRecentIncidents]);
 

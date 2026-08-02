@@ -136,8 +136,6 @@ async def verify_firebase_token(request: Request, call_next):
         request.state.company_id = decoded_token.get("company_id")
         request.state.company_storage_id = decoded_token.get("company_storage_id")
         request.state.translation_language = decoded_token.get("translation_language", "")
-        # ToDo : Remove the log entry later
-        print(f"✅ Authenticated: Company {request.state.company_id}, Storage {request.state.company_storage_id}, Language {request.state.translation_language}")
         token_ctx = firebase_token_var.set(id_token)
         
     except Exception as e:
@@ -271,12 +269,17 @@ def get_google_oidc_token(audience: str) -> Optional[str]:
 
 def CallExecutorService(executor_service_url, method, headers: dict, payload: Optional[dict]):
     try:
+        print(f"Executor Service URL: {executor_service_url}")
+        print(f"Method: {method}")
+        print(f"Headers: {headers}")
+        print(f"Payload: {payload}")
         # Dynamically generate Google OIDC token for the target executor service URL
         oidc_token = get_google_oidc_token(executor_service_url)
         if oidc_token:
             headers = headers.copy()
             headers["Authorization"] = f"Bearer {oidc_token}"
 
+        print("Received OIDC token")
         data = None
         if(payload != None):
             data = json.dumps(payload).encode("utf-8")
@@ -991,6 +994,7 @@ async def get_recent_incidents(
     limit: int = Query(10, description="Maximum number of incidents to fetch")
 ):
     """Fetch recent incidents with their statuses from the Executor service"""
+    print("Fetching Recent incidents")
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -999,6 +1003,7 @@ async def get_recent_incidents(
         headers = {}
         headers = fill_auth_headers(request, headers)
         executor_service_url = BASE_EXECUTOR_URL + f"/incidents/recent?days={days}&limit={limit}"
+        print(f"Fetching Recent incidents from: {executor_service_url}")
         resp_data = CallExecutorService(executor_service_url, "GET", headers, None)
         return resp_data
     except Exception as e:
