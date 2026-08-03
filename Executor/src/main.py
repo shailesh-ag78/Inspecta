@@ -59,7 +59,10 @@ ALLOWED_TYPES = {
     "video/quicktime": ".mov",
     "audio/mpeg": ".mp3",
     "audio/wav": ".wav",
-    "audio/x-wav": ".wav"
+    "audio/x-wav": ".wav",
+    "image/jpeg": ".jpg",
+    "image/jpg": ".jpg",
+    "image/png": ".png"
 }
 
 # Load environment variables from .env file

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { onIdTokenChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
@@ -121,6 +121,8 @@ interface DashboardContextType {
   setIsNotificationsOpen: (val: boolean) => void;
   pollIncidentStatus: (incidentId: string, sessionId: string) => Promise<void>;
   fetchRecentIncidents: () => Promise<void>;
+  processUploadQueue: () => Promise<void>;
+  clearLocalBundles: () => Promise<void>;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -249,18 +251,117 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         console.error("Error polling in context:", error);
       }
 
-      // Reschedule next poll
-      currentDelay = currentDelay === 5000 ? 15000 : 60000;
+      currentDelay = Math.min(currentDelay * 1.5, 30000);
       timeoutId = setTimeout(poll, currentDelay);
+
       setSessionIncidents(prev =>
         prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
       );
     };
 
-    timeoutId = setTimeout(poll, currentDelay);
-    setSessionIncidents(prev =>
-      prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
-    );
+    poll();
+  }, []);
+
+  // IndexedDB Queue Processor
+  const isProcessingQueue = useRef(false);
+
+  const processUploadQueue = useCallback(async () => {
+    if (isProcessingQueue.current) return;
+    isProcessingQueue.current = true;
+
+    try {
+      // Dynamic import to avoid SSR issues if idb is used server-side
+      const { getAllBundlesFromIdb, saveBundleToIdb, deleteBundleFromIdb } = await import('./idb');
+      const { uploadMediaFile } = await import('./api');
+
+      let bundles = await getAllBundlesFromIdb();
+      let pendingBundles = bundles.filter(b => b.status === "pending" || b.status === "failed");
+
+      for (const bundle of pendingBundles) {
+        // Skip if max retries hit
+        if (bundle.retries >= 3) {
+          continue;
+        }
+
+        bundle.status = "uploading";
+        await saveBundleToIdb(bundle);
+
+        // Update UI
+        setSessionIncidents(prev =>
+          prev.map(inc => inc.id === bundle.id ? { ...inc, status: "Uploading", displayMessage: `Uploading ${bundle.primaryType}...` } : inc)
+        );
+
+        try {
+          console.log(`[Queue] Starting upload of bundle ${bundle.id} with ${bundle.attachedMedia?.length || 0} attachments.`);
+          // Upload Primary
+          const primaryFile = new File([bundle.primaryBlob], bundle.primaryFilename, { type: bundle.primaryBlob.type });
+          console.log(`[Queue] Uploading primary file: ${bundle.primaryFilename}`);
+          const { incidentId } = await uploadMediaFile(primaryFile, bundle.inspectionId, (status, message) => {
+            setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: message || status } : inc));
+          });
+          console.log(`[Queue] Primary file uploaded successfully. Incident ID: ${incidentId}`);
+          
+          // Primary success, now upload attachments sequentially
+          let attachmentsSuccess = true;
+          const attachments = bundle.attachedMedia || [];
+          console.log(`[Queue] Proceeding to upload ${attachments.length} attachments.`);
+          for (let i = 0; i < attachments.length; i++) {
+            const attachment = attachments[i];
+            const attFile = new File([attachment.blob], attachment.filename, { type: attachment.blob.type });
+            
+            console.log(`[Queue] Uploading attachment ${i + 1}/${attachments.length}: ${attachment.filename}`);
+            setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: `Uploading image ${i + 1} of ${attachments.length}...` } : inc));
+            
+            try {
+              // We associate attachments with the same inspection, and potentially the same incident (backend support pending, using inspection for now)
+              const uploadRes = await uploadMediaFile(attFile, bundle.inspectionId, () => { });
+              console.log(`[Queue] Attachment ${i + 1} uploaded successfully. Response:`, uploadRes);
+            } catch (attErr) {
+              console.error(`[Queue] Failed to upload attachment ${i + 1} (${attachment.filename}):`, attErr);
+              attachmentsSuccess = false;
+              break; // Stop uploading further attachments for this bundle on failure
+            }
+          }
+          
+          if (attachmentsSuccess) {
+            console.log(`[Queue] Bundle ${bundle.id} uploaded completely.`);
+            // Delete from IDB on full success
+            await deleteBundleFromIdb(bundle.id);
+            setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, status: "Processing", incidentId, displayMessage: "Upload complete, polling status..." } : inc));
+            pollIncidentStatus(incidentId, bundle.id);
+          } else {
+            throw new Error("Attachment upload failed");
+          }
+
+        } catch (err) {
+          console.error(`[Queue] Bundle ${bundle.id} upload failed with error:`, err);
+          bundle.retries += 1;
+          bundle.status = bundle.retries >= 3 ? "failed" : "pending";
+          await saveBundleToIdb(bundle);
+
+          setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? {
+            ...inc,
+            status: bundle.status === "failed" ? "Failed" : "pending",
+            displayMessage: bundle.status === "failed" ? "Upload failed after 3 retries." : "Upload failed, will retry."
+          } : inc));
+        }
+      }
+    } catch (e) {
+      console.error("Queue processor error:", e);
+    } finally {
+      isProcessingQueue.current = false;
+    }
+  }, [pollIncidentStatus]);
+
+  const clearLocalBundles = useCallback(async () => {
+    try {
+      const { clearAllBundlesFromIdb } = await import('./idb');
+      await clearAllBundlesFromIdb();
+      // Remove any pending/failed items from session queue
+      setSessionIncidents(prev => prev.filter(inc => inc.status !== "pending" && inc.status !== "Failed"));
+    } catch (e) {
+      console.error("Failed to clear local bundles:", e);
+    }
   }, []);
 
   const fetchRecentIncidents = useCallback(async () => {
@@ -423,9 +524,22 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-  };
+  const handleLogout = useCallback(async () => {
+    try {
+      await clearLocalBundles();
+      await signOut(auth);
+      setToken(null);
+      setUser(null);
+      setSiteInspections([]);
+      setIncidents([]);
+      setTasks([]);
+      setCompanyName(null);
+      setSessionIncidents([]);
+      setBackendSites([]);
+    } catch (e) {
+      console.error('Logout error:', e);
+    }
+  }, [clearLocalBundles]);
 
   const fetchSiteInspections = useCallback(async () => {
     try {
@@ -996,6 +1110,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         setIsNotificationsOpen,
         pollIncidentStatus,
         fetchRecentIncidents,
+        processUploadQueue,
+        clearLocalBundles,
       }}
     >
       {children}

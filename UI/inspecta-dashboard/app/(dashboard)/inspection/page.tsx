@@ -19,8 +19,10 @@ import {
   ChevronRight
 } from "lucide-react";
 import { authenticatedFetch, uploadMediaFile as apiUploadMediaFile } from "@/lib/api";
+import { saveBundleToIdb, AttachedMedia, IncidentBundle } from "@/lib/idb";
 
 const MAX_SESSION_INCIDENTS = 5; // Limit the number of incidents in the session queue
+const MAX_SESSION_PHOTOS = 5; // Limit max photos attached per recording
 const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
 
 interface SessionIncident {
@@ -33,6 +35,7 @@ interface SessionIncident {
   inspectionName: string;
   siteName: string;
   category: "incident" | "field_note";
+  attachedPhotosCount?: number;
   pollingIntervalId?: any;
   displayMessage?: string;
   timestamp?: number;
@@ -51,6 +54,8 @@ export default function InspectionPage() {
     isNotificationsOpen,
     setIsNotificationsOpen,
     pollIncidentStatus,
+    processUploadQueue,
+    clearLocalBundles,
   } = useDashboard();
 
   // Selection states
@@ -79,6 +84,10 @@ export default function InspectionPage() {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [isRecordingPaused, setIsRecordingPaused] = useState<boolean>(false);
+  const [isAudioPhotoTaking, setIsAudioPhotoTaking] = useState<boolean>(false);
+  const [tempCameraStream, setTempCameraStream] = useState<MediaStream | null>(null);
+  const [currentSessionPhotos, setCurrentSessionPhotos] = useState<AttachedMedia[]>([]);
 
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [incidentError, setIncidentError] = useState<string | null>(null);
@@ -90,11 +99,13 @@ export default function InspectionPage() {
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
+  const tempVideoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
   const durationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadCategoryRef = useRef<"incident" | "field_note">("incident");
+  const currentBundleIdRef = useRef<string>("");
 
   // Auto-select first site
   useEffect(() => {
@@ -119,8 +130,7 @@ export default function InspectionPage() {
 
   // Timer interval for recording duration
   useEffect(() => {
-    if (isRecording) {
-      setRecordDuration(0);
+    if (isRecording && !isRecordingPaused) {
       durationIntervalRef.current = setInterval(() => {
         setRecordDuration(prev => prev + 1);
       }, 1000);
@@ -130,7 +140,12 @@ export default function InspectionPage() {
         durationIntervalRef.current = null;
       }
     }
-  }, [isRecording]);
+    return () => {
+      if (durationIntervalRef.current) {
+        clearInterval(durationIntervalRef.current);
+      }
+    };
+  }, [isRecording, isRecordingPaused]);
 
   // Cleanup helper
   const cleanUpMedia = () => {
@@ -138,22 +153,32 @@ export default function InspectionPage() {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
     }
+    if (tempCameraStream) {
+      tempCameraStream.getTracks().forEach(track => track.stop());
+      setTempCameraStream(null);
+    }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
+    }
+    if (tempVideoRef.current) {
+      tempVideoRef.current.srcObject = null;
     }
     if (durationIntervalRef.current) {
       clearInterval(durationIntervalRef.current);
       durationIntervalRef.current = null;
     }
     setIsRecording(false);
+    setIsRecordingPaused(false);
+    setIsAudioPhotoTaking(false);
+    setCurrentSessionPhotos([]);
     setPhotoBlob(null);
     setPhotoPreview(null);
     setActiveOverlay(null);
   };
 
-  // Launch Recording Workspace Overlay
   const openRecordingOverlay = async (mode: "audio" | "video" | "image", category: "incident" | "field_note") => {
     setIncidentError(null);
+    currentBundleIdRef.current = `bundle_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
     if (!selectedInspectionId) {
       setIncidentError("Please select or create an inspection before recording.");
       return;
@@ -171,6 +196,21 @@ export default function InspectionPage() {
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       setCameraStream(stream);
+
+      // Handle USB Disconnects
+      if (mode === "video" || mode === "image") {
+        const videoTrack = stream.getVideoTracks()[0];
+        if (videoTrack) {
+          videoTrack.onended = () => {
+            setIncidentError("Camera disconnected. Saving recording...");
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+              mediaRecorderRef.current.stop();
+            } else {
+              cleanUpMedia();
+            }
+          };
+        }
+      }
 
       // Delay briefly to allow videoRef component overlay to mount
       setTimeout(() => {
@@ -217,17 +257,54 @@ export default function InspectionPage() {
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-        const filename = `recorded_${overlayCategory}_${timestamp}.${fileExtension}`;
-        const file = new File([blob], filename, { type: mimeType });
+        const filename = `${currentBundleIdRef.current}_recorded_${overlayCategory}_${timestamp}.${fileExtension}`;
 
-        cleanUpMedia();
-        cleanUpMedia(); // Clean up UI immediately after recording stops
-        await uploadMediaFile(file, activeOverlay === "video" ? "video" : "audio", overlayCategory);
+        const bundleId = currentBundleIdRef.current;
+        
+        // Capture current photos before state reset in cleanUpMedia
+        const attached = [...currentSessionPhotos];
+        const pType = activeOverlay === "video" ? "video" : "audio";
+
+        const bundle: IncidentBundle = {
+          id: bundleId,
+          inspectionId: selectedInspectionId,
+          category: overlayCategory,
+          primaryBlob: blob,
+          primaryFilename: filename,
+          primaryType: pType,
+          attachedMedia: attached,
+          status: "pending",
+          retries: 0,
+          createdAt: Date.now()
+        };
+
+        cleanUpMedia(); // Resets states, so we must save the bundle after
+        
+        await saveBundleToIdb(bundle);
+
+        // Add to UI Queue
+        setSessionIncidents(prev => [{
+          id: bundleId,
+          fileName: filename,
+          fileType: pType,
+          uploadedAt: new Date().toLocaleTimeString(),
+          status: "pending",
+          inspectionName: activeInspection?.friendly_name || activeInspection?.inspection_name || "Unknown Inspection",
+          siteName: activeSite?.site_name || "Unknown Site",
+          category: overlayCategory,
+          attachedPhotosCount: attached.length,
+          displayMessage: "Pending Upload"
+        }, ...prev]);
+
+        // Kick off upload processor
+        processUploadQueue();
       };
 
       mediaRecorderRef.current = recorder;
+      setRecordDuration(0);
       recorder.start(1000);
       setIsRecording(true);
+      setIsRecordingPaused(false);
     } catch (err) {
       console.error("Media recorder start error:", err);
       setIncidentError("Unable to start recording.");
@@ -235,8 +312,150 @@ export default function InspectionPage() {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (mediaRecorderRef.current && (isRecording || isRecordingPaused)) {
       mediaRecorderRef.current.stop();
+    }
+  };
+
+  const snapSilentPhoto = () => {
+    if (!videoRef.current || !cameraStream) return;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = videoRef.current.videoWidth || 640;
+      canvas.height = videoRef.current.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            if (currentSessionPhotos.length >= MAX_SESSION_PHOTOS) {
+              setIncidentError(`Maximum of ${MAX_SESSION_PHOTOS} photos allowed.`);
+              return;
+            }
+            const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+            const filename = `${currentBundleIdRef.current}_snapshot_${overlayCategory}_${timestamp}_during_video.jpg`;
+            setCurrentSessionPhotos(prev => [...prev, { blob, filename, type: "image" }]);
+
+            // Debugging: Save to disk automatically
+            try {
+              const link = document.createElement("a");
+              link.href = URL.createObjectURL(blob);
+              link.download = filename;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              console.log("Debug: Saved snapshot to disk:", filename);
+            } catch (e) {
+              console.error("Debug: Failed to save snapshot to disk:", e);
+            }
+          }
+        }, "image/jpeg", 0.95);
+      }
+    } catch (err) {
+      console.error("Silent snapshot error:", err);
+      setIncidentError("Failed to snap picture silently.");
+    }
+  };
+
+  const startAudioPhotoWorkflow = async () => {
+    try {
+      // Pause audio recording
+      if (mediaRecorderRef.current && isRecording && !isRecordingPaused) {
+        mediaRecorderRef.current.pause();
+        setIsRecordingPaused(true);
+      }
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      setTempCameraStream(stream);
+      setIsAudioPhotoTaking(true);
+      
+      setTimeout(() => {
+        if (tempVideoRef.current) {
+          tempVideoRef.current.srcObject = stream;
+          tempVideoRef.current.play().catch(e => console.error("Temp video play failed:", e));
+        }
+      }, 300);
+    } catch (err) {
+      console.error("Error starting camera for audio snapshot:", err);
+      setIncidentError("Could not access camera.");
+      if (mediaRecorderRef.current && isRecording && isRecordingPaused) {
+        mediaRecorderRef.current.resume();
+        setIsRecordingPaused(false);
+      }
+    }
+  };
+
+  const captureAudioPhoto = () => {
+    if (!tempVideoRef.current || !tempCameraStream) return;
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = tempVideoRef.current.videoWidth || 640;
+      canvas.height = tempVideoRef.current.videoHeight || 480;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(tempVideoRef.current, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            if (currentSessionPhotos.length < MAX_SESSION_PHOTOS) {
+              // Append timestamp
+              const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+              const filename = `${currentBundleIdRef.current}_snapshot_${overlayCategory}_${timestamp}_at_${recordDuration}s.jpg`;
+              setCurrentSessionPhotos(prev => [...prev, { blob, filename, type: "image" }]);
+
+              // Debugging: Save to disk automatically
+              try {
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                console.log("Debug: Saved snapshot to disk:", filename);
+              } catch (e) {
+                console.error("Debug: Failed to save snapshot to disk:", e);
+              }
+            } else {
+              setIncidentError(`Maximum of ${MAX_SESSION_PHOTOS} photos allowed.`);
+            }
+            
+            // Clean up temporary camera
+            tempCameraStream.getTracks().forEach(track => track.stop());
+            setTempCameraStream(null);
+            setIsAudioPhotoTaking(false);
+            
+            // Resume audio recording
+            if (mediaRecorderRef.current && isRecording && isRecordingPaused) {
+              mediaRecorderRef.current.resume();
+              setIsRecordingPaused(false);
+            }
+          }
+        }, "image/jpeg", 0.95);
+      }
+    } catch (err) {
+      console.error("Audio snapshot error:", err);
+      setIncidentError("Failed to snap picture during audio.");
+      // Recover state
+      if (tempCameraStream) {
+        tempCameraStream.getTracks().forEach(track => track.stop());
+        setTempCameraStream(null);
+      }
+      setIsAudioPhotoTaking(false);
+      if (mediaRecorderRef.current && isRecording && isRecordingPaused) {
+        mediaRecorderRef.current.resume();
+        setIsRecordingPaused(false);
+      }
+    }
+  };
+
+  const cancelAudioPhoto = () => {
+    if (tempCameraStream) {
+      tempCameraStream.getTracks().forEach(track => track.stop());
+      setTempCameraStream(null);
+    }
+    setIsAudioPhotoTaking(false);
+    if (mediaRecorderRef.current && isRecording && isRecordingPaused) {
+      mediaRecorderRef.current.resume();
+      setIsRecordingPaused(false);
     }
   };
 
@@ -265,7 +484,7 @@ export default function InspectionPage() {
   const uploadPhoto = async () => {
     if (!photoBlob) return;
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const filename = `snapshot_${overlayCategory}_${timestamp}.jpg`;
+    const filename = `${currentBundleIdRef.current}_snapshot_${overlayCategory}_${timestamp}.jpg`;
     const file = new File([photoBlob], filename, { type: "image/jpeg" });
 
     cleanUpMedia();
@@ -292,7 +511,7 @@ export default function InspectionPage() {
     };
 
     try {
-      const { incidentId } = await apiUploadMediaFile(file, selectedInspectionId, onProgress);
+      const { incidentId } = await apiUploadMediaFile(file, selectedInspectionId, onProgress, currentBundleIdRef.current);
 
       setSessionIncidents(prev => {
         const newIncident: SessionIncident = {
@@ -561,15 +780,16 @@ export default function InspectionPage() {
                 </button>
                 <button
                   type="button"
-                  disabled={isSiteDisabled}
+                  disabled={true}
                   onClick={() => openRecordingOverlay("image", "incident")}
                   className={hyperlinkStyle}
+                  title="Picture option under Add New Incident is disabled (will be implemented at a later stage)"
                 >
                   <div className="flex items-center">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
                       <Camera className="w-5 h-5 text-green-600 shrink-0" />
                     </div>
-                    <span className="ml-3 text-left">Picture</span>
+                    <span className="ml-3 text-left font-normal text-slate-400">Picture (Disabled)</span>
                   </div>
                 </button>
                 <button
@@ -675,7 +895,15 @@ export default function InspectionPage() {
 
             {/* Session Queue List */}
             <div className="flex flex-col gap-3 mt-2 border-t border-slate-200/70 pt-4">
-              <h3 className={labelHeaderStyle}>Recorded Incidents & Field Notes</h3>
+              <div className="flex justify-between items-center max-w-[644px]">
+                <h3 className={labelHeaderStyle}>Recorded Incidents & Field Notes</h3>
+                <button 
+                  onClick={clearLocalBundles}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+                >
+                  Clear Local Storage
+                </button>
+              </div>
 
               {sessionIncidents.length === 0 ? (
                 <div className="text-slate-400 text-sm italic">
@@ -700,7 +928,8 @@ export default function InspectionPage() {
                             ${incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
                               incident.status === "Processing" ? "bg-amber-50 text-amber-600 border border-amber-200/50 animate-pulse" :
                                 incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
-                                  "bg-rose-50 text-rose-600 border border-rose-200/50"
+                                  incident.status === "pending" ? "bg-slate-50 text-slate-600 border border-slate-200/50" :
+                                    "bg-rose-50 text-rose-600 border border-rose-200/50"
                             }`}>
                             {incident.status === "Processing" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
                             {incident.status}
@@ -725,15 +954,22 @@ export default function InspectionPage() {
                         </div>
 
                         {/* Row 2 : Col 2 : Left-aligned icon of media type */}
-                        <div className="col-span-1 flex justify-start items-center">
+                        <div className="col-span-1 flex justify-start items-center gap-2">
                           {incident.fileType && (
-                            <div className={`p-2 rounded-lg border ${incident.fileType === "audio" ? "bg-[#800000]/8 border-[#800000]/15 text-[#800000]/80" :
+                            <div className={`p-2 rounded-lg border flex items-center justify-center ${incident.fileType === "audio" ? "bg-[#800000]/8 border-[#800000]/15 text-[#800000]/80" :
                               incident.fileType === "video" ? "bg-blue-50 border-blue-100 text-blue-500" :
                                 "bg-emerald-50 border-emerald-100 text-emerald-500"
                               }`}>
                               {incident.fileType === "audio" && <FileAudio className="w-5 h-5" />}
                               {incident.fileType === "video" && <FileVideo className="w-5 h-5" />}
                               {incident.fileType === "image" && <FileImage className="w-5 h-5" />}
+                            </div>
+                          )}
+                          {/* Attachment Indicator */}
+                          {(incident.attachedPhotosCount || 0) > 0 && (
+                            <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-md border border-slate-200 text-slate-600" title={`${incident.attachedPhotosCount} attached photos`}>
+                              <Camera className="w-3.5 h-3.5" />
+                              <span className="text-xs font-bold">{incident.attachedPhotosCount}</span>
                             </div>
                           )}
                         </div>
@@ -805,14 +1041,24 @@ export default function InspectionPage() {
                   <img src={photoPreview} alt="Captured preview" className="w-full h-full object-contain" />
                 )}
 
+                {/* Temp Audio Photo Viewport */}
+                {activeOverlay === "audio" && isAudioPhotoTaking && (
+                  <video
+                    ref={tempVideoRef}
+                    muted
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                )}
+
                 {/* Audio Visualization UI */}
-                {activeOverlay === "audio" && (
+                {activeOverlay === "audio" && !isAudioPhotoTaking && (
                   <div className="flex flex-col items-center gap-3">
-                    <div className={`p-4 rounded-full bg-slate-900 text-blue-400 ${isRecording ? "animate-pulse border-2 border-red-500 text-red-500" : ""}`}>
+                    <div className={`p-4 rounded-full bg-slate-900 text-blue-400 ${isRecording && !isRecordingPaused ? "animate-pulse border-2 border-red-500 text-red-500" : ""}`}>
                       <Mic className="w-6 h-6" />
                     </div>
                     <span className="text-xs font-bold text-slate-400">
-                      {isRecording ? "Live audio recording active..." : "Microphone ready"}
+                      {isRecording ? (isRecordingPaused ? "Audio paused for photo..." : "Live audio recording active...") : "Microphone ready"}
                     </span>
                   </div>
                 )}
@@ -838,13 +1084,22 @@ export default function InspectionPage() {
                       <Video className="w-4 h-4" /> Start Video Record
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={stopRecording}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                    >
-                      <Square className="w-4 h-4 fill-white" /> Stop & Save
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={snapSilentPhoto}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      >
+                        <Camera className="w-4 h-4" /> Snap Photo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={stopRecording}
+                        className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      >
+                        <Square className="w-4 h-4 fill-white" /> Stop & Save
+                      </button>
+                    </>
                   )
                 )}
 
@@ -858,13 +1113,41 @@ export default function InspectionPage() {
                       <Mic className="w-4 h-4" /> Start Audio Record
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={stopRecording}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                    >
-                      <Square className="w-4 h-4 fill-white" /> Stop & Save
-                    </button>
+                    !isAudioPhotoTaking ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={startAudioPhotoWorkflow}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                        >
+                          <Camera className="w-4 h-4" /> Snap Photo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopRecording}
+                          className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                        >
+                          <Square className="w-4 h-4 fill-white" /> Stop & Save
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={captureAudioPhoto}
+                          className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                        >
+                          <Camera className="w-4 h-4" /> Capture Now
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelAudioPhoto}
+                          className="flex items-center gap-1.5 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                        >
+                          <X className="w-4 h-4" /> Cancel
+                        </button>
+                      </>
+                    )
                   )
                 )}
 

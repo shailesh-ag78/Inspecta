@@ -56,7 +56,7 @@ export default function IncidentSelectionPane() {
         onClick={() => setIsIncidentPaneCollapsed(!isIncidentPaneCollapsed)}
         className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
       >
-        <div className="flex items-center gap-2 text-sm font-bold text-slate-500">
+        <div className="flex items-center gap-2 text-[15px] font-bold text-slate-500">
           <i className="fa-solid fa-building text-slate-600 text-lg mr-2"></i>
           <span className="select-none flex items-center flex-wrap gap-x-1">
             <span>Site : </span>
@@ -88,17 +88,17 @@ export default function IncidentSelectionPane() {
                 title="Expand sites column"
               >
                 <ChevronLeft className="w-3.5 h-3.5 text-slate-500 transform rotate-180 mb-4" />
-                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest [writing-mode:vertical-lr] rotate-180 select-none">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest [writing-mode:vertical-lr] rotate-180 select-none">
                   SITES ({selectedMillerSites.length})
                 </span>
               </div>
             ) : (
               <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin flex flex-col">
                 <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
-                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider px-1 shrink-0">
+                  <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider px-1 shrink-0">
                     Sites ({selectedMillerSites.length})
                   </span>
-                  <div className="flex items-center gap-2 text-[10px] ml-auto mr-1.5">
+                  <div className="flex items-center gap-2 text-[11px] ml-auto mr-1.5">
                     <button
                       type="button"
                       onClick={() => setSelectedMillerSites(backendSites.map(s => String(s.site_name || s.name || '')))}
@@ -132,7 +132,7 @@ export default function IncidentSelectionPane() {
                   const siteId = String(site.site_name || site.name || '');
                   const isChecked = selectedMillerSites.includes(siteId);
                   return (
-                    <label key={siteId} className="flex items-center gap-2 text-xs font-normal text-slate-900 hover:text-slate-1000 cursor-pointer select-none py-0.5">
+                    <label key={siteId} className="flex items-center gap-2 text-[13px] font-normal text-slate-900 hover:text-slate-1000 cursor-pointer select-none py-0.5">
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -144,7 +144,7 @@ export default function IncidentSelectionPane() {
                         className="sr-only"
                       />
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
-                        {isChecked && <i className="fa-solid fa-check text-[9px] text-slate-800 font-extrabold" />}
+                        {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                       </div>
                       <span className="truncate">🏢 {siteId}</span>
                     </label>
@@ -156,10 +156,10 @@ export default function IncidentSelectionPane() {
             {/* Column 2: Inspections */}
             <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin">
               <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider px-1 shrink-0">
+                <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider px-1 shrink-0">
                   Inspections ({selectedMillerInspections.length})
                 </span>
-                <div className="flex items-center gap-2 text-[10px] ml-auto px-1">
+                <div className="flex items-center gap-2 text-[11px] ml-auto px-1">
                   <button
                     type="button"
                     onClick={() => setSelectedMillerInspections(availableInspections.map(item => item.inspection_id || item.site_id).filter(Boolean) as string[])}
@@ -183,7 +183,7 @@ export default function IncidentSelectionPane() {
                 if (!val) return null;
                 const isChecked = selectedMillerInspections.includes(val);
                 return (
-                  <label key={val} className="flex items-center gap-2 text-xs font-normal text-slate-900 hover:text-slate-1000 cursor-pointer select-none py-0.5">
+                  <label key={val} className="flex items-center gap-2 text-[13px] font-normal text-slate-900 hover:text-slate-1000 cursor-pointer select-none py-0.5">
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -195,7 +195,7 @@ export default function IncidentSelectionPane() {
                       className="sr-only"
                     />
                     <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
-                      {isChecked && <i className="fa-solid fa-check text-[9px] text-slate-800 font-extrabold" />}
+                      {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                     </div>
                     <span className="truncate">🔍 {item.label}</span>
                   </label>
@@ -231,13 +231,13 @@ export default function IncidentSelectionPane() {
               </div>
 
               {millerIncidents.length === 0 ? (
-                <div className="text-xs text-slate-450 italic px-2 py-1">No incidents found</div>
+                <div className="text-[13px] text-slate-450 italic px-2 py-1">No incidents found</div>
               ) : (
                 [...millerIncidents].sort((a, b) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime()).map(incident => {
                   const isChecked = selectedMillerIncidents.includes(incident.id);
                   const label = incident.title || `Incident ${incident.id.slice(0, 4)}`;
                   return (
-                    <label key={incident.id} className="flex items-center gap-2 text-xs font-normal text-slate-800 hover:text-slate-950 cursor-pointer select-none py-0.5">
+                    <label key={incident.id} className="flex items-center gap-2 text-[13px] font-normal text-slate-800 hover:text-slate-950 cursor-pointer select-none py-0.5">
                       <input
                         type="checkbox"
                         checked={isChecked}
@@ -249,7 +249,7 @@ export default function IncidentSelectionPane() {
                         className="sr-only"
                       />
                       <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
-                        {isChecked && <i className="fa-solid fa-check text-[9px] text-slate-800 font-extrabold" />}
+                        {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                       </div>
                       <span className="truncate">📌 {label}</span>
                     </label>
