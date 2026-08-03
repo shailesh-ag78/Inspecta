@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
-import { onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { onIdTokenChanged, signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '@/lib/firebase';
 import { themes, defaultTheme, type Theme } from '@/lib/themes';
 import {
@@ -367,9 +367,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // Add Inspection Modal State
   const [isAddInspectionOpen, setIsAddInspectionOpen] = useState(false);
 
-  // Listen for Firebase auth state changes
+  // Listen for Firebase auth state changes and token refreshes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (usr) => {
+    const unsubscribe = onIdTokenChanged(auth, async (usr) => {
       setUser(usr);
       if (usr) {
         try {

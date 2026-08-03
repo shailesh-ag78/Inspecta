@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, setPersistence, browserSessionPersistence } from 'firebase/auth';
 
 // const firebaseConfig = {
 //   apiKey: "AIzaSyAj9IYu7uM7LkaL4B0I3sEyU9lCLXpe1v4",
@@ -25,6 +25,13 @@ const firebaseConfig = {
 
 const app = (isBrowser || hasApiKey) ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApp()) : null;
 const auth = app ? getAuth(app) : ({} as any);
+
+if (isBrowser && app) {
+  setPersistence(auth, browserSessionPersistence).catch((err) => {
+    console.error("Failed to set Firebase session persistence:", err);
+  });
+}
+
 const googleProvider = new GoogleAuthProvider();
 
 export { app, auth, googleProvider };

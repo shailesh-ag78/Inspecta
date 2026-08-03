@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { authenticatedFetch, uploadMediaFile as apiUploadMediaFile } from "@/lib/api";
 
-const MAX_SESSION_INCIDENTS = 10; // Limit the number of incidents in the session queue
+const MAX_SESSION_INCIDENTS = 5; // Limit the number of incidents in the session queue
 const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
 
 interface SessionIncident {
@@ -82,8 +82,11 @@ export default function InspectionPage() {
 
   const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [incidentError, setIncidentError] = useState<string | null>(null);
+  const [isPermissionModalOpen, setIsPermissionModalOpen] = useState<boolean>(false);
 
-
+  const showPermissionHelpModal = () => {
+    setIsPermissionModalOpen(true);
+  };
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -176,9 +179,16 @@ export default function InspectionPage() {
           videoRef.current.play().catch(e => console.error("Video stream play failed:", e));
         }
       }, 300);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error accessing media devices:", err);
-      setIncidentError("Could not access camera/microphone. Check permission settings.");
+      if (err.name === "NotAllowedError" || err.name === "SecurityError") {
+        setIncidentError("Permission denied for camera/microphone.");
+        showPermissionHelpModal();
+      } else if (err.name === "NotFoundError") {
+        setIncidentError("Camera or microphone not found on this device.");
+      } else {
+        setIncidentError("Could not access camera/microphone. Check permission settings.");
+      }
     }
   };
 
@@ -518,7 +528,10 @@ export default function InspectionPage() {
 
             {/* Option A: Add New Incident */}
             <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-              <h4 className={labelHeaderStyle}>📌 Add New Incident</h4>
+              <h4 className={`${labelHeaderStyle} flex items-center gap-2`}>
+                <span className="text-base bg-blue-50 p-1.5 rounded-lg border border-blue-100/70 inline-flex items-center justify-center w-8 h-8 select-none">📌</span>
+                <span>Add New Incident</span>
+              </h4>
               <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
                 <button
                   type="button"
@@ -528,7 +541,7 @@ export default function InspectionPage() {
                 >
                   <div className="flex items-center">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Mic className="w-5 h-5 text-red-600 shrink-0" />
+                      <Mic className="w-5 h-5 text-[#800000] shrink-0" />
                     </div>
                     <span className="ml-3 text-left">Record Audio</span>
                   </div>
@@ -577,7 +590,10 @@ export default function InspectionPage() {
 
             {/* Option B: Add Field Note */}
             <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-              <h4 className={labelHeaderStyle}>📋 Add Field Note</h4>
+              <h4 className={`${labelHeaderStyle} flex items-center gap-2`}>
+                <span className="text-base bg-amber-50 p-1.5 rounded-lg border border-amber-100/70 inline-flex items-center justify-center w-8 h-8 select-none">📋</span>
+                <span>Add Field Note</span>
+              </h4>
               <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
                 <button
                   type="button"
@@ -587,7 +603,7 @@ export default function InspectionPage() {
                 >
                   <div className="flex items-center">
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Mic className="w-5 h-5 text-red-600 shrink-0" />
+                      <Mic className="w-5 h-5 text-[#800000] shrink-0" />
                     </div>
                     <span className="ml-3 text-left">Record Audio</span>
                   </div>
@@ -659,14 +675,14 @@ export default function InspectionPage() {
 
             {/* Session Queue List */}
             <div className="flex flex-col gap-3 mt-2 border-t border-slate-200/70 pt-4">
-              <h3 className={labelHeaderStyle}>Session Queue</h3>
+              <h3 className={labelHeaderStyle}>Recorded Incidents & Field Notes</h3>
 
               {sessionIncidents.length === 0 ? (
                 <div className="text-slate-400 text-sm italic">
-                  No incidents in this session yet.
+                  No recordings or field notes in this session yet.
                 </div>
               ) : (
-                <div className="flex flex-col gap-2.5 max-w-[560px]">
+                <div className="flex flex-col gap-2.5 max-w-[644px]">
                   {[...sessionIncidents]
                     .sort((a, b) => {
                       const timeA = a.timestamp || (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0);
@@ -701,34 +717,37 @@ export default function InspectionPage() {
 
                         {/* Row 2 : Col 1 : Right-aligned icon of Incident or Field Note */}
                         <div className="col-span-1 flex justify-end items-center">
-                          {incident.category === "fieldnote" ? (
-                            <span className="text-lg" title="Field Note" role="img" aria-label="Field Note">📋</span>
+                          {incident.category === "fieldnote" || incident.category === "field_note" ? (
+                            <span className="text-lg bg-amber-50 p-1.5 rounded-lg border border-amber-100/70" title="Field Note" role="img" aria-label="Field Note">📋</span>
                           ) : (
-                            <span className="text-lg" title="Incident" role="img" aria-label="Incident">📌</span>
+                            <span className="text-lg bg-blue-50 p-1.5 rounded-lg border border-blue-100/70" title="Incident" role="img" aria-label="Incident">📌</span>
                           )}
                         </div>
 
                         {/* Row 2 : Col 2 : Left-aligned icon of media type */}
                         <div className="col-span-1 flex justify-start items-center">
                           {incident.fileType && (
-                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-100 text-slate-400">
-                              {incident.fileType === "audio" && <FileAudio className="w-5 h-5 text-red-555" />}
-                              {incident.fileType === "video" && <FileVideo className="w-5 h-5 text-blue-555" />}
-                              {incident.fileType === "image" && <FileImage className="w-5 h-5 text-emerald-655" />}
+                            <div className={`p-2 rounded-lg border ${incident.fileType === "audio" ? "bg-[#800000]/8 border-[#800000]/15 text-[#800000]/80" :
+                              incident.fileType === "video" ? "bg-blue-50 border-blue-100 text-blue-500" :
+                                "bg-emerald-50 border-emerald-100 text-emerald-500"
+                              }`}>
+                              {incident.fileType === "audio" && <FileAudio className="w-5 h-5" />}
+                              {incident.fileType === "video" && <FileVideo className="w-5 h-5" />}
+                              {incident.fileType === "image" && <FileImage className="w-5 h-5" />}
                             </div>
                           )}
                         </div>
 
                         {/* Row 2 : Col 3 : Show display message after date time stamp */}
                         <div className="col-span-1 text-left min-w-0 flex items-center gap-2 flex-wrap">
-                          <span className="text-xs text-slate-700 font-semibold whitespace-nowrap">
+                          <span className="text-sm text-slate-700 font-semibold whitespace-nowrap">
                             {incident.uploadedAt}
                           </span>
                           {incident.displayMessage && (
                             <>
-                              <span className="text-slate-400 text-xs select-none">•</span>
+                              <span className="text-slate-400 text-sm select-none">•</span>
                               <span
-                                className={`text-xs truncate font-semibold ${incident.status === "Failed"
+                                className={`text-sm truncate font-semibold ${incident.status === "Failed"
                                   ? "text-rose-700"
                                   : "text-slate-700"
                                   }`}
@@ -878,6 +897,42 @@ export default function InspectionPage() {
                   )
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Permission Help Modal */}
+      {isPermissionModalOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="max-w-[400px] w-full bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
+            <div className="flex items-center gap-3 text-rose-600">
+              <AlertCircle className="w-6 h-6" />
+              <h3 className="text-lg font-bold">Permissions Required</h3>
+            </div>
+
+            <div className="text-sm text-slate-600 space-y-3">
+              <p>
+                We need access to your camera and microphone to record incidents and field notes. It seems permissions were denied.
+              </p>
+              <p className="font-semibold text-slate-800">How to fix this in Chrome:</p>
+              <ol className="list-decimal list-inside space-y-1.5 ml-1">
+                <li>Look at the URL address bar at the top of your browser.</li>
+                <li>Click the <strong>Lock (🔒)</strong> or <strong>Tune (⚲)</strong> icon on the left side of the URL.</li>
+                <li>Find <strong>Camera</strong> and <strong>Microphone</strong> in the menu.</li>
+                <li>Toggle them on or select <strong>Allow</strong>.</li>
+                <li>Reload this page.</li>
+              </ol>
+            </div>
+
+            <div className="flex justify-end mt-2">
+              <button
+                type="button"
+                onClick={() => setIsPermissionModalOpen(false)}
+                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

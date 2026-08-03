@@ -3,6 +3,7 @@
 import React, { useState, useEffect, forwardRef } from 'react';
 import ReactPlayer from 'react-player';
 import { BACKEND_URL } from '@/lib/api';
+import { auth } from '@/lib/firebase';
 
 interface VideoPlayerProps {
     /**
@@ -54,7 +55,16 @@ const VideoPlayer = forwardRef<any, VideoPlayerProps>(
                     const url = new URL(`${BACKEND_URL}/api/get-video-url`);
                     url.searchParams.set('path', filePath);
                     const headers: Record<string, string> = {};
-                    if (token) headers['Authorization'] = `Bearer ${token}`;
+                    
+                    let activeToken = token;
+                    if (auth.currentUser) {
+                        try {
+                            activeToken = await auth.currentUser.getIdToken();
+                        } catch (tokenErr) {
+                            console.error('Failed to get fresh token:', tokenErr);
+                        }
+                    }
+                    if (activeToken) headers['Authorization'] = `Bearer ${activeToken}`;
 
                     const resp = await fetch(url.toString(), { headers });
                     if (!resp.ok) throw new Error(`get-video-url failed: ${resp.status}`);

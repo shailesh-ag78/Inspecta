@@ -22,7 +22,9 @@ export default function IncidentSelectionPane() {
     millerIncidents,
   } = useDashboard();
 
-  const availableInspections = siteInspections.filter(ins => selectedMillerSites.includes(ins.site_name));
+  const availableInspections = siteInspections
+    .filter(ins => selectedMillerSites.includes(ins.site_name))
+    .sort((a, b) => new Date(b.inspection_created_at || 0).getTime() - new Date(a.inspection_created_at || 0).getTime());
 
   const currentSiteName = selectedMillerSites.length === 0
     ? "None"
@@ -122,7 +124,11 @@ export default function IncidentSelectionPane() {
                   </button>
                 </div>
 
-                {backendSites.map(site => {
+                {[...backendSites].sort((a, b) => {
+                  const nameA = a.site_name || a.name || '';
+                  const nameB = b.site_name || b.name || '';
+                  return nameA.localeCompare(nameB);
+                }).map(site => {
                   const siteId = String(site.site_name || site.name || '');
                   const isChecked = selectedMillerSites.includes(siteId);
                   return (
@@ -227,7 +233,7 @@ export default function IncidentSelectionPane() {
               {millerIncidents.length === 0 ? (
                 <div className="text-xs text-slate-450 italic px-2 py-1">No incidents found</div>
               ) : (
-                millerIncidents.map(incident => {
+                [...millerIncidents].sort((a, b) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime()).map(incident => {
                   const isChecked = selectedMillerIncidents.includes(incident.id);
                   const label = incident.title || `Incident ${incident.id.slice(0, 4)}`;
                   return (
