@@ -2,44 +2,22 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useDashboard } from "@/lib/context";
-import {
-  Plus,
-  Video,
-  Mic,
-  Camera,
-  Upload,
-  Square,
-  CheckCircle2,
-  Loader2,
-  AlertCircle,
-  FileImage,
-  FileAudio,
-  FileVideo,
-  X,
-  ChevronRight
-} from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import { authenticatedFetch, uploadMediaFile as apiUploadMediaFile } from "@/lib/api";
 import { saveBundleToIdb, AttachedMedia, IncidentBundle } from "@/lib/idb";
 
-const MAX_SESSION_INCIDENTS = 5; // Limit the number of incidents in the session queue
+// Import Refactored Components
+import { RecordingOverlay } from "@/components/RecordingOverlay";
+import { IncidentsUploadList, IncidentUpload } from "@/components/IncidentsUploadList";
+import { ActionOptions } from "@/components/ActionOptions";
+import { InspectionSelector } from "@/components/InspectionSelector";
+import { PermissionHelpModal } from "@/components/PermissionHelpModal";
+
+const MAX_INCIDENT_UPLOADS = 5; // Limit the number of incidents in the session queue
 const MAX_SESSION_PHOTOS = 5; // Limit max photos attached per recording
 const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
 
-interface SessionIncident {
-  id: string;
-  incidentId?: string; // The actual incident ID from the backend
-  fileName: string;
-  fileType: "audio" | "video" | "image";
-  uploadedAt: string;
-  status: "Uploading" | "Processing" | "Completed" | "Failed";
-  inspectionName: string;
-  siteName: string;
-  category: "incident" | "field_note";
-  attachedPhotosCount?: number;
-  pollingIntervalId?: any;
-  displayMessage?: string;
-  timestamp?: number;
-}
+// Interface moved to components/IncidentsUploadList.tsx
 
 export default function InspectionPage() {
   const {
@@ -47,8 +25,8 @@ export default function InspectionPage() {
     siteInspections,
     handleAddInspectionSubmit,
     fetchSiteInspections,
-    sessionIncidents,
-    setSessionIncidents,
+    incidentUploads,
+    setIncidentUploads,
     notifications,
     setNotifications,
     isNotificationsOpen,
@@ -283,7 +261,7 @@ export default function InspectionPage() {
         await saveBundleToIdb(bundle);
 
         // Add to UI Queue
-        setSessionIncidents(prev => [{
+        setIncidentUploads(prev => [{
           id: bundleId,
           fileName: filename,
           fileType: pType,
@@ -513,8 +491,8 @@ export default function InspectionPage() {
     try {
       const { incidentId } = await apiUploadMediaFile(file, selectedInspectionId, onProgress, currentBundleIdRef.current);
 
-      setSessionIncidents(prev => {
-        const newIncident: SessionIncident = {
+      setIncidentUploads(prev => {
+        const newIncident: IncidentUpload = {
           id: newId,
           incidentId,
           fileName: file.name,
@@ -528,7 +506,7 @@ export default function InspectionPage() {
           category
         };
         const updatedList = [newIncident, ...prev];
-        return updatedList.slice(0, MAX_SESSION_INCIDENTS);
+        return updatedList.slice(0, MAX_INCIDENT_UPLOADS);
       });
 
       await pollIncidentStatus(incidentId, newId);
@@ -616,259 +594,39 @@ export default function InspectionPage() {
     }
   };
 
-
-  // Increased header/label text size formatting class
-  const labelHeaderStyle = "text-base font-bold text-slate-700 tracking-wide";
-
-  // Hyperlink aesthetic class matching "+ Create New Inspection"
-  const hyperlinkStyle = "text-base font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
-
   return (
     <div className="h-full w-full overflow-y-auto bg-bg dropdown-scrollbar">
       <div className="p-6 flex flex-col items-start justify-start w-full">
         <div className="w-full bg-pane-bg/98 rounded-2xl border border-slate-200/70 shadow-md overflow-hidden flex flex-col">
-
+          
           {/* Configuration Body Content */}
           <div className="p-5 flex flex-col gap-6">
+            
+            <InspectionSelector
+              backendSites={backendSites}
+              selectedSiteId={selectedSiteId}
+              setSelectedSiteId={setSelectedSiteId}
+              filteredInspections={filteredInspections}
+              selectedInspectionId={selectedInspectionId}
+              setSelectedInspectionId={setSelectedInspectionId}
+              isSiteDisabled={isSiteDisabled}
+              isAddingInspectionInline={isAddingInspectionInline}
+              setIsAddingInspectionInline={setIsAddingInspectionInline}
+              newInspectionTitle={newInspectionTitle}
+              setNewInspectionTitle={setNewInspectionTitle}
+              newInspectionDescription={newInspectionDescription}
+              setNewInspectionDescription={setNewInspectionDescription}
+              isCreatingInspection={isCreatingInspection}
+              handleCreateInspection={handleCreateInspection}
+              inspectionError={inspectionError}
+              formatDate={formatDate}
+            />
 
-            {/* Site Selector (Bounded/fixed width) */}
-            <div className="flex flex-col gap-2 w-full max-w-[485px]">
-              <label className={labelHeaderStyle}>
-                Select Site on which incident to be added
-              </label>
-              <select
-                value={selectedSiteId}
-                onChange={(e) => setSelectedSiteId(e.target.value)}
-                className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11"
-              >
-                {backendSites.length === 0 ? (
-                  <option value="">No Sites Available</option>
-                ) : (
-                  backendSites.map(site => (
-                    <option key={site.site_id || site.id} value={site.site_id || site.id}>
-                      🏢 {site.site_name || site.name}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            {/* Inspection Selector & Inline Action (Bounded/fixed width) with increased gap */}
-            <div className="flex flex-col gap-3 w-full max-w-[485px]">
-              <div className="flex flex-col gap-2">
-                <label className={labelHeaderStyle}>Inspection</label>
-                <select
-                  value={selectedInspectionId}
-                  disabled={isSiteDisabled}
-                  onChange={(e) => setSelectedInspectionId(e.target.value)}
-                  className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11 disabled:opacity-50"
-                >
-                  {filteredInspections.length === 0 ? (
-                    <option value="">No Inspections Available under Site</option>
-                  ) : (
-                    filteredInspections.map(ins => {
-                      const dateStr = formatDate(ins.inspection_created_at);
-                      const displayLabel = dateStr ? `${ins.label} (${dateStr})` : ins.label;
-                      return (
-                        <option key={ins.inspection_id} value={ins.inspection_id || ""}>
-                          🔍 {displayLabel}
-                        </option>
-                      );
-                    })
-                  )}
-                </select>
-              </div>
-
-              {/* Inline Action Trigger */}
-              <div className="flex flex-col gap-2 mt-0.5">
-                {!isAddingInspectionInline ? (
-                  <button
-                    type="button"
-                    disabled={isSiteDisabled}
-                    onClick={() => setIsAddingInspectionInline(true)}
-                    className="text-base font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 self-start transition-colors px-1 py-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Plus className="w-5 h-5 text-blue-600" />
-                    <span>Create New Inspection</span>
-                  </button>
-                ) : (
-                  <form onSubmit={handleCreateInspection} className="flex flex-col gap-3.5 bg-slate-50 p-4 rounded-lg border border-slate-200/80 animate-fadeIn">
-                    <span className="text-xs text-slate-600 font-bold uppercase">Adding New Inspection</span>
-
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] text-slate-500 font-bold">Inspection Title</label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Safety Audit - Boiler Room"
-                        value={newInspectionTitle}
-                        onChange={(e) => setNewInspectionTitle(e.target.value)}
-                        className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] text-slate-500 font-bold">Description (Optional)</label>
-                      <textarea
-                        placeholder="Add an optional description about this audit..."
-                        value={newInspectionDescription}
-                        rows={2}
-                        onChange={(e) => setNewInspectionDescription(e.target.value)}
-                        className="text-sm bg-white border border-slate-200 rounded-lg px-3 py-2 text-slate-800 focus:outline-none focus:border-blue-500 resize-none"
-                      />
-                    </div>
-
-                    <div className="flex gap-2.5 justify-end">
-                      <button
-                        type="button"
-                        onClick={() => setIsAddingInspectionInline(false)}
-                        className="px-3.5 py-2 bg-slate-200 text-slate-700 rounded-lg text-xs font-bold hover:bg-slate-300 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isCreatingInspection || !newInspectionTitle.trim()}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
-                      >
-                        {isCreatingInspection ? "Saving..." : "Save"}
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {inspectionError && (
-                  <p className="text-xs text-rose-500 bg-rose-50 border border-rose-100 rounded-lg px-3 py-1.5 flex items-center gap-1">
-                    <AlertCircle className="w-3.5 h-3.5" />
-                    <span>{inspectionError}</span>
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Option A: Add New Incident */}
-            <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-              <h4 className={`${labelHeaderStyle} flex items-center gap-2`}>
-                <span className="text-base bg-blue-50 p-1.5 rounded-lg border border-blue-100/70 inline-flex items-center justify-center w-8 h-8 select-none">📌</span>
-                <span>Add New Incident</span>
-              </h4>
-              <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
-                <button
-                  type="button"
-                  disabled={isSiteDisabled}
-                  onClick={() => openRecordingOverlay("audio", "incident")}
-                  className={hyperlinkStyle}
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Mic className="w-5 h-5 text-[#800000] shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left">Record Audio</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  disabled={isSiteDisabled}
-                  onClick={() => openRecordingOverlay("video", "incident")}
-                  className={hyperlinkStyle}
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Video className="w-5 h-5 text-blue-600 shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left">Record Video</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  disabled={true}
-                  onClick={() => openRecordingOverlay("image", "incident")}
-                  className={hyperlinkStyle}
-                  title="Picture option under Add New Incident is disabled (will be implemented at a later stage)"
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Camera className="w-5 h-5 text-green-600 shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left font-normal text-slate-400">Picture (Disabled)</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  disabled={isSiteDisabled}
-                  onClick={() => triggerFileUpload("incident")}
-                  className={hyperlinkStyle}
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Upload className="w-5 h-5 text-purple-600 shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left">Upload File</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            {/* Option B: Add Field Note */}
-            <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-              <h4 className={`${labelHeaderStyle} flex items-center gap-2`}>
-                <span className="text-base bg-amber-50 p-1.5 rounded-lg border border-amber-100/70 inline-flex items-center justify-center w-8 h-8 select-none">📋</span>
-                <span>Add Field Note</span>
-              </h4>
-              <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
-                <button
-                  type="button"
-                  disabled={isSiteDisabled}
-                  onClick={() => openRecordingOverlay("audio", "field_note")}
-                  className={hyperlinkStyle}
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Mic className="w-5 h-5 text-[#800000] shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left">Record Audio</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  disabled={isSiteDisabled}
-                  onClick={() => openRecordingOverlay("video", "field_note")}
-                  className={hyperlinkStyle}
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Video className="w-5 h-5 text-blue-600 shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left">Record Video</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  disabled={isSiteDisabled}
-                  onClick={() => openRecordingOverlay("image", "field_note")}
-                  className={hyperlinkStyle}
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Camera className="w-5 h-5 text-green-600 shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left">Picture</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  disabled={isSiteDisabled}
-                  onClick={() => triggerFileUpload("field_note")}
-                  className={hyperlinkStyle}
-                >
-                  <div className="flex items-center">
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                      <Upload className="w-5 h-5 text-purple-600 shrink-0" />
-                    </div>
-                    <span className="ml-3 text-left">Upload File</span>
-                  </div>
-                </button>
-              </div>
-            </div>
+            <ActionOptions
+              isSiteDisabled={isSiteDisabled}
+              openRecordingOverlay={openRecordingOverlay}
+              triggerFileUpload={triggerFileUpload}
+            />
 
             <input
               type="file"
@@ -893,333 +651,43 @@ export default function InspectionPage() {
               </div>
             )}
 
-            {/* Session Queue List */}
-            <div className="flex flex-col gap-3 mt-2 border-t border-slate-200/70 pt-4">
-              <div className="flex justify-between items-center max-w-[644px]">
-                <h3 className={labelHeaderStyle}>Recorded Incidents & Field Notes</h3>
-                <button 
-                  onClick={clearLocalBundles}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
-                >
-                  Clear Local Storage
-                </button>
-              </div>
+            <IncidentsUploadList
+              incidentUploads={incidentUploads}
+              clearLocalBundles={clearLocalBundles}
+            />
 
-              {sessionIncidents.length === 0 ? (
-                <div className="text-slate-400 text-sm italic">
-                  No recordings or field notes in this session yet.
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2.5 max-w-[644px]">
-                  {[...sessionIncidents]
-                    .sort((a, b) => {
-                      const timeA = a.timestamp || (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0);
-                      const timeB = b.timestamp || (b.uploadedAt ? new Date(b.uploadedAt).getTime() : 0);
-                      return timeB - timeA;
-                    })
-                    .map((incident) => (
-                      <div
-                        key={incident.id}
-                        className="grid grid-cols-[auto_auto_1fr] gap-y-2 gap-x-4 items-center bg-white border border-slate-200 rounded-xl p-4 shadow-sm hover:border-slate-350 transition-colors"
-                      >
-                        {/* Row 1 : Col 1 and Col 2 merged : show Stats */}
-                        <div className="col-span-2 flex items-center justify-start">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider 
-                            ${incident.status === "Uploading" ? "bg-blue-50 text-blue-600 border border-blue-200/50" :
-                              incident.status === "Processing" ? "bg-amber-50 text-amber-600 border border-amber-200/50 animate-pulse" :
-                                incident.status === "Completed" ? "bg-emerald-50 text-emerald-600 border border-emerald-200/50" :
-                                  incident.status === "pending" ? "bg-slate-50 text-slate-600 border border-slate-200/50" :
-                                    "bg-rose-50 text-rose-600 border border-rose-200/50"
-                            }`}>
-                            {incident.status === "Processing" && <Loader2 className="w-2.5 h-2.5 animate-spin" />}
-                            {incident.status}
-                          </span>
-                        </div>
-
-                        {/* Row 1 : Col 3 : Show file name */}
-                        <div className="col-span-1 text-left min-w-0">
-                          <span className="text-sm font-bold text-slate-800 truncate block" title={incident.fileName}>
-                            {incident.incidentId ? incident.incidentId : ''} - {' '}
-                            {incident.fileName}
-                          </span>
-                        </div>
-
-                        {/* Row 2 : Col 1 : Right-aligned icon of Incident or Field Note */}
-                        <div className="col-span-1 flex justify-end items-center">
-                          {incident.category === "fieldnote" || incident.category === "field_note" ? (
-                            <span className="text-lg bg-amber-50 p-1.5 rounded-lg border border-amber-100/70" title="Field Note" role="img" aria-label="Field Note">📋</span>
-                          ) : (
-                            <span className="text-lg bg-blue-50 p-1.5 rounded-lg border border-blue-100/70" title="Incident" role="img" aria-label="Incident">📌</span>
-                          )}
-                        </div>
-
-                        {/* Row 2 : Col 2 : Left-aligned icon of media type */}
-                        <div className="col-span-1 flex justify-start items-center gap-2">
-                          {incident.fileType && (
-                            <div className={`p-2 rounded-lg border flex items-center justify-center ${incident.fileType === "audio" ? "bg-[#800000]/8 border-[#800000]/15 text-[#800000]/80" :
-                              incident.fileType === "video" ? "bg-blue-50 border-blue-100 text-blue-500" :
-                                "bg-emerald-50 border-emerald-100 text-emerald-500"
-                              }`}>
-                              {incident.fileType === "audio" && <FileAudio className="w-5 h-5" />}
-                              {incident.fileType === "video" && <FileVideo className="w-5 h-5" />}
-                              {incident.fileType === "image" && <FileImage className="w-5 h-5" />}
-                            </div>
-                          )}
-                          {/* Attachment Indicator */}
-                          {(incident.attachedPhotosCount || 0) > 0 && (
-                            <div className="flex items-center gap-1 px-2 py-1 bg-slate-100 rounded-md border border-slate-200 text-slate-600" title={`${incident.attachedPhotosCount} attached photos`}>
-                              <Camera className="w-3.5 h-3.5" />
-                              <span className="text-xs font-bold">{incident.attachedPhotosCount}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Row 2 : Col 3 : Show display message after date time stamp */}
-                        <div className="col-span-1 text-left min-w-0 flex items-center gap-2 flex-wrap">
-                          <span className="text-sm text-slate-700 font-semibold whitespace-nowrap">
-                            {incident.uploadedAt}
-                          </span>
-                          {incident.displayMessage && (
-                            <>
-                              <span className="text-slate-400 text-sm select-none">•</span>
-                              <span
-                                className={`text-sm truncate font-semibold ${incident.status === "Failed"
-                                  ? "text-rose-700"
-                                  : "text-slate-700"
-                                  }`}
-                                title={incident.displayMessage}
-                              >
-                                {incident.displayMessage}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
           </div>
         </div>
       </div>
 
-      {/* Recording Overlay Modal */}
-      {activeOverlay && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-[480px] w-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200">
-            {/* Modal Header */}
-            <div className="bg-slate-900 px-5 py-3 flex items-center justify-between border-b border-slate-855">
-              <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
-                {activeOverlay === "audio" && <Mic className="w-4 h-4 text-red-550" />}
-                {activeOverlay === "video" && <Video className="w-4 h-4 text-blue-550" />}
-                {activeOverlay === "image" && <Camera className="w-4 h-4 text-emerald-400" />}
-                <span>Record {activeOverlay} ({overlayCategory === "incident" ? "Incident" : "Field Note"})</span>
-              </h4>
-              <button
-                onClick={cleanUpMedia}
-                className="text-slate-400 hover:text-white p-1 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+      <RecordingOverlay
+        activeOverlay={activeOverlay}
+        overlayCategory={overlayCategory}
+        cleanUpMedia={cleanUpMedia}
+        videoRef={videoRef}
+        tempVideoRef={tempVideoRef}
+        photoPreview={photoPreview}
+        isAudioPhotoTaking={isAudioPhotoTaking}
+        isRecording={isRecording}
+        isRecordingPaused={isRecordingPaused}
+        recordDuration={recordDuration}
+        formatTimer={formatTimer}
+        startRecording={startRecording}
+        stopRecording={stopRecording}
+        snapSilentPhoto={snapSilentPhoto}
+        startAudioPhotoWorkflow={startAudioPhotoWorkflow}
+        captureAudioPhoto={captureAudioPhoto}
+        cancelAudioPhoto={cancelAudioPhoto}
+        snapPhoto={snapPhoto}
+        uploadPhoto={uploadPhoto}
+        setPhotoBlob={setPhotoBlob}
+        setPhotoPreview={setPhotoPreview}
+      />
 
-            {/* Modal Content */}
-            <div className="p-5 flex flex-col gap-4">
-              <div className="relative aspect-video w-full rounded-2xl bg-black overflow-hidden border border-slate-200 flex flex-col items-center justify-center">
-                {/* Video / Camera Viewport */}
-                {(activeOverlay === "video" || activeOverlay === "image") && !photoPreview && (
-                  <video
-                    ref={videoRef}
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                )}
-
-                {/* Taken Snapshot Viewport */}
-                {activeOverlay === "image" && photoPreview && (
-                  <img src={photoPreview} alt="Captured preview" className="w-full h-full object-contain" />
-                )}
-
-                {/* Temp Audio Photo Viewport */}
-                {activeOverlay === "audio" && isAudioPhotoTaking && (
-                  <video
-                    ref={tempVideoRef}
-                    muted
-                    playsInline
-                    className="w-full h-full object-cover"
-                  />
-                )}
-
-                {/* Audio Visualization UI */}
-                {activeOverlay === "audio" && !isAudioPhotoTaking && (
-                  <div className="flex flex-col items-center gap-3">
-                    <div className={`p-4 rounded-full bg-slate-900 text-blue-400 ${isRecording && !isRecordingPaused ? "animate-pulse border-2 border-red-500 text-red-500" : ""}`}>
-                      <Mic className="w-6 h-6" />
-                    </div>
-                    <span className="text-xs font-bold text-slate-400">
-                      {isRecording ? (isRecordingPaused ? "Audio paused for photo..." : "Live audio recording active...") : "Microphone ready"}
-                    </span>
-                  </div>
-                )}
-
-                {/* Recording duration badge */}
-                {isRecording && (
-                  <div className="absolute top-3 left-3 bg-black/60 border border-red-500/50 rounded-full px-2.5 py-0.5 text-[9px] text-red-400 font-extrabold flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
-                    <span>{formatTimer(recordDuration)}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Action buttons inside Overlay */}
-              <div className="flex justify-center gap-3">
-                {activeOverlay === "video" && (
-                  !isRecording ? (
-                    <button
-                      type="button"
-                      onClick={startRecording}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                    >
-                      <Video className="w-4 h-4" /> Start Video Record
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={snapSilentPhoto}
-                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                      >
-                        <Camera className="w-4 h-4" /> Snap Photo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={stopRecording}
-                        className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                      >
-                        <Square className="w-4 h-4 fill-white" /> Stop & Save
-                      </button>
-                    </>
-                  )
-                )}
-
-                {activeOverlay === "audio" && (
-                  !isRecording ? (
-                    <button
-                      type="button"
-                      onClick={startRecording}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                    >
-                      <Mic className="w-4 h-4" /> Start Audio Record
-                    </button>
-                  ) : (
-                    !isAudioPhotoTaking ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={startAudioPhotoWorkflow}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                        >
-                          <Camera className="w-4 h-4" /> Snap Photo
-                        </button>
-                        <button
-                          type="button"
-                          onClick={stopRecording}
-                          className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                        >
-                          <Square className="w-4 h-4 fill-white" /> Stop & Save
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={captureAudioPhoto}
-                          className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                        >
-                          <Camera className="w-4 h-4" /> Capture Now
-                        </button>
-                        <button
-                          type="button"
-                          onClick={cancelAudioPhoto}
-                          className="flex items-center gap-1.5 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                        >
-                          <X className="w-4 h-4" /> Cancel
-                        </button>
-                      </>
-                    )
-                  )
-                )}
-
-                {activeOverlay === "image" && (
-                  !photoPreview ? (
-                    <button
-                      type="button"
-                      onClick={snapPhoto}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                    >
-                      <Camera className="w-4 h-4" /> Snap Snapshot
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={uploadPhoto}
-                        className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-750 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
-                      >
-                        <CheckCircle2 className="w-4 h-4" /> Upload Photo
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setPhotoBlob(null); setPhotoPreview(null); }}
-                        className="px-4 py-2 bg-slate-100 hover:bg-slate-255 text-slate-600 rounded-full text-xs font-bold"
-                      >
-                        Retake
-                      </button>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Permission Help Modal */}
-      {isPermissionModalOpen && (
-        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="max-w-[400px] w-full bg-white rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
-            <div className="flex items-center gap-3 text-rose-600">
-              <AlertCircle className="w-6 h-6" />
-              <h3 className="text-lg font-bold">Permissions Required</h3>
-            </div>
-
-            <div className="text-sm text-slate-600 space-y-3">
-              <p>
-                We need access to your camera and microphone to record incidents and field notes. It seems permissions were denied.
-              </p>
-              <p className="font-semibold text-slate-800">How to fix this in Chrome:</p>
-              <ol className="list-decimal list-inside space-y-1.5 ml-1">
-                <li>Look at the URL address bar at the top of your browser.</li>
-                <li>Click the <strong>Lock (🔒)</strong> or <strong>Tune (⚲)</strong> icon on the left side of the URL.</li>
-                <li>Find <strong>Camera</strong> and <strong>Microphone</strong> in the menu.</li>
-                <li>Toggle them on or select <strong>Allow</strong>.</li>
-                <li>Reload this page.</li>
-              </ol>
-            </div>
-
-            <div className="flex justify-end mt-2">
-              <button
-                type="button"
-                onClick={() => setIsPermissionModalOpen(false)}
-                className="px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PermissionHelpModal
+        isPermissionModalOpen={isPermissionModalOpen}
+        setIsPermissionModalOpen={setIsPermissionModalOpen}
+      />
     </div>
   );
 }

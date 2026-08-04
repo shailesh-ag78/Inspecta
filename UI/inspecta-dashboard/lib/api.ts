@@ -224,10 +224,6 @@ export async function uploadMediaFile(
   }
 }
 
-// Stub implementations for recording and picture taking
-export const recordVideo = async (): Promise<File> => { throw new Error("recordVideo not implemented"); };
-export const recordAudio = async (): Promise<File> => { throw new Error("recordAudio not implemented"); };
-export const takePicture = async (): Promise<File> => { throw new Error("takePicture not implemented"); };
 
 /** Fetches recent incidents for the active company. */
 export async function getRecentIncidents(days: number = 7, limit: number = 10): Promise<any[]> {

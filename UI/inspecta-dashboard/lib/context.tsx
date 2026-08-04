@@ -113,8 +113,8 @@ interface DashboardContextType {
   millerIncidents: any[];
   setMillerIncidents: React.Dispatch<React.SetStateAction<any[]>>;
   millerIncidentsLoading: boolean;
-  sessionIncidents: any[];
-  setSessionIncidents: React.Dispatch<React.SetStateAction<any[]>>;
+  incidentUploads: any[];
+  setIncidentUploads: React.Dispatch<React.SetStateAction<any[]>>;
   notifications: any[];
   setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
   isNotificationsOpen: boolean;
@@ -149,7 +149,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [headerSiteName, setHeaderSiteName] = useState<string>('');
   const [headerInspectionName, setHeaderInspectionName] = useState<string>('');
 
-  const [sessionIncidents, setSessionIncidents] = useState<any[]>([]);
+  const [incidentUploads, setIncidentUploads] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
 
@@ -179,7 +179,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
     const poll = async () => {
       if (Date.now() - startTime >= 180000) {
-        setSessionIncidents(prev =>
+        setIncidentUploads(prev =>
           prev.map(inc => inc.id === sessionId ? { ...inc, status: "Failed", displayMessage: "Analysis failed.", pollingIntervalId: undefined } : inc)
         );
         setNotifications(prev => [
@@ -206,7 +206,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         const statusMsg = statusData.display_message || "";
         console.log("Incident Status : ", statusMsg);
 
-        setSessionIncidents(prev =>
+        setIncidentUploads(prev =>
           prev.map(inc => {
             if (inc.id === sessionId) {
               const mappedStatus = isFinished ? (isFailed ? "Failed" : "Completed") : "Processing";
@@ -242,7 +242,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             },
             ...prev
           ]);
-          setSessionIncidents(prev =>
+          setIncidentUploads(prev =>
             prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: undefined } : inc)
           );
           return;
@@ -254,7 +254,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       currentDelay = Math.min(currentDelay * 1.5, 30000);
       timeoutId = setTimeout(poll, currentDelay);
 
-      setSessionIncidents(prev =>
+      setIncidentUploads(prev =>
         prev.map(inc => inc.id === sessionId ? { ...inc, pollingIntervalId: timeoutId } : inc)
       );
     };
@@ -287,7 +287,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         await saveBundleToIdb(bundle);
 
         // Update UI
-        setSessionIncidents(prev =>
+        setIncidentUploads(prev =>
           prev.map(inc => inc.id === bundle.id ? { ...inc, status: "Uploading", displayMessage: `Uploading ${bundle.primaryType}...` } : inc)
         );
 
@@ -297,7 +297,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           const primaryFile = new File([bundle.primaryBlob], bundle.primaryFilename, { type: bundle.primaryBlob.type });
           console.log(`[Queue] Uploading primary file: ${bundle.primaryFilename}`);
           const { incidentId } = await uploadMediaFile(primaryFile, bundle.inspectionId, (status, message) => {
-            setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: message || status } : inc));
+            setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: message || status } : inc));
           });
           console.log(`[Queue] Primary file uploaded successfully. Incident ID: ${incidentId}`);
           
@@ -310,7 +310,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             const attFile = new File([attachment.blob], attachment.filename, { type: attachment.blob.type });
             
             console.log(`[Queue] Uploading attachment ${i + 1}/${attachments.length}: ${attachment.filename}`);
-            setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: `Uploading image ${i + 1} of ${attachments.length}...` } : inc));
+            setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: `Uploading image ${i + 1} of ${attachments.length}...` } : inc));
             
             try {
               // We associate attachments with the same inspection, and potentially the same incident (backend support pending, using inspection for now)
@@ -327,7 +327,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             console.log(`[Queue] Bundle ${bundle.id} uploaded completely.`);
             // Delete from IDB on full success
             await deleteBundleFromIdb(bundle.id);
-            setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, status: "Processing", incidentId, displayMessage: "Upload complete, polling status..." } : inc));
+            setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, status: "Processing", incidentId, displayMessage: "Upload complete, polling status..." } : inc));
             pollIncidentStatus(incidentId, bundle.id);
           } else {
             throw new Error("Attachment upload failed");
@@ -339,7 +339,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           bundle.status = bundle.retries >= 3 ? "failed" : "pending";
           await saveBundleToIdb(bundle);
 
-          setSessionIncidents(prev => prev.map(inc => inc.id === bundle.id ? {
+          setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? {
             ...inc,
             status: bundle.status === "failed" ? "Failed" : "pending",
             displayMessage: bundle.status === "failed" ? "Upload failed after 3 retries." : "Upload failed, will retry."
@@ -358,7 +358,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       const { clearAllBundlesFromIdb } = await import('./idb');
       await clearAllBundlesFromIdb();
       // Remove any pending/failed items from session queue
-      setSessionIncidents(prev => prev.filter(inc => inc.status !== "pending" && inc.status !== "Failed"));
+      setIncidentUploads(prev => prev.filter(inc => inc.status !== "pending" && inc.status !== "Failed"));
     } catch (e) {
       console.error("Failed to clear local bundles:", e);
     }
@@ -399,7 +399,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         };
       });
 
-      setSessionIncidents(formattedRecent);
+      setIncidentUploads(formattedRecent);
 
       // Hydrate notifications from the loaded incidents (if they are Completed or Failed)
       // Only do this if localStorage doesn't have any notifications to prevent duplicates
@@ -438,7 +438,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       fetchRecentIncidents();
     } else {
       // Clear states when logged out
-      setSessionIncidents([]);
+      setIncidentUploads([]);
       setNotifications([]);
       localStorage.removeItem("inspecta_notifications");
     }
@@ -447,11 +447,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   // Cleanup polling intervals on unmount
   useEffect(() => {
     return () => {
-      sessionIncidents.forEach(inc => {
+      incidentUploads.forEach(inc => {
         if (inc.pollingIntervalId) clearTimeout(inc.pollingIntervalId);
       });
     };
-  }, [sessionIncidents]);
+  }, [incidentUploads]);
 
   // Loading and error states
   const [siteInspectionsLoading, setSiteInspectionsLoading] = useState(true);
@@ -534,7 +534,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setIncidents([]);
       setTasks([]);
       setCompanyName(null);
-      setSessionIncidents([]);
+      setIncidentUploads([]);
       setBackendSites([]);
     } catch (e) {
       console.error('Logout error:', e);
@@ -1102,8 +1102,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         millerIncidents,
         setMillerIncidents,
         millerIncidentsLoading,
-        sessionIncidents,
-        setSessionIncidents,
+        incidentUploads,
+        setIncidentUploads,
         notifications,
         setNotifications,
         isNotificationsOpen,

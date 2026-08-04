@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, setPersistence, browserSessionPersistence, browserLocalPersistence } from 'firebase/auth';
 
 // const firebaseConfig = {
 //   apiKey: "AIzaSyAj9IYu7uM7LkaL4B0I3sEyU9lCLXpe1v4",
@@ -27,7 +27,10 @@ const app = (isBrowser || hasApiKey) ? (getApps().length === 0 ? initializeApp(f
 const auth = app ? getAuth(app) : ({} as any);
 
 if (isBrowser && app) {
-  setPersistence(auth, browserSessionPersistence).catch((err) => {
+  // Use local persistence in development for convenience, and session persistence in production for security.
+  const persistenceMode = process.env.NODE_ENV === 'development' ? browserLocalPersistence : browserSessionPersistence;
+  
+  setPersistence(auth, persistenceMode).catch((err) => {
     console.error("Failed to set Firebase session persistence:", err);
   });
 }
