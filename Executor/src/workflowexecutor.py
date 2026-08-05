@@ -537,7 +537,8 @@ class WorkflowExecutor:
                                                 video_url=state.get("video_url", ""), 
                                                 translation_language = state["translation_language"],
                                                 env_mode=env_mode)
-            logger.info(f"Extracted summary: {summary}, from tasks JSON URL: {tasks_json_url}")
+            # ToDo : Add Summary in Incident Table. Show it in UI
+            # logger.info(f"Extracted summary: {summary}, from tasks JSON URL: {tasks_json_url}")
                 
             # PERSISTENCE: Bulk insert final tasks
             await self.repo.bulk_add_incident_tasks(

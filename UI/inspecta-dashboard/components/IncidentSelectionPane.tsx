@@ -88,14 +88,14 @@ export default function IncidentSelectionPane() {
                 title="Expand sites column"
               >
                 <ChevronLeft className="w-3.5 h-3.5 text-slate-500 transform rotate-180 mb-4" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest [writing-mode:vertical-lr] rotate-180 select-none">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest [writing-mode:vertical-lr] rotate-180 select-none">
                   SITES ({selectedMillerSites.length})
                 </span>
               </div>
             ) : (
               <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin flex flex-col">
                 <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
-                  <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider px-1 shrink-0">
+                  <span className="text-xs font-bold text-amber-800 uppercase tracking-wider px-1 shrink-0">
                     Sites ({selectedMillerSites.length})
                   </span>
                   <div className="flex items-center gap-2 text-[11px] ml-auto mr-1.5">
@@ -143,7 +143,7 @@ export default function IncidentSelectionPane() {
                         }}
                         className="sr-only"
                       />
-                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                         {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                       </div>
                       <span className="truncate">🏢 {siteId}</span>
@@ -156,7 +156,7 @@ export default function IncidentSelectionPane() {
             {/* Column 2: Inspections */}
             <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin">
               <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
-                <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider px-1 shrink-0">
+                <span className="text-xs font-bold text-blue-600 uppercase tracking-wider px-1 shrink-0">
                   Inspections ({selectedMillerInspections.length})
                 </span>
                 <div className="flex items-center gap-2 text-[11px] ml-auto px-1">
@@ -194,7 +194,7 @@ export default function IncidentSelectionPane() {
                       }}
                       className="sr-only"
                     />
-                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
+                    <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                       {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                     </div>
                     <span className="truncate">🔍 {item.label}</span>
@@ -206,7 +206,7 @@ export default function IncidentSelectionPane() {
             {/* Column 3: Incidents */}
             <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin">
               <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
-                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider px-1 shrink-0">
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider px-1 shrink-0">
                   Incidents ({selectedMillerIncidents.length})
                 </span>
                 {millerIncidents.length > 0 && (
@@ -248,7 +248,7 @@ export default function IncidentSelectionPane() {
                         }}
                         className="sr-only"
                       />
-                      <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                         {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                       </div>
                       <span className="truncate">📌 {label}</span>

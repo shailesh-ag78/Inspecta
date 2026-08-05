@@ -514,7 +514,7 @@ export default function TaskManagementPage() {
               onClick={() => setIsFiltersCollapsed(!isFiltersCollapsed)}
               className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors"
             >
-              <h3 className="text-sm font-bold text-slate-500 flex items-center gap-2">
+              <h3 className="text-base font-bold text-slate-500 flex items-center gap-2">
                 <i className="fa-solid fa-filter text-slate-600 text-lg mr-2"></i>
                 <span className="tracking-wide">Task Filters</span>
                 <button
@@ -528,7 +528,7 @@ export default function TaskManagementPage() {
                   className={`p-1 rounded-lg border transition-all ${isGlobalTranslationEnabled ? 'bg-blue-100 border-blue-200 shadow-sm' : 'hover:bg-slate-200 border-transparent'}`}
                   title="Toggle default translation for all tasks"
                 >
-                  <img src="/trasnlation_icon.png" alt="Translate" className="w-4 h-4 object-contain scale-[1.25]" />
+                  <img src="/trasnlation_icon.png" alt="Translate" className="w-4 h-4 object-contain scale-[1.5]" />
                 </button>
               </h3>
               <div className="flex items-center gap-2">
@@ -548,7 +548,7 @@ export default function TaskManagementPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Types Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Task Type</h4>
+                    <h4 className="text-sm font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Task Type</h4>
                     <div className="flex flex-col gap-2">
                       {[
                         { id: 'install', label: '🛠️ Install' },
@@ -558,7 +558,7 @@ export default function TaskManagementPage() {
                       ].map((t) => {
                         const isChecked = filters.task_types.includes(t.id);
                         return (
-                          <label key={t.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                          <label key={t.id} className="flex items-center gap-2.5 text-sm font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -589,7 +589,7 @@ export default function TaskManagementPage() {
 
                   {/* Severity Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Severity</h4>
+                    <h4 className="text-sm font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Severity</h4>
                     <div className="flex flex-col gap-2">
                       {[
                         { id: 1, label: '🔴 Severe' },
@@ -598,7 +598,7 @@ export default function TaskManagementPage() {
                       ].map((sev) => {
                         const isChecked = filters.severities.includes(sev.id);
                         return (
-                          <label key={sev.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                          <label key={sev.id} className="flex items-center gap-2.5 text-sm font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -629,7 +629,7 @@ export default function TaskManagementPage() {
 
                   {/* Status Filter */}
                   <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
-                    <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status</h4>
+                    <h4 className="text-sm font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Status</h4>
                     <div className="flex flex-col gap-2">
                       {[
                         { id: 'pending', label: '🕒 Pending' },
@@ -640,7 +640,7 @@ export default function TaskManagementPage() {
                       ].map((st) => {
                         const isChecked = filters.task_statuses.includes(st.id);
                         return (
-                          <label key={st.id} className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                          <label key={st.id} className="flex items-center gap-2.5 text-sm font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
                             <input
                               type="checkbox"
                               checked={isChecked}
@@ -670,11 +670,11 @@ export default function TaskManagementPage() {
                   </div>
 
                   {/* Quick Filters */}
-                  <div className="py-1.5 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm flex flex-col justify-between">
+                  <div className="py-2 px-3 rounded-xl border border-blue-200/50 bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm flex flex-col justify-between">
                     <div>
-                      <h4 className="text-xs font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Quick Filters</h4>
+                      <h4 className="text-sm font-bold text-slate-800 mb-1.5 uppercase tracking-wider">Quick Filters</h4>
                       <div className="flex flex-col gap-2">
-                        <label className="flex items-center gap-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
+                        <label className="flex items-center gap-2.5 text-sm font-semibold text-slate-600 hover:text-slate-900 cursor-pointer select-none py-1">
                           <input
                             type="checkbox"
                             checked={assignedToMe}
@@ -695,9 +695,10 @@ export default function TaskManagementPage() {
                           </div>
                           <span>👤 My Tasks</span>
                         </label>
+                        <hr className="border-t border-blue-200/50" />
 
-                        <div className="relative group flex flex-col gap-0.5">
-                          <span className="text-[11px] font-semibold text-slate-600 select-none">Created in last</span>
+                        <div className="relative group flex flex-col gap-1">
+                          <span className="text-sm font-semibold text-slate-600 select-none">Created in last</span>
                           <div className="flex items-center border border-slate-300 rounded-lg bg-white overflow-hidden shadow-sm w-full">
                             <input
                               type="number"
@@ -708,7 +709,7 @@ export default function TaskManagementPage() {
                                 const val = e.target.value === '' ? '' : parseInt(e.target.value);
                                 setDaysFilter(val);
                               }}
-                              className="w-12 px-2 py-0.5 text-xs border-r border-slate-200 focus:outline-none text-slate-700 font-semibold"
+                              className="w-15 px-2 py-0.5 text-sm border-r border-slate-200 focus:outline-none text-slate-700 font-semibold"
                             />
                             <select
                               value={daysFilter === '' ? 'custom' : daysFilter}
@@ -840,7 +841,7 @@ export default function TaskManagementPage() {
                       </div>
                       <div className="grid grid-cols-2 gap-2.5 p-0.1 text-[8.5px] text-slate-700">
                         <div className="h-9 w-full flex flex-row items-center justify-center gap-1.5 bg-red-50/70 border border-red-200/60 rounded-lg shadow-sm">
-                          <span className="text-[10px] text-red-600 font-bold uppercase leading-none">Severe:</span>
+                          <span className="text-[11px] text-red-600 font-bold uppercase leading-none">Severe:</span>
                           <span className="text-[13px] font-extrabold text-red-700 leading-none">{kpiSeverityCounts.severe}</span>
                         </div>
                         <div className="h-9 w-full flex flex-row items-center justify-center gap-1.5 bg-yellow-50/70 border border-yellow-200/60 rounded-lg shadow-sm">
