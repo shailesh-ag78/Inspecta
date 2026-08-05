@@ -253,7 +253,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 title={isSidebarCollapsed ? tab.label : undefined}
                 className={`flex items-center transition-all ${isSidebarCollapsed
                   ? "justify-center w-10 h-10 rounded-xl"
-                  : "gap-4 px-3 py-2 rounded-xl text-sm font-semibold tracking-wide w-full"
+                  : "gap-4 px-3 py-2 rounded-xl text-base font-semibold tracking-wide w-full"
                   } ${isActive
                     ? "bg-white/15 text-white border border-white/10 shadow-sm"
                     : "text-white/60 hover:text-white hover:bg-white/5 border border-transparent"

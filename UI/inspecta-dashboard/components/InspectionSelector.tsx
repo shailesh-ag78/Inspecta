@@ -52,14 +52,14 @@ export function InspectionSelector({
         <select
           value={selectedSiteId}
           onChange={(e) => setSelectedSiteId(e.target.value)}
-          className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11"
+          className="w-full text-base font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11"
         >
           {backendSites.length === 0 ? (
             <option value="">No Sites Available</option>
           ) : (
             backendSites.map((site) => (
-              <option key={site.site_id || site.id} value={site.site_id || site.id}>
-                🏢 {site.site_name || site.name}
+              <option key={site.site_id || site.id} value={site.site_id || site.id} className="text-base">
+                🏢  {site.site_name || site.name}
               </option>
             ))
           )}
@@ -74,7 +74,7 @@ export function InspectionSelector({
             value={selectedInspectionId}
             disabled={isSiteDisabled}
             onChange={(e) => setSelectedInspectionId(e.target.value)}
-            className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11 disabled:opacity-50"
+            className="w-full text-base font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11 disabled:opacity-50"
           >
             {filteredInspections.length === 0 ? (
               <option value="">No Inspections Available under Site</option>
@@ -83,8 +83,8 @@ export function InspectionSelector({
                 const dateStr = formatDate(ins.inspection_created_at);
                 const displayLabel = dateStr ? `${ins.label} (${dateStr})` : ins.label;
                 return (
-                  <option key={ins.inspection_id} value={ins.inspection_id || ""}>
-                    🔍 {displayLabel}
+                  <option key={ins.inspection_id} value={ins.inspection_id || ""} className="text-base">
+                    🔍  {displayLabel}
                   </option>
                 );
               })
