@@ -47,7 +47,7 @@ export function InspectionSelector({
       {/* Site Selector (Bounded/fixed width) */}
       <div className="flex flex-col gap-2 w-full max-w-[485px]">
         <label className={labelHeaderStyle}>
-          Select Site on which incident to be added
+          Site for Incident
         </label>
         <select
           value={selectedSiteId}
@@ -69,7 +69,7 @@ export function InspectionSelector({
       {/* Inspection Selector & Inline Action (Bounded/fixed width) with increased gap */}
       <div className="flex flex-col gap-3 w-full max-w-[485px]">
         <div className="flex flex-col gap-2">
-          <label className={labelHeaderStyle}>Inspection</label>
+          <label className={labelHeaderStyle}>Inspection for Incident</label>
           <select
             value={selectedInspectionId}
             disabled={isSiteDisabled}

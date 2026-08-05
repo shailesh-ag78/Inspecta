@@ -19,7 +19,7 @@ export function ActionOptions({
     <>
       {/* Option A: Add New Incident */}
       <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-        <h4 className={`${labelHeaderStyle} flex items-center gap-2`}>
+        <h4 className={`${labelHeaderStyle} flex items-center gap-3`}>
           <span className="incident-icon text-base bg-blue-50 p-1.5 rounded-lg border border-blue-100/70 inline-flex items-center justify-center w-8 h-8 select-none" />
           <span>Add New Incident</span>
         </h4>
@@ -82,7 +82,7 @@ export function ActionOptions({
 
       {/* Option B: Add Field Note */}
       <div className="flex flex-col gap-2.5 border-t border-slate-100 pt-4">
-        <h4 className={`${labelHeaderStyle} flex items-center gap-2`}>
+        <h4 className={`${labelHeaderStyle} flex items-center gap-3`}>
           <span className="field-note-icon text-base bg-slate-50 p-1.5 rounded-lg border border-slate-100/70 text-lg inline-flex items-center justify-center w-8 h-8 select-none" />
           <span>Add Field Note</span>
         </h4>
