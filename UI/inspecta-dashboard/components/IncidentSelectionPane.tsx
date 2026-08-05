@@ -146,7 +146,10 @@ export default function IncidentSelectionPane() {
                       <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                         {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                       </div>
-                      <span className="truncate">🏢 {siteId}</span>
+                      <span className="truncate flex items-center gap-1">
+                        <span className="site-icon" />
+                        {siteId}
+                      </span>
                     </label>
                   );
                 })}
@@ -197,7 +200,10 @@ export default function IncidentSelectionPane() {
                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                       {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                     </div>
-                    <span className="truncate">🔍 {item.label}</span>
+                    <span className="truncate flex items-center gap-1">
+                      <span className="inspection-icon" />
+                      {item.label}
+                    </span>
                   </label>
                 );
               })}
@@ -251,7 +257,10 @@ export default function IncidentSelectionPane() {
                       <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                         {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                       </div>
-                      <span className="truncate">📌 {label}</span>
+                      <span className="truncate flex items-center gap-1">
+                        <span className="incident-icon" />
+                        {label}
+                      </span>
                     </label>
                   );
                 })

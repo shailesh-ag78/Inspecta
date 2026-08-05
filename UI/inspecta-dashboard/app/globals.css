@@ -104,3 +104,23 @@ body {
     border-radius: 8px !important;
   }
 }
+
+/* Incident Icon */
+.incident-icon::before {
+  content: "📌";
+}
+
+/* Site Icon */
+.site-icon::before {
+  content: "🏢";
+}
+
+/* Inspection Icon */
+.inspection-icon::before {
+  content: "🔍";
+}
+
+/* Field Note Icon */
+.field-note-icon::before {
+  content: "📋";
+}

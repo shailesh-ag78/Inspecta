@@ -129,22 +129,18 @@ export function IncidentsUploadList({ incidentUploads, clearLocalBundles }: Inci
                   {/* Category Icon */}
                   {incident.category === "field_note" ? (
                     <span
-                      className="text-base bg-amber-50 rounded-lg border border-amber-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
+                      className="field-note-icon text-base bg-amber-50 rounded-lg border border-amber-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
                       title="Field Note"
                       role="img"
                       aria-label="Field Note"
-                    >
-                      📋
-                    </span>
+                    />
                   ) : (
                     <span
-                      className="text-base bg-blue-50 rounded-lg border border-blue-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
+                      className="incident-icon text-base bg-blue-50 rounded-lg border border-blue-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
                       title="Incident"
                       role="img"
                       aria-label="Incident"
-                    >
-                      📌
-                    </span>
+                    />
                   )}
 
                   {/* Media Type Icon */}
