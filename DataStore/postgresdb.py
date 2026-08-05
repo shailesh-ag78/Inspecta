@@ -382,7 +382,7 @@ class IncidentRepository:
             async with conn.cursor() as cur:
                 await cur.execute(
                     """
-                    SELECT id, inspection_id, created_at FROM incidents 
+                    SELECT id, inspection_id, video_url, created_at FROM incidents 
                     WHERE company_id = %s AND created_at >= NOW() - (%s * INTERVAL '1 day') 
                     ORDER BY created_at DESC 
                     LIMIT %s

@@ -1,6 +1,8 @@
 # Force reload comment
 from os import path
 import sys
+sys.stdout.reconfigure(encoding='utf-8')
+sys.stderr.reconfigure(encoding='utf-8')
 import os
 from pathlib import Path
 
@@ -103,7 +105,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-print("✅ CORS Middleware configured for local and Firebase hosting")
+print("[Success] CORS Middleware configured for local and Firebase hosting")
 
 # ============ Authentication ============
 
@@ -236,6 +238,7 @@ class SiteInput(BaseModel):
 class UIUploadIncidentRequest(BaseModel):
     inspector_id: int
     file_url: str
+    additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
     blob_name: Optional[str] = None
     translation_language: Optional[str] = ""
 
@@ -919,11 +922,12 @@ async def upload_incident(
         payload = {
             "inspector_id": data.inspector_id,
             "file_url": file_url_payload,
+            "additional_file_urls": data.additional_file_urls,
             "translation_language": data.translation_language
         }
         resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
         incident_id = resp_data.get("incident_id")
-        print(f"✅ Incident Created: {incident_id}. LangGraph thread started")
+        print(f"[Success] Incident Created: {incident_id}. LangGraph thread started")
         return {"status": "success", "data": {"incident_id": incident_id}}
     except Exception as e:
         print(f"Error calling Executor: {e}")

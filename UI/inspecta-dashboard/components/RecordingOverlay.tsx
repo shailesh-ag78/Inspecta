@@ -5,8 +5,8 @@ interface RecordingOverlayProps {
   activeOverlay: "audio" | "video" | "image" | null;
   overlayCategory: "incident" | "field_note";
   cleanUpMedia: () => void;
-  videoRef: React.RefObject<HTMLVideoElement>;
-  tempVideoRef: React.RefObject<HTMLVideoElement>;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  tempVideoRef: React.RefObject<HTMLVideoElement | null>;
   photoPreview: string | null;
   isAudioPhotoTaking: boolean;
   isRecording: boolean;

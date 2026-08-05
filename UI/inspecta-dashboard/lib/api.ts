@@ -146,18 +146,18 @@ export function formatSiteInspections(combinations: any[]): any[] {
  * @param onProgress A callback function to report the upload progress.
  * @returns A promise that resolves when the upload is complete.
  */
-export async function uploadMediaFile(
+export async function uploadFileToStorage(
   file: File,
-  inspectionId: string,
-  onProgress: (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => void
-): Promise<{ incidentId: string }> {
-  if (!inspectionId) {
-    onProgress("Failed", "No inspection selected.");
-    throw new Error("No inspection selected.");
-  }
-
+  onProgress?: (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => void
+): Promise<string> {
   try {
-    onProgress("Uploading", `Uploading ${file.name}...`);
+    if (onProgress) {
+      if (file.type.startsWith("image/")) {
+        onProgress("Uploading", "Uploading Image");
+      } else {
+        onProgress("Uploading", `Uploading ${file.name}...`);
+      }
+    }
 
     const uploadUrlResp = await authenticatedFetch(
       `/api/get-upload-url?fileName=${encodeURIComponent(file.name)}`
@@ -166,7 +166,6 @@ export async function uploadMediaFile(
     const uploadUrlJson = await uploadUrlResp.json();
     const {
       upload_url: uploadUrl,
-      blob_name: blobName,
       storage_type: storageType,
     } = uploadUrlJson.data || {};
 
@@ -191,37 +190,41 @@ export async function uploadMediaFile(
       throw new Error(`Unsupported storage configuration: ${storageType}`);
     }
 
-    onProgress("Processing", "File uploaded, registering incident...");
-
-    const registerResp = await authenticatedFetch(
-      `/api/inspections/${inspectionId}/upload-incident`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          inspector_id: 0, // This is filled on the backend
-          file_url: uploadUrl,
-          blob_name: blobName,
-          translation_language: "" // This is filled on the backend
-        }),
-      }
-    );
-    if (!registerResp.ok) throw new Error("Failed to register incident record");
-
-    const registerJson = await registerResp.json();
-    const incidentId = registerJson.data?.incident_id;
-    if (!incidentId) throw new Error("No incident ID returned from register");
-
-    onProgress("Processing", "Upload completed. Analysis is in-progress");
-    return {
-      incidentId,
-    };
+    return uploadUrl;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "An unknown upload error occurred";
-    onProgress("Failed", errorMessage);
-    console.error("Incident upload failed:", err);
+    if (onProgress) onProgress("Failed", errorMessage);
+    console.error("File upload failed:", err);
     throw err;
   }
+}
+
+export async function registerIncident(
+  inspectionId: string,
+  primaryUrl: string,
+  additionalFileUrls: string[]
+): Promise<{ incidentId: string }> {
+
+  const registerResp = await authenticatedFetch(
+    `/api/inspections/${inspectionId}/upload-incident`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        inspector_id: 0,
+        file_url: primaryUrl,
+        additional_file_urls: additionalFileUrls,
+        translation_language: ""
+      }),
+    }
+  );
+  if (!registerResp.ok) throw new Error("Failed to register incident record");
+
+  const registerJson = await registerResp.json();
+  const incidentId = registerJson.data?.incident_id || registerJson.incident_id;
+  if (!incidentId) throw new Error("No incident ID returned from register");
+
+  return { incidentId };
 }
 
 

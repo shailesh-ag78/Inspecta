@@ -64,6 +64,9 @@ ALLOWED_TYPES = {
     "image/jpg": ".jpg",
     "image/png": ".png"
 }
+ALLOWED_VIDEO_TYPES = [".mp4", ".mov"]
+ALLOWED_AUDIO_TYPES = [".mp3", ".wav"]
+ALLOWED_IMAGE_TYPES = [".jpg", ".png"]
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
@@ -254,6 +257,7 @@ class IncidentUploadRequest(BaseModel):
     # Mandatory fields
     inspector_id: int
     file_url: str = Field(..., description="Full GCS path, e.g., gs://<bucket_name>/f83k-92js/uploads/file.mp4")
+    additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
     gps_coordinates: Optional[Tuple[float, float]] = None # (lat, long)
     translation_language: Optional[str] = Field(None, description="Language to be used for translation of title and description of tasks, e.g., hindi, marathi")
 
@@ -273,11 +277,20 @@ async def upload_incident_endpoint(
     if company_storage_id is None:
         raise HTTPException(status_code=401, detail="Invalid storage")
 
-    # 1. Security Check: Prevent Directory Traversal
-    incident_file = ""
+    logger.info(f"[Request] Primary file : {data.file_url}")
+    logger.info(f"[Request] Additional file urls : {data.additional_file_urls}")
+
+    additional_file_urls = []
+    file_size = 0
+    if data.additional_file_urls:
+        additional_file_urls.extend(data.additional_file_urls)
+          
     if ENV_MODE == "local":
         # Resolve the path to its absolute form to handle any "../" tricks
-        data.file_url = os.path.abspath(data.file_url)
+        data.file_url = os.path.abspath(os.path.normpath(data.file_url)).replace("/", "\\")
+        for index, file_url in enumerate(additional_file_urls):
+            additional_file_urls[index] = os.path.abspath(os.path.normpath(file_url)).replace("/", "\\")
+
         # Define the ONLY allowed directory for this company
         allowed_prefix = os.path.join(LOCAL_STORAGE_ROOT, company_storage_id, UPLOADS_FOLDER)
     else:
@@ -289,8 +302,19 @@ async def upload_incident_endpoint(
         #if not data.file_url.startswith(f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"):
         allowed_prefix =  f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"
 
+    logger.info(f"Allowed prefix : {allowed_prefix}")
+    logger.info(f"File url : {data.file_url}")
     if not data.file_url.startswith(allowed_prefix):
         raise HTTPException(status_code=403, detail="Security Violation: Invalid storage path.")
+    
+    logger.info("Checking for additional files")
+    # Check Security Violation for additional files also
+    for file_url in additional_file_urls:
+        logger.info(f"File url : {file_url}")
+        if not file_url.startswith(allowed_prefix):
+            raise HTTPException(status_code=403, detail=f"Security Violation: Invalid storage path for {file_url}")
+        # ToDo: Check file type to ensure only supported format of image files are passed
+        # ToDo: Check for file size or any other checks.
 
     # 2. Check File name and size
     file_size = 0
@@ -309,8 +333,8 @@ async def upload_incident_endpoint(
             raise HTTPException(status_code=404, detail="File not found.")
         file_size = blob.size or 0
 
-    if file_size and file_size > (500 * 1024 * 1024):
-        raise HTTPException(status_code=413, detail="File too large (Max 500MB).")  
+    if file_size and file_size > (300 * 1024 * 1024):
+        raise HTTPException(status_code=413, detail="File too large (Max 300MB).")  
 
     """
     Called by Mobile UI (Multipart Form Data).
@@ -342,7 +366,6 @@ async def get_recent_incidents(
     days: int = Query(7, description="Number of days of history to fetch"),
     limit: int = Query(10, description="Maximum number of incidents to fetch")
 ):
-    logger.info("Fetching recent incidents")
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -374,13 +397,26 @@ async def get_recent_incidents(
             else:
                 uploaded_at_str = str(uploaded_at) if uploaded_at else ""
 
+            video_url = inc.get("video_url") or ""
+            file_type = "unknown"
+            if video_url:
+                parts = video_url.rsplit('.', 1)
+                extension = "." + parts[-1].lower() if len(parts) > 1 else ""
+                if extension in ALLOWED_VIDEO_TYPES:
+                    file_type = "video"
+                elif extension in ALLOWED_AUDIO_TYPES:
+                    file_type = "audio"
+                elif extension in ALLOWED_IMAGE_TYPES:
+                    file_type = "image"
+
             results.append({
                 "id": incident_id,
                 "incidentId": incident_id,
                 "inspectionId": inspection_id,
                 "uploadedAt": uploaded_at_str,
                 "incident_status": status,   # Status could be one of these values : processing / completed / failed
-                "displayMessage": display_message
+                "displayMessage": display_message,
+                "incident_media": file_type
             })
         
         return {"status": "Success", "data": results}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useDashboard } from "@/lib/context";
 import { Loader2, AlertCircle } from "lucide-react";
-import { authenticatedFetch, uploadMediaFile as apiUploadMediaFile } from "@/lib/api";
+import { authenticatedFetch, uploadFileToStorage, registerIncident } from "@/lib/api";
 import { saveBundleToIdb, AttachedMedia, IncidentBundle } from "@/lib/idb";
 
 // Import Refactored Components
@@ -84,6 +84,9 @@ export default function InspectionPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadCategoryRef = useRef<"incident" | "field_note">("incident");
   const currentBundleIdRef = useRef<string>("");
+  const currentSessionPhotosRef = useRef<AttachedMedia[]>([]);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+  const tempCameraStreamRef = useRef<MediaStream | null>(null);
 
   // Auto-select first site
   useEffect(() => {
@@ -125,6 +128,27 @@ export default function InspectionPage() {
     };
   }, [isRecording, isRecordingPaused]);
 
+  // Keep refs in sync with state for unmount cleanup
+  useEffect(() => {
+    cameraStreamRef.current = cameraStream;
+  }, [cameraStream]);
+
+  useEffect(() => {
+    tempCameraStreamRef.current = tempCameraStream;
+  }, [tempCameraStream]);
+
+  // Stop streams on unmount to prevent camera/microphone resource leaks
+  useEffect(() => {
+    return () => {
+      if (cameraStreamRef.current) {
+        cameraStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+      if (tempCameraStreamRef.current) {
+        tempCameraStreamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
   // Cleanup helper
   const cleanUpMedia = () => {
     if (cameraStream) {
@@ -149,6 +173,7 @@ export default function InspectionPage() {
     setIsRecordingPaused(false);
     setIsAudioPhotoTaking(false);
     setCurrentSessionPhotos([]);
+    currentSessionPhotosRef.current = [];
     setPhotoBlob(null);
     setPhotoPreview(null);
     setActiveOverlay(null);
@@ -213,6 +238,9 @@ export default function InspectionPage() {
   const startRecording = () => {
     if (!cameraStream) return;
     recordedChunksRef.current = [];
+    setCurrentSessionPhotos([]);
+    currentSessionPhotosRef.current = [];
+    currentBundleIdRef.current = `bundle_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
 
     let options = {};
     if (MediaRecorder.isTypeSupported("video/webm;codecs=vp9")) {
@@ -235,12 +263,12 @@ export default function InspectionPage() {
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-        const filename = `${currentBundleIdRef.current}_recorded_${overlayCategory}_${timestamp}.${fileExtension}`;
+        const filename = `${currentBundleIdRef.current}_${overlayCategory}_${timestamp}.${fileExtension}`;
 
         const bundleId = currentBundleIdRef.current;
-        
+
         // Capture current photos before state reset in cleanUpMedia
-        const attached = [...currentSessionPhotos];
+        const attached = [...currentSessionPhotosRef.current];
         const pType = activeOverlay === "video" ? "video" : "audio";
 
         const bundle: IncidentBundle = {
@@ -257,21 +285,26 @@ export default function InspectionPage() {
         };
 
         cleanUpMedia(); // Resets states, so we must save the bundle after
-        
+
         await saveBundleToIdb(bundle);
 
         // Add to UI Queue
+        const primarySizeKB = Math.round(blob.size / 1024);
+        const attachedSizesKB = attached.map(media => Math.round(media.blob.size / 1024));
+
         setIncidentUploads(prev => [{
           id: bundleId,
           fileName: filename,
           fileType: pType,
           uploadedAt: new Date().toLocaleTimeString(),
-          status: "pending",
-          inspectionName: activeInspection?.friendly_name || activeInspection?.inspection_name || "Unknown Inspection",
+          status: "Uploading",
+          inspectionName: activeInspection?.label || "Unknown Inspection",
           siteName: activeSite?.site_name || "Unknown Site",
           category: overlayCategory,
           attachedPhotosCount: attached.length,
-          displayMessage: "Pending Upload"
+          displayMessage: "Uploading...",
+          primarySizeKB,
+          attachedSizesKB
         }, ...prev]);
 
         // Kick off upload processor
@@ -312,20 +345,9 @@ export default function InspectionPage() {
             }
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             const filename = `${currentBundleIdRef.current}_snapshot_${overlayCategory}_${timestamp}_during_video.jpg`;
-            setCurrentSessionPhotos(prev => [...prev, { blob, filename, type: "image" }]);
-
-            // Debugging: Save to disk automatically
-            try {
-              const link = document.createElement("a");
-              link.href = URL.createObjectURL(blob);
-              link.download = filename;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              console.log("Debug: Saved snapshot to disk:", filename);
-            } catch (e) {
-              console.error("Debug: Failed to save snapshot to disk:", e);
-            }
+            const newPhoto = { blob, filename, type: "image" as const };
+            setCurrentSessionPhotos(prev => [...prev, newPhoto]);
+            currentSessionPhotosRef.current.push(newPhoto);
           }
         }, "image/jpeg", 0.95);
       }
@@ -342,11 +364,11 @@ export default function InspectionPage() {
         mediaRecorderRef.current.pause();
         setIsRecordingPaused(true);
       }
-      
+
       const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
       setTempCameraStream(stream);
       setIsAudioPhotoTaking(true);
-      
+
       setTimeout(() => {
         if (tempVideoRef.current) {
           tempVideoRef.current.srcObject = stream;
@@ -378,29 +400,18 @@ export default function InspectionPage() {
               // Append timestamp
               const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
               const filename = `${currentBundleIdRef.current}_snapshot_${overlayCategory}_${timestamp}_at_${recordDuration}s.jpg`;
-              setCurrentSessionPhotos(prev => [...prev, { blob, filename, type: "image" }]);
-
-              // Debugging: Save to disk automatically
-              try {
-                const link = document.createElement("a");
-                link.href = URL.createObjectURL(blob);
-                link.download = filename;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                console.log("Debug: Saved snapshot to disk:", filename);
-              } catch (e) {
-                console.error("Debug: Failed to save snapshot to disk:", e);
-              }
+              const newPhoto = { blob, filename, type: "image" as const };
+              setCurrentSessionPhotos(prev => [...prev, newPhoto]);
+              currentSessionPhotosRef.current.push(newPhoto);
             } else {
               setIncidentError(`Maximum of ${MAX_SESSION_PHOTOS} photos allowed.`);
             }
-            
+
             // Clean up temporary camera
             tempCameraStream.getTracks().forEach(track => track.stop());
             setTempCameraStream(null);
             setIsAudioPhotoTaking(false);
-            
+
             // Resume audio recording
             if (mediaRecorderRef.current && isRecording && isRecordingPaused) {
               mediaRecorderRef.current.resume();
@@ -477,43 +488,59 @@ export default function InspectionPage() {
     const newId = `session_${Date.now()}`;
     setIncidentError(null);
 
+    const primarySizeKB = Math.round(file.size / 1024);
+
+    // Immediately add to UI Queue with Uploading status
+    setIncidentUploads(prev => [{
+      id: newId,
+      fileName: file.name,
+      fileType: fileType,
+      uploadedAt: new Date().toLocaleTimeString(),
+      timestamp: Date.now(),
+      status: "Uploading",
+      inspectionName: activeInspection?.label || "Unknown Inspection",
+      siteName: activeSite?.site_name || "Unknown Site",
+      category,
+      displayMessage: `Uploading ${fileType}...`,
+      primarySizeKB
+    }, ...prev].slice(0, MAX_INCIDENT_UPLOADS));
+
     const onProgress = (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => {
       if (status === "Uploading") {
         setUploadProgress(message || `Uploading ${file.name}...`);
+        setIncidentUploads(prev => prev.map(inc => inc.id === newId ? { ...inc, status: "Uploading", displayMessage: message || `Uploading ${fileType}...` } : inc));
       } else {
         setUploadProgress(null);
       }
       if (status === "Failed") {
         setIncidentError(message || "Upload failed");
+        setIncidentUploads(prev => prev.map(inc => inc.id === newId ? { ...inc, status: "Failed", displayMessage: message || "Upload failed." } : inc));
       }
     };
 
     try {
-      const { incidentId } = await apiUploadMediaFile(file, selectedInspectionId, onProgress, currentBundleIdRef.current);
+      const primaryUrl = await uploadFileToStorage(file, onProgress);
+      setUploadProgress(null);
+      const { incidentId } = await registerIncident(selectedInspectionId, primaryUrl, []);
 
-      setIncidentUploads(prev => {
-        const newIncident: IncidentUpload = {
-          id: newId,
-          incidentId,
-          fileName: file.name,
-          fileType: fileType,
-          uploadedAt: new Date().toLocaleString(),
-          timestamp: Date.now(),
-          status: "Processing",
-          displayMessage: "Analysis is in progress.",
-          inspectionName: activeInspection?.label || "Inspection",
-          siteName: activeSite?.site_name || activeSite?.name || "Site",
-          category
-        };
-        const updatedList = [newIncident, ...prev];
-        return updatedList.slice(0, MAX_INCIDENT_UPLOADS);
-      });
+      setIncidentUploads(prev => prev.map(inc => inc.id === newId ? {
+        ...inc,
+        incidentId,
+        status: "Processing",
+        displayMessage: "Analysis is in progress."
+      } : inc));
 
       await pollIncidentStatus(incidentId, newId);
     } catch (error) {
+      setUploadProgress(null);
       const errorMessage = error instanceof Error ? error.message : "An unknown upload error occurred";
       setIncidentError(errorMessage);
       console.error("Incident upload failed:", error);
+      setIncidentUploads(prev => prev.map(inc => inc.id === newId ? {
+        ...inc,
+        status: "Failed",
+        displayMessage: errorMessage
+      } : inc));
     }
   };
 
@@ -598,10 +625,10 @@ export default function InspectionPage() {
     <div className="h-full w-full overflow-y-auto bg-bg dropdown-scrollbar">
       <div className="p-6 flex flex-col items-start justify-start w-full">
         <div className="w-full bg-pane-bg/98 rounded-2xl border border-slate-200/70 shadow-md overflow-hidden flex flex-col">
-          
+
           {/* Configuration Body Content */}
           <div className="p-5 flex flex-col gap-6">
-            
+
             <InspectionSelector
               backendSites={backendSites}
               selectedSiteId={selectedSiteId}

@@ -272,10 +272,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     try {
       // Dynamic import to avoid SSR issues if idb is used server-side
       const { getAllBundlesFromIdb, saveBundleToIdb, deleteBundleFromIdb } = await import('./idb');
-      const { uploadMediaFile } = await import('./api');
+      const { uploadFileToStorage, registerIncident } = await import('./api');
 
       let bundles = await getAllBundlesFromIdb();
+      console.log("[Debug] Received " + bundles.length + " bundles from IDB");
       let pendingBundles = bundles.filter(b => b.status === "pending" || b.status === "failed");
+      console.log("[Debug] Received " + pendingBundles.length + " pending bundles from IDB");
 
       for (const bundle of pendingBundles) {
         // Skip if max retries hit
@@ -293,56 +295,57 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
         try {
           console.log(`[Queue] Starting upload of bundle ${bundle.id} with ${bundle.attachedMedia?.length || 0} attachments.`);
+          const additionalFileUrls: string[] = [];
+
           // Upload Primary
           const primaryFile = new File([bundle.primaryBlob], bundle.primaryFilename, { type: bundle.primaryBlob.type });
           console.log(`[Queue] Uploading primary file: ${bundle.primaryFilename}`);
-          const { incidentId } = await uploadMediaFile(primaryFile, bundle.inspectionId, (status, message) => {
+          const primaryUrl = await uploadFileToStorage(primaryFile, (status, message) => {
             setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: message || status } : inc));
           });
-          console.log(`[Queue] Primary file uploaded successfully. Incident ID: ${incidentId}`);
-          
-          // Primary success, now upload attachments sequentially
-          let attachmentsSuccess = true;
+          console.log(`[Queue] Primary file uploaded successfully to: ${primaryUrl}`);
+
+          // Upload Attachments sequentially
           const attachments = bundle.attachedMedia || [];
           console.log(`[Queue] Proceeding to upload ${attachments.length} attachments.`);
           for (let i = 0; i < attachments.length; i++) {
             const attachment = attachments[i];
             const attFile = new File([attachment.blob], attachment.filename, { type: attachment.blob.type });
-            
+
             console.log(`[Queue] Uploading attachment ${i + 1}/${attachments.length}: ${attachment.filename}`);
-            setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: `Uploading image ${i + 1} of ${attachments.length}...` } : inc));
-            
+            setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: `Uploading Image ${i + 1}` } : inc));
+
             try {
-              // We associate attachments with the same inspection, and potentially the same incident (backend support pending, using inspection for now)
-              const uploadRes = await uploadMediaFile(attFile, bundle.inspectionId, () => { });
-              console.log(`[Queue] Attachment ${i + 1} uploaded successfully. Response:`, uploadRes);
+              const attUrl = await uploadFileToStorage(attFile, () => { });
+              additionalFileUrls.push(attUrl);
+              console.log(`[Queue] Attachment ${i + 1} uploaded successfully to: ${attUrl}`);
             } catch (attErr) {
               console.error(`[Queue] Failed to upload attachment ${i + 1} (${attachment.filename}):`, attErr);
-              attachmentsSuccess = false;
-              break; // Stop uploading further attachments for this bundle on failure
+              throw new Error("Attachment upload failed");
             }
           }
-          
-          if (attachmentsSuccess) {
-            console.log(`[Queue] Bundle ${bundle.id} uploaded completely.`);
-            // Delete from IDB on full success
-            await deleteBundleFromIdb(bundle.id);
-            setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, status: "Processing", incidentId, displayMessage: "Upload complete, polling status..." } : inc));
-            pollIncidentStatus(incidentId, bundle.id);
-          } else {
-            throw new Error("Attachment upload failed");
-          }
+
+          // Register Incident
+          setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: "Registering incident..." } : inc));
+          console.log(`[Queue] All files uploaded. Registering incident with additional ${additionalFileUrls.length} files.`);
+
+          const { incidentId } = await registerIncident(bundle.inspectionId, primaryUrl, additionalFileUrls);
+
+          console.log(`[Queue] Bundle ${bundle.id} uploaded and registered completely. Incident ID: ${incidentId}`);
+
+          // Delete from IDB on full success
+          await deleteBundleFromIdb(bundle.id);
+          setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, status: "Processing", incidentId, displayMessage: "Upload complete, polling status..." } : inc));
+          pollIncidentStatus(incidentId, bundle.id);
 
         } catch (err) {
           console.error(`[Queue] Bundle ${bundle.id} upload failed with error:`, err);
-          bundle.retries += 1;
-          bundle.status = bundle.retries >= 3 ? "failed" : "pending";
-          await saveBundleToIdb(bundle);
+          await deleteBundleFromIdb(bundle.id);
 
           setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? {
             ...inc,
-            status: bundle.status === "failed" ? "Failed" : "pending",
-            displayMessage: bundle.status === "failed" ? "Upload failed after 3 retries." : "Upload failed, will retry."
+            status: "Failed",
+            displayMessage: "Upload failed."
           } : inc));
         }
       }
@@ -388,7 +391,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           id: inc.id || inc.incidentId,
           incidentId: inc.incidentId,
           fileName: `Incident ${inc.incidentId ? inc.incidentId.substring(0, 4) : ""}`,
-          fileType: "",
+          fileType: inc.incident_media || "",
           category: "",
           uploadedAt: inc.uploadedAt ? new Date(inc.uploadedAt).toLocaleString() : new Date().toLocaleString(),
           timestamp: inc.uploadedAt ? new Date(inc.uploadedAt).getTime() : Date.now(),
