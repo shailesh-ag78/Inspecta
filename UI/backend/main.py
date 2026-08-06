@@ -999,7 +999,6 @@ async def get_recent_incidents(
     limit: int = Query(10, description="Maximum number of incidents to fetch")
 ):
     """Fetch recent incidents with their statuses from the Executor service"""
-    print("Fetching Recent incidents")
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -1008,7 +1007,6 @@ async def get_recent_incidents(
         headers = {}
         headers = fill_auth_headers(request, headers)
         executor_service_url = BASE_EXECUTOR_URL + f"/incidents/recent?days={days}&limit={limit}"
-        print(f"Fetching Recent incidents from: {executor_service_url}")
         resp_data = CallExecutorService(executor_service_url, "GET", headers, None)
         return resp_data
     except Exception as e:
