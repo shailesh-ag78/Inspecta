@@ -519,9 +519,9 @@ export default function InspectionPage() {
     };
 
     try {
-      const primaryUrl = await uploadFileToStorage(file, onProgress);
+      const { uploadUrl, blobName } = await uploadFileToStorage(file, onProgress);
       setUploadProgress(null);
-      const { incidentId } = await registerIncident(selectedInspectionId, primaryUrl, []);
+      const { incidentId } = await registerIncident(selectedInspectionId, uploadUrl, [], blobName, []);
 
       setIncidentUploads(prev => prev.map(inc => inc.id === newId ? {
         ...inc,

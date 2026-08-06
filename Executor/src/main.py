@@ -225,10 +225,6 @@ async def create_inspection_endpoint(
     The company_id is pulled from the authenticated session/state.
     """
     # Extract company_id (Grab the Token from the 'Authorization' Header)
-    # print("Creating inspection")
-    # print("data", data)
-    # print(f"Company ID: {getattr(request.state, 'company_id', 'N/A')}")
-    # print(f"Company Storage ID: {getattr(request.state, 'company_storage_id', 'N/A')}")
     company_id = getattr(request.state, "company_id", None)
     if company_id is None:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -294,7 +290,7 @@ async def upload_incident_endpoint(
         # Define the ONLY allowed directory for this company
         allowed_prefix = os.path.join(LOCAL_STORAGE_ROOT, company_storage_id, UPLOADS_FOLDER)
     else:
-        # Check GCS Metadata: Does the file actually exist and have a sane size?
+        # Check GCS Metadata: Does the file actually exist and have a same size?
         # This prevents the AI from trying to process a 'missing' or 'fake' file.
         # File name example : "gs://inspecta-file-bucket/f83k-92js/uploads/a1b2-c3d4.mp4"
         #Format : full_gcp_path = f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/UPLOADS_FOLDER/{filename}"
@@ -452,7 +448,7 @@ async def get_status_endpoint(incident_id: str, request: Request):
 
 # UI calls this method to create a new place where to upload the file
 @app.get("/get-upload-url")
-async def get_upload_url(request: Request, fileType: Optional[str] = Query(None)):
+async def get_upload_url(request: Request, fileType: str):
     # Extract company_storage_id (Grab the Token from the 'Authorization' Header)
     company_storage_id = getattr(request.state, "company_storage_id", None)
     if company_storage_id is None:
@@ -472,8 +468,6 @@ async def get_upload_url(request: Request, fileType: Optional[str] = Query(None)
     
     # This is the "relative" path inside the bucket or root folder
     blob_name = f"{company_storage_id}/{UPLOADS_FOLDER}/{unique_name}"
-
-    # print("in executor class /get-upload-url blob_name",blob_name)
 
     if ENV_MODE == "local":
         # 2. Local Logic: Return the absolute path on your hard drive

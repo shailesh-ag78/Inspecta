@@ -105,7 +105,7 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
-print("[Success] CORS Middleware configured for local and Firebase hosting")
+#print("[Success] CORS Middleware configured for local and Firebase hosting")
 
 # ============ Authentication ============
 
@@ -239,6 +239,7 @@ class UIUploadIncidentRequest(BaseModel):
     inspector_id: int
     file_url: str
     additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
+    additional_blobs: Optional[list[str]] = Field(None, description="List of blob names for additional files")
     blob_name: Optional[str] = None
     translation_language: Optional[str] = ""
 
@@ -698,16 +699,15 @@ def upload_file_data(file_path, real_upload_path, blob_name):
         # In a local scenario, the UI would upload the file to 'real_upload_path'.
         # For this test, we manually copy it to simulate a successful upload.    
         shutil.copy(file_path, real_upload_path)
-        print("✅ Simulated file upload to local storage.")
     else:
         # Upload to GCS
-        global gcs_client
-        if ENV_MODE.startswith("local"):
-            datastore_path = Path(__file__).parent.parent.parent / "DataStore"
-            gcp_key_file = (datastore_path / "gcp-key.json").resolve()
-            gcs_client = storage.Client.from_service_account_json(gcp_key_file)
-        else:
-            gcs_client = storage.Client()
+        gcs_client = storage.Client() 
+        # if ENV_MODE.startswith("local"):
+        #     datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+        #     gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+        #     gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+        # else:
+        #     gcs_client = storage.Client()
 
         bucket = gcs_client.bucket(INSPCTA_FILE_BUCKET)
         blob = bucket.blob(blob_name)
@@ -870,8 +870,8 @@ async def get_upload_url(request: Request, fileName: str = Query(..., descriptio
         upload_url = resp_data.get("upload_url")
         blob_name = resp_data.get("blob_name")
         storage_type = resp_data.get("storage_type")
-        print(f"✅ Received Upload Path: {upload_url} and  Received Blob Name: {blob_name} and Storage Type: {storage_type}")
-        return {"status": "success", "data": {"upload_url": upload_url, "blob_name": blob_name, "storage_type": storage_type}}
+        #print(f"✅ Received Upload Path: {upload_url} and  Received Blob Name: {blob_name} and Storage Type: {storage_type} and fileType = {fileType}")
+        return {"status": "success", "data": {"upload_url": upload_url, "blob_name": blob_name, "storage_type": storage_type, "file_type": fileType}}
     except Exception as e:
         print(f"Error calling Executor: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to connect to Executor: {str(e)}")
@@ -918,16 +918,23 @@ async def upload_incident(
         headers = {}
         headers = fill_auth_headers(request, headers)
         executor_service_url = BASE_EXECUTOR_URL + f"/inspections/{inspection_id}/upload-incident"
+
         file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{data.blob_name}" if ENV_MODE != "local" and data.blob_name else data.file_url
+        
+        additional_file_urls = []
+        if ENV_MODE != "local" and data.additional_blobs:
+            additional_file_urls = [f"gs://{INSPCTA_FILE_BUCKET}/{blob}" for blob in data.additional_blobs]
+        elif data.additional_file_urls:
+            additional_file_urls = data.additional_file_urls
+
         payload = {
             "inspector_id": data.inspector_id,
             "file_url": file_url_payload,
-            "additional_file_urls": data.additional_file_urls,
+            "additional_file_urls": additional_file_urls,
             "translation_language": data.translation_language
         }
         resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
         incident_id = resp_data.get("incident_id")
-        print(f"[Success] Incident Created: {incident_id}. LangGraph thread started")
         return {"status": "success", "data": {"incident_id": incident_id}}
     except Exception as e:
         print(f"Error calling Executor: {e}")

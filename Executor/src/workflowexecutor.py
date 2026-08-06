@@ -181,6 +181,7 @@ class IncidentState(TypedDict):
     translation_language: str
     # 'operator.add' allows nodes to append to this list without overwriting
     generated_tasks: Annotated[List[dict], operator.add]
+    analysisfailed : bool
 
 class WorkflowExecutor:
     @classmethod
@@ -314,7 +315,8 @@ class WorkflowExecutor:
             "transcript": "",         # Initialize as empty string
             "transcript_segments_json_url": "", # Initialize as empty string
             "generated_tasks": [],     # Initialize the list for operator.add
-            "translation_language": translation_language
+            "translation_language": translation_language,
+            "analysisfailed" : False
         })
         
         # We do NOT 'await' this so the UI response is instant
@@ -401,6 +403,15 @@ class WorkflowExecutor:
                 error=e
             )
             logger.error(f"❌ Audio Extraction failed for {incident_id}: {str(e)}", exc_info=True)
+            try:
+                config = self.langsmith_config.create_run_config(
+                    thread_id=incident_id,
+                    incident_id=incident_id,
+                    company_id=state["company_id"]
+                )
+                await self.workflow.aupdate_state(config, {"analysisfailed": True})
+            except Exception as update_err:
+                logger.error(f"Failed to update state with analysisfailed flag: {update_err}")
             raise
 
     async def _transcribe_node(self, state: IncidentState):
@@ -479,6 +490,15 @@ class WorkflowExecutor:
                 error=e
             )
             logger.error(f"❌ Transcription failed: {e}", exc_info=True)
+            try:
+                config = self.langsmith_config.create_run_config(
+                    thread_id=incident_id,
+                    incident_id=incident_id,
+                    company_id=state["company_id"]
+                )
+                await self.workflow.aupdate_state(config, {"analysisfailed": True})
+            except Exception as update_err:
+                logger.error(f"Failed to update state with analysisfailed flag: {update_err}")
             raise
 
     async def _generate_tasks_node(self, state: IncidentState):
@@ -571,6 +591,15 @@ class WorkflowExecutor:
                 error=e
             )
             logger.error(f"❌ Task generation failed: {e}", exc_info=True)
+            try:
+                config = self.langsmith_config.create_run_config(
+                    thread_id=incident_id,
+                    incident_id=incident_id,
+                    company_id=state["company_id"]
+                )
+                await self.workflow.aupdate_state(config, {"analysisfailed": True})
+            except Exception as update_err:
+                logger.error(f"Failed to update state with analysisfailed flag: {update_err}")
             raise
 
     async def get_status(self, company_id: int, incident_id: str):
@@ -596,16 +625,24 @@ class WorkflowExecutor:
         has_transcript = bool(state.values.get("transcript"))
         has_tasks = bool(state.values.get("generated_tasks"))
         
+        analysis_failed = bool(state.values.get("analysisfailed"))
+        
         # Determine current status based on execution state
-        if not state.next:
+        if analysis_failed:
+            status_key = "failed"
+            logger.error(f"❌ Analysis failed for {incident_id}")
+            message = "Step - Failed: Analysis failed."
+        elif not state.next:
             # Graph has reached END node
             if has_tasks:
                 status_key = "completed"
+                logger.info(f"✅ Complete: Analysis complete! Tasks generated for {incident_id}")
                 message = "Step - Complete: Analysis complete! Tasks generated."
             else:
                 # Graph finished but failed to generate tasks
-                status_key = "failed"
-                message = "Step - Failed: Analysis failed: No tasks were generated."
+                status_key = "completed"
+                logger.warning(f"⚠️ No tasks generated for {incident_id}")
+                message = "Step - Complete: Analysis complete: No tasks were generated."
         else:
             # Graph is still running
             status_key = "processing"

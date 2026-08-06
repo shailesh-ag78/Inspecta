@@ -11,6 +11,8 @@ import {
   formatIncidents,
   formatTasks,
   getRecentIncidents,
+  uploadFileToStorage,
+  registerIncident,
 } from '@/lib/api';
 
 interface SiteInspection {
@@ -272,7 +274,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     try {
       // Dynamic import to avoid SSR issues if idb is used server-side
       const { getAllBundlesFromIdb, saveBundleToIdb, deleteBundleFromIdb } = await import('./idb');
-      const { uploadFileToStorage, registerIncident } = await import('./api');
 
       let bundles = await getAllBundlesFromIdb();
       console.log("[Debug] Received " + bundles.length + " bundles from IDB");
@@ -296,11 +297,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         try {
           console.log(`[Queue] Starting upload of bundle ${bundle.id} with ${bundle.attachedMedia?.length || 0} attachments.`);
           const additionalFileUrls: string[] = [];
+          const additionalBlobs: string[] = [];
 
           // Upload Primary
           const primaryFile = new File([bundle.primaryBlob], bundle.primaryFilename, { type: bundle.primaryBlob.type });
           console.log(`[Queue] Uploading primary file: ${bundle.primaryFilename}`);
-          const primaryUrl = await uploadFileToStorage(primaryFile, (status, message) => {
+          const { uploadUrl: primaryUrl, blobName: primaryBlobName } = await uploadFileToStorage(primaryFile, (status, message) => {
             setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: message || status } : inc));
           });
           console.log(`[Queue] Primary file uploaded successfully to: ${primaryUrl}`);
@@ -316,8 +318,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
             setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: `Uploading Image ${i + 1}` } : inc));
 
             try {
-              const attUrl = await uploadFileToStorage(attFile, () => { });
+              const { uploadUrl: attUrl, blobName: attBlobName } = await uploadFileToStorage(attFile, () => { });
               additionalFileUrls.push(attUrl);
+              additionalBlobs.push(attBlobName);
               console.log(`[Queue] Attachment ${i + 1} uploaded successfully to: ${attUrl}`);
             } catch (attErr) {
               console.error(`[Queue] Failed to upload attachment ${i + 1} (${attachment.filename}):`, attErr);
@@ -329,7 +332,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: "Registering incident..." } : inc));
           console.log(`[Queue] All files uploaded. Registering incident with additional ${additionalFileUrls.length} files.`);
 
-          const { incidentId } = await registerIncident(bundle.inspectionId, primaryUrl, additionalFileUrls);
+          const { incidentId } = await registerIncident(bundle.inspectionId, primaryUrl, additionalFileUrls, primaryBlobName, additionalBlobs);
 
           console.log(`[Queue] Bundle ${bundle.id} uploaded and registered completely. Incident ID: ${incidentId}`);
 
@@ -716,9 +719,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const uploadIncidentVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setSelectedFile(file);
-
       const selectedItem = siteInspections.find(
         (item) => (item.inspection_id || item.site_id) === selectedInspection
       );
@@ -728,65 +728,38 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      const files = Array.from(e.target.files);
+      const primaryFile = files.find(f => f.type.startsWith('video/') || f.type.startsWith('audio/')) || files[0];
+      const additionalFiles = files.filter(f => f !== primaryFile);
+
+      setSelectedFile(primaryFile);
       document.body.style.cursor = 'wait';
+
       try {
-        const uploadUrlResp = await authenticatedFetch(
-          `/api/get-upload-url?fileName=${encodeURIComponent(file.name)}`
+        // Upload primary file
+        const primaryResult = await uploadFileToStorage(primaryFile);
+
+        // Upload additional files
+        const additionalResults = await Promise.all(
+          additionalFiles.map(file => uploadFileToStorage(file))
         );
-        if (!uploadUrlResp.ok) throw new Error('Failed to get upload URL');
-        const uploadUrlJson = await uploadUrlResp.json();
-        const {
-          upload_url: uploadUrl,
-          blob_name: blobName,
-          storage_type: storageType,
-        } = uploadUrlJson.data || {};
 
-        if (storageType === 'gcs') {
-          const gcsResponse = await fetch(uploadUrl, {
-            method: 'PUT',
-            headers: { 'Content-Type': file.type || 'video/mp4' },
-            body: file,
-          });
-          if (!gcsResponse.ok) {
-            throw new Error(`Failed to upload to GCS: ${gcsResponse.status}`);
-          }
-        } else if (storageType === 'local') {
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('filePath', uploadUrl);
+        console.log("primaryResult : ", primaryResult);
+        console.log("additionalResults : ", additionalResults);
 
-          const localResponse = await authenticatedFetch('/api/upload-local', {
-            method: 'POST',
-            body: formData,
-          });
-          if (!localResponse.ok) {
-            throw new Error(`Failed to upload to local storage: ${localResponse.status}`);
-          }
-        } else {
-          throw new Error(`Unsupported storage type for browser upload: ${storageType}`);
-        }
-
-        const registerResp = await authenticatedFetch(
-          `/api/inspections/${selectedInspection}/upload-incident`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              inspector_id: 0,
-              file_url: uploadUrl,
-              blob_name: blobName,
-              translation_language: ""
-            }),
-          }
+        const { incidentId } = await registerIncident(
+          selectedInspection,
+          primaryResult.uploadUrl,
+          additionalResults.map(r => r.uploadUrl),
+          primaryResult.blobName,
+          additionalResults.map(r => r.blobName)
         );
-        if (!registerResp.ok) throw new Error('Failed to register incident');
 
-        const result = await registerResp.json();
-        setLastUploadedFileName(file.name);
-        console.log("Video file uploaded successfully : ", result);
+        setLastUploadedFileName(primaryFile.name);
+        console.log("Incident files uploaded and registered successfully. Incident ID: ", incidentId);
       } catch (error) {
         console.error("Upload failed:", error);
-        setLastUploadedFileName(`Failed to upload video ${file.name}`);
+        setLastUploadedFileName(`Failed to upload incident files: ${primaryFile.name}`);
       } finally {
         document.body.style.cursor = 'default';
       }

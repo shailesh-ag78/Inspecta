@@ -149,7 +149,7 @@ export function formatSiteInspections(combinations: any[]): any[] {
 export async function uploadFileToStorage(
   file: File,
   onProgress?: (status: "Uploading" | "Processing" | "Completed" | "Failed", message?: string) => void
-): Promise<string> {
+): Promise<{ uploadUrl: string; blobName: string }> {
   try {
     if (onProgress) {
       if (file.type.startsWith("image/")) {
@@ -166,13 +166,15 @@ export async function uploadFileToStorage(
     const uploadUrlJson = await uploadUrlResp.json();
     const {
       upload_url: uploadUrl,
+      blob_name: blobName,
       storage_type: storageType,
+      file_type: fileType
     } = uploadUrlJson.data || {};
 
     if (storageType === "gcs") {
       const gcsResponse = await fetch(uploadUrl, {
         method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
+        headers: { "Content-Type": fileType || "application/octet-stream" },
         body: file,
       });
       if (!gcsResponse.ok) throw new Error(`Cloud storage upload failed: ${gcsResponse.status}`);
@@ -190,7 +192,7 @@ export async function uploadFileToStorage(
       throw new Error(`Unsupported storage configuration: ${storageType}`);
     }
 
-    return uploadUrl;
+    return { uploadUrl, blobName };
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : "An unknown upload error occurred";
     if (onProgress) onProgress("Failed", errorMessage);
@@ -202,7 +204,9 @@ export async function uploadFileToStorage(
 export async function registerIncident(
   inspectionId: string,
   primaryUrl: string,
-  additionalFileUrls: string[]
+  additionalFileUrls: string[],
+  blobName?: string,
+  additionalBlobs?: string[]
 ): Promise<{ incidentId: string }> {
 
   const registerResp = await authenticatedFetch(
@@ -213,7 +217,9 @@ export async function registerIncident(
       body: JSON.stringify({
         inspector_id: 0,
         file_url: primaryUrl,
+        blob_name: blobName,
         additional_file_urls: additionalFileUrls,
+        additional_blobs: additionalBlobs,
         translation_language: ""
       }),
     }
