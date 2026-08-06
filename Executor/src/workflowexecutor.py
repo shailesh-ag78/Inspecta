@@ -668,7 +668,7 @@ class WorkflowExecutor:
             }
         }
 
-    async def get_recent_incidents(self, company_id: int, days: int = 7, limit: int = 10) -> List[Dict]:
+    async def get_recent_incidents(self, company_id: int, days: int = 7, limit: int = 10) -> List[dict[str, Any]]:
         """Fetches recent incidents for a company and enriches them with their inspection IDs."""
         logger.info("Fetching recent incidents from repository")
         incidents = await self.repo.get_recent_incidents(company_id, days, limit)
