@@ -201,6 +201,24 @@ class IncidentRepository:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
+    
+    async def update_incident_summary(self, company_id: int, incident_id: str, summary: str):
+        """Update incident summary"""
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                
+                await cur.execute(
+                    """
+                    UPDATE incidents 
+                    SET summary = %s
+                    WHERE id = %s
+                    RETURNING *
+                    """,
+                    (summary, incident_id)
+                )
+                row = await cur.fetchone()
+                return dict(row) if row else None
+
     async def create_inspection(self, company_id: int, site_id: int, friendly_name: Optional[str] = None) -> Optional[str]:
             """Inserts a new inspection record and returns the UUID."""
             async with self.session(company_id) as conn:

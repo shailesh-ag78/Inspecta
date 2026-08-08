@@ -7,7 +7,7 @@ import { ReportingIncidents } from "@/components/ReportingIncidents";
 import { ReportingCanvas } from "@/components/ReportingCanvas";
 
 export default function ReportsPage() {
-  const { theme, millerIncidents, setIsIncidentPaneCollapsed } = useDashboard();
+  const { theme, millerIncidents, selectedMillerIncidents, setSelectedMillerIncidents, setIsIncidentPaneCollapsed } = useDashboard();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [droppedIncidents, setDroppedIncidents] = useState<any[]>([]);
   const [selectedIncidentIds, setSelectedIncidentIds] = useState<string[]>([]);
@@ -17,38 +17,75 @@ export default function ReportsPage() {
     setIsIncidentPaneCollapsed(false);
   }, [setIsIncidentPaneCollapsed]);
 
+  // Derive incidents filtered by IncidentSelectionPane choices
+  const displayedIncidents = React.useMemo(() => {
+    if (selectedMillerIncidents.length === 0) return [];
+    return millerIncidents.filter((inc) => selectedMillerIncidents.includes(inc.id));
+  }, [millerIncidents, selectedMillerIncidents]);
+
+  // Auto-prune canvas tiles if they are removed from the refreshed incident list
+  React.useEffect(() => {
+    setDroppedIncidents((prev) => {
+      if (prev.length === 0) return prev;
+      const validIds = new Set(displayedIncidents.map((inc) => inc.id));
+      const filtered = prev.filter((item) => validIds.has(item.id));
+      if (filtered.length !== prev.length) {
+        return filtered;
+      }
+      return prev;
+    });
+  }, [displayedIncidents]);
+
   // HTML5 Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, incidentId: string) => {
-    const dragIds = selectedIncidentIds.includes(incidentId) 
-      ? selectedIncidentIds 
+    const dragIds = selectedIncidentIds.includes(incidentId)
+      ? selectedIncidentIds
       : [incidentId];
     e.dataTransfer.setData("application/json", JSON.stringify(dragIds));
     e.dataTransfer.setData("text/plain", incidentId);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent, index?: number) => {
     e.preventDefault();
     let idsToDrop: string[] = [];
     const jsonStr = e.dataTransfer.getData("application/json");
     if (jsonStr) {
       try {
         idsToDrop = JSON.parse(jsonStr);
-      } catch (err) {}
+      } catch (err) { }
     }
     if (idsToDrop.length === 0) {
       const fallbackId = e.dataTransfer.getData("text/plain");
       if (fallbackId) idsToDrop = [fallbackId];
     }
 
+    if (idsToDrop.length === 0) return;
+
     setDroppedIncidents((prev) => {
-      const newItems = [...prev];
-      idsToDrop.forEach((id) => {
-        if (!newItems.some((item) => item.id === id)) {
-          const incident = millerIncidents.find((inc) => inc.id === id);
-          if (incident) newItems.push(incident);
+      // Find objects for idsToDrop (checking prev first, then millerIncidents)
+      const objectsToDrop: any[] = idsToDrop
+        .map((id) => prev.find((item) => item.id === id) || millerIncidents.find((inc) => inc.id === id))
+        .filter(Boolean);
+
+      if (objectsToDrop.length === 0) return prev;
+
+      const dropIdSet = new Set(idsToDrop);
+      const rawTargetIndex = typeof index === 'number' ? index : prev.length;
+
+      // Calculate how many items before targetIndex were removed from prev
+      let removedBeforeTarget = 0;
+      for (let i = 0; i < Math.min(rawTargetIndex, prev.length); i++) {
+        if (dropIdSet.has(prev[i].id)) {
+          removedBeforeTarget++;
         }
-      });
-      return newItems;
+      }
+
+      const remaining = prev.filter((item) => !dropIdSet.has(item.id));
+      const adjustedTargetIndex = Math.max(0, Math.min(rawTargetIndex - removedBeforeTarget, remaining.length));
+
+      const next = [...remaining];
+      next.splice(adjustedTargetIndex, 0, ...objectsToDrop);
+      return next;
     });
     setSelectedIncidentIds([]);
   };
@@ -72,6 +109,72 @@ export default function ReportsPage() {
 
   const handleClearCanvas = () => {
     setDroppedIncidents([]);
+  };
+
+  const { companyName, selectedMillerSites, user } = useDashboard();
+  const selectedSiteName = selectedMillerSites.length === 1
+    ? selectedMillerSites[0]
+    : selectedMillerSites.length > 1
+      ? `${selectedMillerSites.length} Sites Selected`
+      : "No Site Selected";
+  const userName = user?.displayName || user?.email || "Inspector";
+
+  const generateReportSummary = (incidents: any[]): string => {
+    // TODo : Generate Summary using AI 
+    return incidents
+      .map((inc) => inc.summary)
+      .filter(Boolean)
+      .join("\n\n");
+  };
+
+  const handleGenerateReport = (summaryText: string) => {
+    const generatedSummary = generateReportSummary(droppedIncidents);
+    const reportData = {
+      date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+      companyName: companyName || "Inspecta Inc.",
+      selectedSiteName,
+      summary: generatedSummary && generatedSummary.trim() !== "" ? generatedSummary : summaryText,
+      incidents: droppedIncidents.map((inc) => ({
+        id: inc.id,
+        summary: inc.summary,
+        created: inc.created
+      })),
+      userName,
+      generatedAt: new Date().toISOString()
+    };
+
+    const request = indexedDB.open("InspectaReportsDB", 1);
+
+    request.onupgradeneeded = (event: any) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains("reports")) {
+        db.createObjectStore("reports", { keyPath: "id" });
+      }
+    };
+
+    request.onsuccess = (event: any) => {
+      const db = event.target.result;
+      const transaction = db.transaction("reports", "readwrite");
+      const store = transaction.objectStore("reports");
+
+      // Store using a static key so only one report exists at any point in time
+      const record = {
+        id: "active_report",
+        data: reportData
+      };
+
+      const putRequest = store.put(record);
+      putRequest.onsuccess = () => {
+        alert("Generating report");
+      };
+      putRequest.onerror = (err: any) => {
+        console.error("Failed to store report in IndexedDB:", err);
+      };
+    };
+
+    request.onerror = (event: any) => {
+      console.error("IndexedDB error:", event);
+    };
   };
 
   return (
@@ -112,8 +215,9 @@ export default function ReportsPage() {
               {/* ReportingIncidents (Left side, far narrower than canvas on desktop) */}
               <div className="w-full lg:w-[360px] shrink-0 min-w-0 flex flex-col h-[300px] lg:h-full">
                 <ReportingIncidents
-                  incidents={millerIncidents}
+                  incidents={displayedIncidents}
                   selectedIncidentIds={selectedIncidentIds}
+                  droppedIncidentIds={droppedIncidents.map((i) => i.id)}
                   onToggleSelect={(id) => {
                     setSelectedIncidentIds((prev) =>
                       prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
@@ -121,6 +225,7 @@ export default function ReportsPage() {
                   }}
                   onDragStart={handleDragStart}
                   onAddAll={handleAddAll}
+                  onRefresh={() => setSelectedMillerIncidents(millerIncidents.map(i => i.id))}
                 />
               </div>
 
@@ -131,6 +236,10 @@ export default function ReportsPage() {
                   onDrop={handleDrop}
                   onClear={handleClearCanvas}
                   onRemoveIncident={handleRemoveIncident}
+                  companyName={companyName || "Inspecta Inc."}
+                  selectedSiteName={selectedSiteName}
+                  userName={userName}
+                  onGenerateReport={handleGenerateReport}
                 />
               </div>
 

@@ -1,25 +1,30 @@
 import React from "react";
-import { Plus } from "lucide-react";
+import { Plus, RotateCw } from "lucide-react";
 
 interface Incident {
   id: string;
+  summary?: string;
   created?: string;
 }
 
 interface ReportingIncidentsProps {
   incidents: Incident[];
   selectedIncidentIds: string[];
+  droppedIncidentIds: string[];
   onToggleSelect: (id: string) => void;
   onDragStart: (e: React.DragEvent, id: string) => void;
   onAddAll: (ids: string[]) => void;
+  onRefresh?: () => void;
 }
 
 export function ReportingIncidents({
   incidents,
   selectedIncidentIds,
+  droppedIncidentIds,
   onToggleSelect,
   onDragStart,
-  onAddAll
+  onAddAll,
+  onRefresh
 }: ReportingIncidentsProps) {
 
   // Sort in descending order of their date and time
@@ -38,16 +43,29 @@ export function ReportingIncidents({
           <i className="fa-solid fa-list-check text-slate-500" />
           Incidents ({sortedIncidents.length})
         </h5>
-        {sortedIncidents.length > 0 && (
-          <button
-            type="button"
-            onClick={() => onAddAll(sortedIncidents.map(i => i.id))}
-            className="text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-0.5 rounded-full transition-colors flex items-center gap-0.5 shadow-sm cursor-pointer"
-          >
-            <Plus className="w-2.5 h-2.5" />
-            Add All
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              title="Refresh incident list"
+              className="text-[10px] font-bold text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 p-1.5 rounded-full transition-colors flex items-center justify-center shadow-sm cursor-pointer"
+            >
+              <RotateCw className="w-2.5 h-2.5" />
+            </button>
+          )}
+          {sortedIncidents.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onAddAll(sortedIncidents.filter(i => !droppedIncidentIds.includes(i.id)).map(i => i.id))}
+              disabled={sortedIncidents.every(i => droppedIncidentIds.includes(i.id))}
+              className="text-[10px] font-bold text-slate-500 hover:text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed bg-slate-100 hover:bg-slate-200 border border-slate-200 px-3 py-0.5 rounded-full transition-colors flex items-center gap-0.5 shadow-sm cursor-pointer"
+            >
+              <Plus className="w-2.5 h-2.5" />
+              Add All
+            </button>
+          )}
+        </div>
       </div>
 
       {sortedIncidents.length === 0 ? (
@@ -57,36 +75,43 @@ export function ReportingIncidents({
       ) : (
         <div className="grid grid-cols-3 gap-2">
           {sortedIncidents.map((incident) => {
-            const label = `${incident.id.slice(0, 4)}XXX`;
+            const label = `${incident.id.slice(0, 6)}XXX`;
 
             const createdDate = incident.created ? new Date(incident.created) : null;
             const dateStr = createdDate ? createdDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'N/A';
             const timeStr = createdDate ? createdDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'N/A';
             const isSelected = selectedIncidentIds.includes(incident.id);
+            const isAlreadyAdded = droppedIncidentIds.includes(incident.id);
 
             return (
               <div
                 key={incident.id}
-                draggable
-                onDragStart={(e) => onDragStart(e, incident.id)}
-                onClick={() => onToggleSelect(incident.id)}
-                className={`relative w-full h-[88px] border rounded-lg flex flex-col items-center justify-center shadow-sm cursor-grab active:cursor-grabbing transition-all select-none group text-center px-1 ${isSelected
-                  ? "bg-gradient-to-br from-orange-100 to-orange-200 border-orange-400 ring-2 ring-orange-300"
-                  : "bg-gradient-to-br from-orange-50 to-orange-100/60 border-orange-200/80 hover:border-orange-350"
+                draggable={!isAlreadyAdded}
+                onDragStart={(e) => !isAlreadyAdded && onDragStart(e, incident.id)}
+                onClick={() => !isAlreadyAdded && onToggleSelect(incident.id)}
+                className={`relative w-full h-[88px] border rounded-lg flex flex-col items-center justify-center shadow-sm transition-all select-none group text-center px-1 ${isAlreadyAdded
+                  ? "bg-orange-50/50 border-orange-200/60 opacity-85 cursor-not-allowed text-orange-950/70"
+                  : isSelected
+                    ? "bg-gradient-to-br from-orange-100 to-orange-200 border-orange-400 ring-2 ring-orange-300 cursor-grab active:cursor-grabbing"
+                    : "bg-gradient-to-br from-orange-50 to-orange-100/60 border-orange-200/80 hover:border-orange-350 cursor-grab active:cursor-grabbing"
                   }`}
                 id={label}
+                title={incident.summary || `Incident ${incident.id}`}
               >
+                {/* Grey dot in top-right corner if already added to canvas */}
+                {isAlreadyAdded && (
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-slate-400 shadow-sm" title="Already added to report" />
+                )}
+
                 {/* Match IncidentSelectionPane format (Row 1) */}
                 <span className="text-[11px] font-black text-orange-900 tracking-wider truncate w-full px-1 group-hover:text-blue-600 transition-colors">
                   {label}
                 </span>
 
-                {/* Greyed out Date (Row 2) */}
                 <span className="text-[11px] font-medium text-slate-900 mt-1">
                   {dateStr}
                 </span>
 
-                {/* Greyed out Time (Row 3) */}
                 <span className="text-[11px] font-medium text-slate-900 mt-1">
                   {timeStr}
                 </span>

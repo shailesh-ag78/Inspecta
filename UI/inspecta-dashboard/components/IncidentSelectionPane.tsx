@@ -50,7 +50,7 @@ export default function IncidentSelectionPane({ singleSiteMode = false }: { sing
         const incDate = new Date(inc.created);
         const now = new Date();
         const diffDays = (now.getTime() - incDate.getTime()) / (1000 * 3600 * 24);
-        
+
         if (incidentDateFilter === 'Today' && diffDays > 1) return false;
         if (incidentDateFilter === 'Last week' && diffDays > 7) return false;
       }
@@ -92,7 +92,7 @@ export default function IncidentSelectionPane({ singleSiteMode = false }: { sing
     : selectedMillerIncidents.length === millerIncidents.length
       ? "All Incidents"
       : selectedMillerIncidents.length === 1
-        ? `${selectedMillerIncidents[0].slice(0, 4)}XXX`
+        ? `${selectedMillerIncidents[0].slice(0, 8)} - XXX`
         : `${selectedMillerIncidents.length} Selected`;
 
   return (
@@ -327,7 +327,7 @@ export default function IncidentSelectionPane({ singleSiteMode = false }: { sing
                       );
                     })}
                   </div>
-                  
+
                   {/* Modern Independent Pill Toggles */}
                   <div className="flex items-center gap-3">
                     <button
@@ -338,7 +338,7 @@ export default function IncidentSelectionPane({ singleSiteMode = false }: { sing
                       <span className={`incident-icon ${!showIncidents ? 'opacity-50 grayscale' : ''}`} />
                       Incidents
                     </button>
-                    
+
                     <button
                       type="button"
                       onClick={() => setShowFieldNotes(!showFieldNotes)}
@@ -356,7 +356,7 @@ export default function IncidentSelectionPane({ singleSiteMode = false }: { sing
               ) : (
                 [...filteredIncidents].sort((a, b) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime()).map(incident => {
                   const isChecked = selectedMillerIncidents.includes(incident.id);
-                  const label = `${incident.id.slice(0, 4)}XXX`;
+                  const label = `${incident.id.slice(0, 8)}-XXX`;
                   return (
                     <label key={incident.id} className="flex items-center gap-2 text-[13px] font-normal text-slate-800 hover:text-slate-950 cursor-pointer select-none py-0.5">
                       <input
