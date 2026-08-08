@@ -256,6 +256,7 @@ class IncidentUploadRequest(BaseModel):
     additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
     gps_coordinates: Optional[Tuple[float, float]] = None # (lat, long)
     translation_language: Optional[str] = Field(None, description="Language to be used for translation of title and description of tasks, e.g., hindi, marathi")
+    incident_type: Optional[int] = 0
 
 @app.post("/inspections/{inspection_id}/upload-incident")
 async def upload_incident_endpoint(
@@ -347,7 +348,8 @@ async def upload_incident_endpoint(
         file_url=data.file_url,
         existing_incident_id = None,
         translation_language=data.translation_language,
-        gps_coordinates=data.gps_coordinates
+        gps_coordinates=data.gps_coordinates,
+        incident_type=data.incident_type if data.incident_type is not None else 0
     )
 
     return {
@@ -405,6 +407,11 @@ async def get_recent_incidents(
                 elif extension in ALLOWED_IMAGE_TYPES:
                     file_type = "image"
 
+            inc_type_int = inc.get("incident_type", 0)
+            if inc_type_int is None:
+                inc_type_int = 0
+            incident_type_str = "fieldnote" if inc_type_int == 1 else "incident"
+
             results.append({
                 "id": incident_id,
                 "incidentId": incident_id,
@@ -412,7 +419,8 @@ async def get_recent_incidents(
                 "uploadedAt": uploaded_at_str,
                 "incident_status": status,   # Status could be one of these values : processing / completed / failed
                 "displayMessage": display_message,
-                "incident_media": file_type
+                "incident_media": file_type,
+                "incident_type": inc_type_int
             })
         
         return {"status": "Success", "data": results}

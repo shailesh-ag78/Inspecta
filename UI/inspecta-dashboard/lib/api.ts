@@ -117,6 +117,7 @@ export function formatIncidents(incidents: any[]): any[] {
         created: new Date(incident.created_at).toISOString(),
         task_count: parseInt(incident.task_count),
         summary: incident.summary || "",
+        incident_type: incident.incident_type ? String(incident.incident_type).toLowerCase() : "incident",
       };
     });
 }
@@ -207,7 +208,8 @@ export async function registerIncident(
   primaryUrl: string,
   additionalFileUrls: string[],
   blobName?: string,
-  additionalBlobs?: string[]
+  additionalBlobs?: string[],
+  incidentType: string = "incident"
 ): Promise<{ incidentId: string }> {
 
   const registerResp = await authenticatedFetch(
@@ -221,7 +223,8 @@ export async function registerIncident(
         blob_name: blobName,
         additional_file_urls: additionalFileUrls,
         additional_blobs: additionalBlobs,
-        translation_language: ""
+        translation_language: "",
+        incident_type: incidentType
       }),
     }
   );

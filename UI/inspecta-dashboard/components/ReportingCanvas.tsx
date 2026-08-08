@@ -6,6 +6,7 @@ interface Incident {
   status: string;
   summary: string;
   created?: string;
+  incident_type?: string;
 }
 
 interface ReportingCanvasProps {

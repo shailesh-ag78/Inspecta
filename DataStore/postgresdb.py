@@ -31,6 +31,10 @@ class TaskType(IntEnum):
     VERIFY = 3
     CLEAR = 4
 
+class IncidentType(IntEnum):
+    INCIDENT = 0
+    FIELDNOTE = 1
+
 # --- 2. The Repository ---
 class IncidentRepository:
     def __init__(self, dsn: str):
@@ -66,7 +70,8 @@ class IncidentRepository:
         video_url: str, 
         gps_coordinates: Optional[tuple] = None, # (lat, long)
         audio_url: Optional[str] = None,
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
+        incident_type: int = 0
     ) -> str:
         """Creates the incident record linked to an inspection."""
         async with self.session(company_id) as conn:
@@ -81,11 +86,11 @@ class IncidentRepository:
                 await cur.execute(
                     """
                     INSERT INTO incidents 
-                    (inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s) 
+                    (inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates, incident_type) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
                     RETURNING id
                     """,
-                    (inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val)
+                    (inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val, incident_type)
                 )
                 result = await cur.fetchone()
                 if result is None:
@@ -400,7 +405,7 @@ class IncidentRepository:
             async with conn.cursor() as cur:
                 await cur.execute(
                     """
-                    SELECT id, inspection_id, video_url, created_at FROM incidents 
+                    SELECT id, inspection_id, video_url, created_at, incident_type FROM incidents 
                     WHERE company_id = %s AND created_at >= NOW() - (%s * INTERVAL '1 day') 
                     ORDER BY created_at DESC 
                     LIMIT %s

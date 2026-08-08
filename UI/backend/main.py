@@ -220,6 +220,7 @@ class IncidentInput(BaseModel):
     gps_lat: Optional[float] = None
     gps_lon: Optional[float] = None
     metadata: Optional[Dict[str, Any]] = {}
+    incident_type: Optional[str] = "incident"
 
 class TaskUpdateInput(BaseModel):
     task_title: str
@@ -242,6 +243,7 @@ class UIUploadIncidentRequest(BaseModel):
     additional_blobs: Optional[list[str]] = Field(None, description="List of blob names for additional files")
     blob_name: Optional[str] = None
     translation_language: Optional[str] = ""
+    incident_type: Optional[str] = "incident"
 
 
     def fill_default_data(self, request: Request):
@@ -322,6 +324,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 # ============ Incidents Endpoints ============
 
+def format_incident_response(incident: dict) -> dict:
+    if not incident:
+        return incident
+    res = dict(incident)
+    inc_type_int = res.get("incident_type", 0)
+    if inc_type_int is None:
+        inc_type_int = 0
+    res["incident_type"] = "fieldnote" if inc_type_int == 1 else "incident"
+    return res
+
 @app.get("/api/incidents")
 async def get_incidents_for_site_or_inspection(
     request: Request,
@@ -341,7 +353,8 @@ async def get_incidents_for_site_or_inspection(
         else:
             incidents = await repository.get_incidents_for_site(siteId, company_id)
         
-        return {"status": "success", "data": incidents}
+        formatted_incidents = [format_incident_response(i) for i in incidents]
+        return {"status": "success", "data": formatted_incidents}
     except Exception as e:
         print(f"❌ Error fetching incidents: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -379,7 +392,7 @@ async def get_incident(
         if not incident:
             raise HTTPException(status_code=404, detail="Incident not found")
         
-        return {"status": "success", "data": incident}
+        return {"status": "success", "data": format_incident_response(incident)}
     except HTTPException:
         raise
     except Exception as e:
@@ -400,6 +413,7 @@ async def create_incident(
         if incident.gps_lat is not None and incident.gps_lon is not None:
             gps_coords = (incident.gps_lat, incident.gps_lon)
         
+        inc_type_int = 1 if incident.incident_type and incident.incident_type.lower() == "fieldnote" else 0
         incident_id = await repository.create_incident(
             company_id=company_id,
             inspection_id=incident.inspection_id,
@@ -407,7 +421,8 @@ async def create_incident(
             video_url=incident.video_url,
             gps_coordinates=gps_coords,
             audio_url=incident.audio_url,
-            metadata=incident.metadata
+            metadata=incident.metadata,
+            incident_type=inc_type_int
         )
         
         return {"status": "success", "data": {"incident_id": incident_id}}
@@ -927,11 +942,13 @@ async def upload_incident(
         elif data.additional_file_urls:
             additional_file_urls = data.additional_file_urls
 
+        inc_type_int = 1 if data.incident_type and data.incident_type.lower() == "fieldnote" else 0
         payload = {
             "inspector_id": data.inspector_id,
             "file_url": file_url_payload,
             "additional_file_urls": additional_file_urls,
-            "translation_language": data.translation_language
+            "translation_language": data.translation_language,
+            "incident_type": inc_type_int
         }
         resp_data = CallExecutorService(executor_service_url, "POST", headers, payload)
         incident_id = resp_data.get("incident_id")
@@ -1008,6 +1025,12 @@ async def get_recent_incidents(
         headers = fill_auth_headers(request, headers)
         executor_service_url = BASE_EXECUTOR_URL + f"/incidents/recent?days={days}&limit={limit}"
         resp_data = CallExecutorService(executor_service_url, "GET", headers, None)
+        if resp_data and "data" in resp_data and isinstance(resp_data["data"], list):
+            for item in resp_data["data"]:
+                inc_type_val = item.get("incident_type", 0)
+                if inc_type_val is None:
+                    inc_type_val = 0
+                item["incident_type"] = "fieldnote" if inc_type_val == 1 else "incident"
         return resp_data
     except Exception as e:
         print(f"Error calling Executor for recent incidents: {e}")

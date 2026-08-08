@@ -31,6 +31,7 @@ interface Incident {
   status: string;
   created: string;
   task_count: number;
+  incident_type?: string;
 }
 
 interface Task {

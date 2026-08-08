@@ -4,7 +4,15 @@ import { useDashboard } from '@/lib/context';
 import { ChevronDown, ChevronLeft, Filter, AlertTriangle, FileText } from 'lucide-react';
 import React from 'react';
 
-export default function IncidentSelectionPane({ singleSiteMode = false }: { singleSiteMode?: boolean }) {
+export default function IncidentSelectionPane({ 
+  singleSiteMode = false,
+  defaultShowIncidents = true,
+  defaultShowFieldNotes = false
+}: { 
+  singleSiteMode?: boolean;
+  defaultShowIncidents?: boolean;
+  defaultShowFieldNotes?: boolean;
+}) {
   const {
     theme,
     siteInspections,
@@ -38,12 +46,17 @@ export default function IncidentSelectionPane({ singleSiteMode = false }: { sing
 
   // Incident Filtering State
   const [incidentDateFilter, setIncidentDateFilter] = React.useState<'All' | 'Today' | 'Last week'>('All');
-  const [showIncidents, setShowIncidents] = React.useState(true);
-  const [showFieldNotes, setShowFieldNotes] = React.useState(true);
+  const [showIncidents, setShowIncidents] = React.useState(defaultShowIncidents);
+  const [showFieldNotes, setShowFieldNotes] = React.useState(defaultShowFieldNotes);
   const [isIncidentFilterCollapsed, setIsIncidentFilterCollapsed] = React.useState(true);
 
   const filteredIncidents = React.useMemo(() => {
     return millerIncidents.filter(inc => {
+      // Type filter
+      const type = inc.incident_type ? inc.incident_type.toLowerCase() : 'incident';
+      if (type === 'fieldnote' && !showFieldNotes) return false;
+      if (type === 'incident' && !showIncidents) return false;
+
       // Date filter
       if (incidentDateFilter !== 'All') {
         if (!inc.created) return false;
@@ -373,7 +386,7 @@ export default function IncidentSelectionPane({ singleSiteMode = false }: { sing
                         {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                       </div>
                       <span className="truncate flex items-center gap-1">
-                        <span className="incident-icon" />
+                        <span className={incident.incident_type === 'fieldnote' ? 'field-note-icon' : 'incident-icon'} />
                         {label}
                       </span>
                     </label>
