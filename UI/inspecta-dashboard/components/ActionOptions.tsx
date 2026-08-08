@@ -13,7 +13,7 @@ export function ActionOptions({
   triggerFileUpload
 }: ActionOptionsProps) {
   const labelHeaderStyle = "text-base font-bold text-slate-700 tracking-wide";
-  const hyperlinkStyle = "text-base font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
+  const hyperlinkStyle = "text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
 
   return (
     <>

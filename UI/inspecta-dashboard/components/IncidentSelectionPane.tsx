@@ -1,10 +1,10 @@
 "use client";
 
 import { useDashboard } from '@/lib/context';
-import { ChevronDown, ChevronLeft } from 'lucide-react';
+import { ChevronDown, ChevronLeft, Filter, AlertTriangle, FileText } from 'lucide-react';
 import React from 'react';
 
-export default function IncidentSelectionPane() {
+export default function IncidentSelectionPane({ singleSiteMode = false }: { singleSiteMode?: boolean }) {
   const {
     theme,
     siteInspections,
@@ -21,6 +21,51 @@ export default function IncidentSelectionPane() {
     backendSites,
     millerIncidents,
   } = useDashboard();
+
+  // Enforce single site selection when in singleSiteMode
+  React.useEffect(() => {
+    if (singleSiteMode && selectedMillerSites.length > 1) {
+      setSelectedMillerSites([selectedMillerSites[0]]);
+    }
+  }, [singleSiteMode, selectedMillerSites, setSelectedMillerSites]);
+
+  // Responsive auto-collapse site column on mobile
+  React.useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsSiteColumnCollapsed(true);
+    }
+  }, [setIsSiteColumnCollapsed]);
+
+  // Incident Filtering State
+  const [incidentDateFilter, setIncidentDateFilter] = React.useState<'All' | 'Today' | 'Last week'>('All');
+  const [showIncidents, setShowIncidents] = React.useState(true);
+  const [showFieldNotes, setShowFieldNotes] = React.useState(true);
+  const [isIncidentFilterCollapsed, setIsIncidentFilterCollapsed] = React.useState(true);
+
+  const filteredIncidents = React.useMemo(() => {
+    return millerIncidents.filter(inc => {
+      // Date filter
+      if (incidentDateFilter !== 'All') {
+        if (!inc.created) return false;
+        const incDate = new Date(inc.created);
+        const now = new Date();
+        const diffDays = (now.getTime() - incDate.getTime()) / (1000 * 3600 * 24);
+        
+        if (incidentDateFilter === 'Today' && diffDays > 1) return false;
+        if (incidentDateFilter === 'Last week' && diffDays > 7) return false;
+      }
+      return true;
+    });
+  }, [millerIncidents, incidentDateFilter, showIncidents, showFieldNotes]);
+
+  // Uncheck incidents that become hidden
+  React.useEffect(() => {
+    const visibleIds = new Set(filteredIncidents.map(inc => inc.id));
+    const newSelected = selectedMillerIncidents.filter(id => visibleIds.has(id));
+    if (newSelected.length !== selectedMillerIncidents.length) {
+      setSelectedMillerIncidents(newSelected);
+    }
+  }, [filteredIncidents, selectedMillerIncidents, setSelectedMillerIncidents]);
 
   const availableInspections = siteInspections
     .filter(ins => selectedMillerSites.includes(ins.site_name))
@@ -47,7 +92,7 @@ export default function IncidentSelectionPane() {
     : selectedMillerIncidents.length === millerIncidents.length
       ? "All Incidents"
       : selectedMillerIncidents.length === 1
-        ? (millerIncidents.find(inc => inc.id === selectedMillerIncidents[0])?.title || "1 Selected")
+        ? `${selectedMillerIncidents[0].slice(0, 4)}XXX`
         : `${selectedMillerIncidents.length} Selected`;
 
   return (
@@ -79,16 +124,16 @@ export default function IncidentSelectionPane() {
       </div>
       {!isIncidentPaneCollapsed && (
         <div className="p-3 bg-slate-50/50">
-          <div className="flex flex-row divide-x divide-slate-200 border border-blue-200/50 rounded-xl h-[180px] overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
+          <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-slate-200 border border-blue-200/50 rounded-xl min-h-[220px] md:h-[220px] overflow-hidden bg-gradient-to-br from-slate-50 to-blue-50/70 shadow-sm">
             {/* Column 1: Sites */}
             {isSiteColumnCollapsed ? (
               <div
                 onClick={() => setIsSiteColumnCollapsed(false)}
-                className="w-8 bg-slate-100 hover:bg-slate-200 border-r border-slate-200 flex flex-col items-center py-3 cursor-pointer transition-colors"
+                className="md:w-8 md:h-full h-8 bg-slate-100 hover:bg-slate-200 md:border-r md:border-b-0 border-b border-slate-200 flex md:flex-col flex-row items-center justify-center md:py-3 cursor-pointer transition-colors"
                 title="Expand sites column"
               >
-                <ChevronLeft className="w-3.5 h-3.5 text-slate-500 transform rotate-180 mb-4" />
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest [writing-mode:vertical-lr] rotate-180 select-none">
+                <ChevronLeft className="w-3.5 h-3.5 text-slate-500 transform md:rotate-180 rotate-[-90deg] md:mb-4 md:mr-0 mr-3" />
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-widest md:[writing-mode:vertical-lr] md:rotate-180 select-none">
                   SITES ({selectedMillerSites.length})
                 </span>
               </div>
@@ -96,28 +141,30 @@ export default function IncidentSelectionPane() {
               <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin flex flex-col">
                 <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
                   <span className="text-xs font-bold text-amber-800 uppercase tracking-wider px-1 shrink-0">
-                    Sites ({selectedMillerSites.length})
+                    Sites ({singleSiteMode ? (selectedMillerSites.length > 0 ? 1 : 0) : selectedMillerSites.length})
                   </span>
-                  <div className="flex items-center gap-2 text-[11px] ml-auto mr-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMillerSites(backendSites.map(s => String(s.site_name || s.name || '')))}
-                      className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
-                    >
-                      Select All
-                    </button>
-                    <span className="text-slate-300">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMillerSites([])}
-                      className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
-                    >
-                      Deselect All
-                    </button>
-                  </div>
+                  {!singleSiteMode && (
+                    <div className="flex items-center gap-2 text-xs ml-auto mr-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMillerSites(backendSites.map(s => String(s.site_name || s.name || '')))}
+                        className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMillerSites([])}
+                        className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                      >
+                        Deselect All
+                      </button>
+                    </div>
+                  )}
                   <button
                     onClick={() => setIsSiteColumnCollapsed(true)}
-                    className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors shrink-0"
+                    className="text-slate-400 hover:text-slate-600 p-0.5 rounded transition-colors shrink-0 ml-auto"
                     title="Collapse sites column"
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
@@ -137,14 +184,28 @@ export default function IncidentSelectionPane() {
                         type="checkbox"
                         checked={isChecked}
                         onChange={() => {
-                          setSelectedMillerSites(prev =>
-                            prev.includes(siteId) ? prev.filter(s => s !== siteId) : [...prev, siteId]
-                          );
+                          if (singleSiteMode) {
+                            if (isChecked) {
+                              setSelectedMillerSites([]);
+                            } else {
+                              setSelectedMillerSites([siteId]);
+                            }
+                          } else {
+                            setSelectedMillerSites(prev =>
+                              prev.includes(siteId) ? prev.filter(s => s !== siteId) : [...prev, siteId]
+                            );
+                          }
                         }}
                         className="sr-only"
                       />
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
-                        {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
+                      <div className={`w-4 h-4 border flex items-center justify-center transition-all ${singleSiteMode ? 'rounded-full' : 'rounded'} ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
+                        {isChecked && (
+                          singleSiteMode ? (
+                            <div className="w-2 h-2 bg-slate-800 rounded-full" />
+                          ) : (
+                            <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />
+                          )
+                        )}
                       </div>
                       <span className="truncate flex items-center gap-1">
                         <span className="site-icon" />
@@ -162,7 +223,7 @@ export default function IncidentSelectionPane() {
                 <span className="text-xs font-bold text-blue-600 uppercase tracking-wider px-1 shrink-0">
                   Inspections ({selectedMillerInspections.length})
                 </span>
-                <div className="flex items-center gap-2 text-[11px] ml-auto px-1">
+                <div className="flex items-center gap-2 text-xs ml-auto px-1">
                   <button
                     type="button"
                     onClick={() => setSelectedMillerInspections(availableInspections.map(item => item.inspection_id || item.site_id).filter(Boolean) as string[])}
@@ -200,8 +261,8 @@ export default function IncidentSelectionPane() {
                     <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${isChecked ? 'border-slate-600 bg-slate-200/80 shadow-inner' : 'border-slate-300 bg-white hover:border-slate-400'}`}>
                       {isChecked && <i className="fa-solid fa-check text-[10px] text-slate-800 font-extrabold" />}
                     </div>
-                    <span className="truncate flex items-center gap-1">
-                      <span className="inspection-icon" />
+                    <span className="truncate flex items-center gap-1.5">
+                      <img src="/SiteInspection.ico" alt="Inspection" className="w-5 h-5 object-contain opacity-95 shrink-0" />
                       {item.label}
                     </span>
                   </label>
@@ -210,38 +271,92 @@ export default function IncidentSelectionPane() {
             </div>
 
             {/* Column 3: Incidents */}
-            <div className="flex-1 h-full overflow-y-auto p-2 space-y-1 scrollbar-thin">
-              <div className="flex items-center justify-between mb-1.5 border-b border-slate-200 pb-1">
+            <div className="flex-1 md:h-full overflow-y-auto p-2 space-y-1 scrollbar-thin">
+              <div className="flex flex-wrap items-center justify-between mb-1.5 border-b border-slate-200 pb-1 gap-1">
                 <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider px-1 shrink-0">
                   Incidents ({selectedMillerIncidents.length})
                 </span>
-                {millerIncidents.length > 0 && (
-                  <div className="flex items-center gap-2 text-[10px] ml-auto px-1">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMillerIncidents(millerIncidents.map(inc => inc.id))}
-                      className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
-                    >
-                      Select All
-                    </button>
-                    <span className="text-slate-300">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedMillerIncidents([])}
-                      className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
-                    >
-                      Deselect All
-                    </button>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 text-xs ml-auto px-1">
+                  <button
+                    type="button"
+                    onClick={() => setIsIncidentFilterCollapsed(!isIncidentFilterCollapsed)}
+                    className={`flex items-center gap-1 font-bold px-1.5 py-0.5 rounded transition-colors ${!isIncidentFilterCollapsed ? 'bg-slate-200/50 text-slate-600' : 'bg-slate-200/50 text-slate-500 hover:text-slate-800'}`}
+                  >
+                    <Filter className="w-3.5 h-3.5 text-slate-400" />
+                    Filter
+                  </button>
+                  {filteredIncidents.length > 0 && (
+                    <>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMillerIncidents(filteredIncidents.map(inc => inc.id))}
+                        className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                      >
+                        Select All
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedMillerIncidents([])}
+                        className="text-slate-500 hover:text-slate-700 font-bold cursor-pointer"
+                      >
+                        Deselect All
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
-              {millerIncidents.length === 0 ? (
+              {/* Filter Bar */}
+              {!isIncidentFilterCollapsed && (
+                <div className="bg-slate-50/70 border border-slate-200/80 rounded-lg p-2.5 mb-2 shadow-inner space-y-3">
+                  {/* Modern Segmented Control for Dates */}
+                  <div className="inline-flex bg-slate-200/50 p-1 rounded-md border border-slate-200">
+                    {(['All', 'Today', 'Last week'] as const).map(opt => {
+                      const isActive = incidentDateFilter === opt;
+                      return (
+                        <button
+                          key={opt}
+                          type="button"
+                          onClick={() => setIncidentDateFilter(opt)}
+                          className={`px-4 py-1.5 rounded text-xs font-bold transition-all duration-200 ${isActive ? 'bg-white text-slate-800 shadow-sm border border-slate-200/60' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 border border-transparent'}`}
+                        >
+                          {opt}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Modern Independent Pill Toggles */}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowIncidents(!showIncidents)}
+                      className={`relative inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 border ${showIncidents ? 'bg-gradient-to-br from-orange-50 to-orange-100/60 border-orange-200 text-orange-800 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:border-slate-300'}`}
+                    >
+                      <span className={`incident-icon ${!showIncidents ? 'opacity-50 grayscale' : ''}`} />
+                      Incidents
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => setShowFieldNotes(!showFieldNotes)}
+                      className={`relative inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 border ${showFieldNotes ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm' : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50 hover:border-slate-300'}`}
+                    >
+                      <span className={`field-note-icon ${!showFieldNotes ? 'opacity-50 grayscale' : ''}`} />
+                      Field Notes
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {filteredIncidents.length === 0 ? (
                 <div className="text-[13px] text-slate-450 italic px-2 py-1">No incidents found</div>
               ) : (
-                [...millerIncidents].sort((a, b) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime()).map(incident => {
+                [...filteredIncidents].sort((a, b) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime()).map(incident => {
                   const isChecked = selectedMillerIncidents.includes(incident.id);
-                  const label = incident.title || `Incident ${incident.id.slice(0, 4)}`;
+                  const label = `${incident.id.slice(0, 4)}XXX`;
                   return (
                     <label key={incident.id} className="flex items-center gap-2 text-[13px] font-normal text-slate-800 hover:text-slate-950 cursor-pointer select-none py-0.5">
                       <input

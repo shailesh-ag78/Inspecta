@@ -62,6 +62,7 @@ CREATE TABLE incidents (
     company_id INTEGER REFERENCES companies(id),
     inspector_id INTEGER REFERENCES inspectors(id),
     gps_coordinates POINT,
+    summary TEXT,
     
     -- Master Media References
     video_url TEXT, -- Primary GCS link

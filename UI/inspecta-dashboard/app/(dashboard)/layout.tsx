@@ -10,7 +10,7 @@ import IncidentSelectionPane from "@/components/IncidentSelectionPane";
 import { themes } from "@/lib/themes";
 
 function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const {
     user,
     theme,
@@ -343,7 +343,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
         {/* Main Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col">
-          {pathname !== "/inspection" && <IncidentSelectionPane />}
+          {pathname !== "/inspection" && (
+            <IncidentSelectionPane key={pathname} singleSiteMode={pathname === "/reports"} />
+          )}
           <div className="flex-1 overflow-hidden">
             {children}
           </div>

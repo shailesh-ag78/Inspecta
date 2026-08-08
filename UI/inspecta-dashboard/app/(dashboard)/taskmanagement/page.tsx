@@ -1234,23 +1234,7 @@ export default function TaskManagementPage() {
         )}
       </main>
 
-      {/* Mobile Sticky Bottom Action Bar */}
-      <div className="lg:hidden shrink-0 bg-slate-900 border-t border-slate-700/50 p-3 flex gap-3 z-30 sticky bottom-0 mobile-action-bar">
-        <button
-          onClick={() => setIsAddInspectionOpen(true)}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} hover:brightness-110 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95`}
-        >
-          <Plus className="w-4 h-4" />
-          Add Inspection
-        </button>
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition-all shadow-md active:scale-95"
-        >
-          <Upload className="w-4 h-4" />
-          Upload Incident Video
-        </button>
-      </div>
+
 
       <input
         type="file"

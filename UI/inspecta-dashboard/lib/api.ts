@@ -116,6 +116,7 @@ export function formatIncidents(incidents: any[]): any[] {
         status,
         created: new Date(incident.created_at).toISOString(),
         task_count: parseInt(incident.task_count),
+        summary: incident.summary || "",
       };
     });
 }

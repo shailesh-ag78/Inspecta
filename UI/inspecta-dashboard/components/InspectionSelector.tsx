@@ -52,13 +52,13 @@ export function InspectionSelector({
         <select
           value={selectedSiteId}
           onChange={(e) => setSelectedSiteId(e.target.value)}
-          className="w-full text-base font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11"
+          className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11"
         >
           {backendSites.length === 0 ? (
             <option value="">No Sites Available</option>
           ) : (
             backendSites.map((site) => (
-              <option key={site.site_id || site.id} value={site.site_id || site.id} className="text-base">
+              <option key={site.site_id || site.id} value={site.site_id || site.id} className="text-sm">
                 🏢  {site.site_name || site.name}
               </option>
             ))
@@ -74,7 +74,7 @@ export function InspectionSelector({
             value={selectedInspectionId}
             disabled={isSiteDisabled}
             onChange={(e) => setSelectedInspectionId(e.target.value)}
-            className="w-full text-base font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11 disabled:opacity-50"
+            className="w-full text-sm font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-3 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11 disabled:opacity-50"
           >
             {filteredInspections.length === 0 ? (
               <option value="">No Inspections Available under Site</option>
@@ -83,7 +83,7 @@ export function InspectionSelector({
                 const dateStr = formatDate(ins.inspection_created_at);
                 const displayLabel = dateStr ? `${ins.label} (${dateStr})` : ins.label;
                 return (
-                  <option key={ins.inspection_id} value={ins.inspection_id || ""} className="text-base">
+                  <option key={ins.inspection_id} value={ins.inspection_id || ""} className="text-sm">
                     🔍  {displayLabel}
                   </option>
                 );
@@ -99,7 +99,7 @@ export function InspectionSelector({
               type="button"
               disabled={isSiteDisabled}
               onClick={() => setIsAddingInspectionInline(true)}
-              className="text-base font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 self-start transition-colors px-1 py-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 self-start transition-colors px-1 py-0.5 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Plus className="w-5 h-5 text-blue-600" />
               <span>Create New Inspection</span>
