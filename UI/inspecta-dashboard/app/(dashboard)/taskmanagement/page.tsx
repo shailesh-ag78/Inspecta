@@ -1193,37 +1193,6 @@ export default function TaskManagementPage() {
                 )}
               </div>
 
-              <div className="absolute bottom-12 right-5 flex flex-col items-end gap-3 z-30">
-                <button
-                  onClick={() => setIsAddInspectionOpen(true)}
-                  className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-xs font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)]"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add Inspection
-                </button>
-
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold rounded-full transition-all hover:-translate-y-0.5 active:translate-y-0 whitespace-nowrap shadow-[0_4px_14px_rgba(0,0,0,0.3)]"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    Upload incident video
-                  </button>
-                </div>
-              </div>
-
-              <div className="absolute bottom-0 left-0 right-0 h-9 bg-slate-950/90 border-t border-slate-700/50 flex items-center px-4 z-30">
-                <span className="text-xs text-slate-400 font-medium truncate">
-                  {lastUploadedFileName?.startsWith('Failed') ? (
-                    <span className="text-red-400 font-semibold">{lastUploadedFileName}</span>
-                  ) : (
-                    <>
-                      Last uploaded video: <span className="text-blue-400 font-semibold">{lastUploadedFileName || 'None'}</span>
-                    </>
-                  )}
-                </span>
-              </div>
             </div>
           </aside>
         )}
@@ -1235,7 +1204,7 @@ export default function TaskManagementPage() {
             className={`w-12 bg-gradient-to-r ${theme.primary.from} ${theme.primary.to} hover:brightness-110 text-white flex items-center justify-center transition-all duration-200 border-l-2 border-white/20 shadow-lg`}
             title="Expand Video Pane"
           >
-            <ChevronLeft className="w-5 h-5 rotate-180" />
+            <ChevronLeft className="w-5 h-5" />
           </button>
         )}
       </main>
