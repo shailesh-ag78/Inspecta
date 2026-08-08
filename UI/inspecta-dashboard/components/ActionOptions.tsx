@@ -13,7 +13,10 @@ export function ActionOptions({
   triggerFileUpload
 }: ActionOptionsProps) {
   const labelHeaderStyle = "text-base font-bold text-slate-700 tracking-wide";
-  const hyperlinkStyle = "text-sm font-bold text-blue-600 hover:text-blue-700 flex items-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer";
+
+  // Custom styled tile classes with 10% height reduction (88px -> 80px) and font size boost
+  const incidentTileStyle = "relative w-full h-[80px] border border-orange-200/80 bg-orange-50/60 hover:bg-orange-100/85 hover:border-orange-350 rounded-lg flex flex-col items-center justify-center gap-1 shadow-sm transition-all select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
+  const fieldNoteTileStyle = "relative w-full h-[80px] border border-blue-200/80 bg-blue-100/60 hover:bg-blue-200/85 hover:border-blue-350 rounded-lg flex flex-col items-center justify-center gap-1 shadow-sm transition-all select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
 
   return (
     <>
@@ -23,59 +26,46 @@ export function ActionOptions({
           <span className="incident-icon text-base bg-blue-50 p-1.5 rounded-lg border border-blue-100/70 inline-flex items-center justify-center w-8 h-8 select-none" />
           <span>Add New Incident</span>
         </h4>
-        <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-[560px] px-1 mt-1.5">
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("audio", "incident")}
-            className={hyperlinkStyle}
+            className={incidentTileStyle}
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Mic className="w-5 h-5 text-[#800000] shrink-0" />
-              </div>
-              <span className="ml-3 text-left">Record Audio</span>
-            </div>
+            <Mic className="w-6 h-6 text-[#800000] shrink-0" />
+            <span className="text-xs text-[#800000] tracking-wide">Record Audio</span>
           </button>
+
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("video", "incident")}
-            className={hyperlinkStyle}
+            className={incidentTileStyle}
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Video className="w-5 h-5 text-blue-600 shrink-0" />
-              </div>
-              <span className="ml-3 text-left">Record Video</span>
-            </div>
+            <Video className="w-6 h-6 text-blue-600 shrink-0" />
+            <span className="text-xs text-blue-600 tracking-wide">Record Video</span>
           </button>
+
           <button
             type="button"
             disabled={true}
             onClick={() => openRecordingOverlay("image", "incident")}
-            className={hyperlinkStyle}
+            className={incidentTileStyle}
             title="Picture option under Add New Incident is disabled (will be implemented at a later stage)"
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Camera className="w-5 h-5 text-green-600 shrink-0" />
-              </div>
-              <span className="ml-3 text-left font-normal text-slate-400">Picture (Disabled)</span>
-            </div>
+            <Camera className="w-6 h-6 text-green-600 shrink-0 opacity-50" />
+            <span className="text-xs text-green-600 opacity-50 tracking-wide">Picture</span>
           </button>
+
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => triggerFileUpload("incident")}
-            className={hyperlinkStyle}
+            className={incidentTileStyle}
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Upload className="w-5 h-5 text-purple-600 shrink-0" />
-              </div>
-              <span className="ml-3 text-left">Upload File</span>
-            </div>
+            <Upload className="w-6 h-6 text-purple-600 shrink-0" />
+            <span className="text-xs text-purple-600 tracking-wide">Upload File</span>
           </button>
         </div>
       </div>
@@ -86,58 +76,45 @@ export function ActionOptions({
           <span className="field-note-icon text-base bg-slate-50 p-1.5 rounded-lg border border-slate-100/70 text-lg inline-flex items-center justify-center w-8 h-8 select-none" />
           <span>Add Field Note</span>
         </h4>
-        <div className="grid grid-cols-2 gap-y-3.5 gap-x-4 max-w-[485px] px-1 mt-1">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 max-w-[560px] px-1 mt-1.5">
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("audio", "field_note")}
-            className={hyperlinkStyle}
+            className={fieldNoteTileStyle}
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Mic className="w-5 h-5 text-[#800000] shrink-0" />
-              </div>
-              <span className="ml-3 text-left">Record Audio</span>
-            </div>
+            <Mic className="w-6 h-6 text-[#800000] shrink-0" />
+            <span className="text-xs text-[#800000] tracking-wide">Record Audio</span>
           </button>
+
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("video", "field_note")}
-            className={hyperlinkStyle}
+            className={fieldNoteTileStyle}
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Video className="w-5 h-5 text-blue-600 shrink-0" />
-              </div>
-              <span className="ml-3 text-left">Record Video</span>
-            </div>
+            <Video className="w-6 h-6 text-blue-600 shrink-0" />
+            <span className="text-xs text-blue-600 tracking-wide">Record Video</span>
           </button>
+
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("image", "field_note")}
-            className={hyperlinkStyle}
+            className={fieldNoteTileStyle}
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Camera className="w-5 h-5 text-green-600 shrink-0" />
-              </div>
-              <span className="ml-3 text-left">Picture</span>
-            </div>
+            <Camera className="w-6 h-6 text-green-600 shrink-0" />
+            <span className="text-xs text-green-600 tracking-wide">Picture</span>
           </button>
+
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => triggerFileUpload("field_note")}
-            className={hyperlinkStyle}
+            className={fieldNoteTileStyle}
           >
-            <div className="flex items-center">
-              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-200">
-                <Upload className="w-5 h-5 text-purple-600 shrink-0" />
-              </div>
-              <span className="ml-3 text-left">Upload File</span>
-            </div>
+            <Upload className="w-6 h-6 text-purple-600 shrink-0" />
+            <span className="text-xs text-purple-600 tracking-wide">Upload File</span>
           </button>
         </div>
       </div>

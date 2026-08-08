@@ -117,7 +117,7 @@ body {
 
 /* Inspection Icon */
 .inspection-icon::before {
-  content: "🔍";
+  content: url(../public/SiteInspection.ico);
 }
 
 /* Field Note Icon */
