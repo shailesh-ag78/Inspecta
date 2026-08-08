@@ -229,12 +229,18 @@ export default function TaskManagementPage() {
   };
 
   const getTaskTypeIcon = (type: string) => {
-    switch (type) {
-      case 'install': return 'fa-tools';
-      case 'repair': return 'fa-wrench';
-      case 'verify': return 'fa-clipboard-check';
-      case 'clear': return 'fa-broom';
-      default: return 'fa-question';
+    switch (type?.toLowerCase()?.trim()) {
+      case 'install':
+      case 'insatll':
+        return 'fa-tools';
+      case 'repair':
+        return 'fa-wrench';
+      case 'verify':
+        return 'fa-clipboard-check';
+      case 'clear':
+        return 'fa-broom';
+      default:
+        return 'fa-question';
     }
   };
 

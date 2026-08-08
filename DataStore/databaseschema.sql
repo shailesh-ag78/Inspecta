@@ -68,6 +68,7 @@ CREATE TABLE incidents (
     video_url TEXT, -- Primary GCS link
     audio_url TEXT, -- Primary GCS link
     
+    incident_type SMALLINT NOT NULL DEFAULT 0, -- 0: incident (Default), 1: fieldnote
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

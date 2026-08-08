@@ -5,6 +5,7 @@ interface Incident {
   id: string;
   summary?: string;
   created?: string;
+  incident_type?: string;
 }
 
 interface ReportingIncidentsProps {
@@ -82,6 +83,25 @@ export function ReportingIncidents({
             const timeStr = createdDate ? createdDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'N/A';
             const isSelected = selectedIncidentIds.includes(incident.id);
             const isAlreadyAdded = droppedIncidentIds.includes(incident.id);
+            const isFieldNote = incident.incident_type === 'fieldnote';
+            let tileClasses = "";
+            let textLabelClass = "";
+
+            if (isFieldNote) {
+              tileClasses = isAlreadyAdded
+                ? "bg-blue-50/50 border-blue-200/60 opacity-85 cursor-not-allowed text-blue-950/70"
+                : isSelected
+                  ? "bg-gradient-to-br from-blue-100 to-blue-200 border-blue-400 ring-2 ring-blue-300 cursor-grab active:cursor-grabbing"
+                  : "bg-gradient-to-br from-blue-50 to-blue-100/60 border-blue-200/80 hover:border-blue-350 cursor-grab active:cursor-grabbing";
+              textLabelClass = "text-[11px] font-black text-blue-900 tracking-wider truncate w-full px-1 transition-colors";
+            } else {
+              tileClasses = isAlreadyAdded
+                ? "bg-orange-50/50 border-orange-200/60 opacity-85 cursor-not-allowed text-orange-950/70"
+                : isSelected
+                  ? "bg-gradient-to-br from-orange-100 to-orange-200 border-orange-400 ring-2 ring-orange-300 cursor-grab active:cursor-grabbing"
+                  : "bg-gradient-to-br from-orange-50 to-orange-100/60 border-orange-200/80 hover:border-orange-350 cursor-grab active:cursor-grabbing";
+              textLabelClass = "text-[11px] font-black text-orange-900 tracking-wider truncate w-full px-1 group-hover:text-blue-600 transition-colors";
+            }
 
             return (
               <div
@@ -89,12 +109,7 @@ export function ReportingIncidents({
                 draggable={!isAlreadyAdded}
                 onDragStart={(e) => !isAlreadyAdded && onDragStart(e, incident.id)}
                 onClick={() => !isAlreadyAdded && onToggleSelect(incident.id)}
-                className={`relative w-full h-[88px] border rounded-lg flex flex-col items-center justify-center shadow-sm transition-all select-none group text-center px-1 ${isAlreadyAdded
-                  ? "bg-orange-50/50 border-orange-200/60 opacity-85 cursor-not-allowed text-orange-950/70"
-                  : isSelected
-                    ? "bg-gradient-to-br from-orange-100 to-orange-200 border-orange-400 ring-2 ring-orange-300 cursor-grab active:cursor-grabbing"
-                    : "bg-gradient-to-br from-orange-50 to-orange-100/60 border-orange-200/80 hover:border-orange-350 cursor-grab active:cursor-grabbing"
-                  }`}
+                className={`relative w-full h-[88px] border rounded-lg flex flex-col items-center justify-center shadow-sm transition-all select-none group text-center px-1 ${tileClasses}`}
                 id={label}
                 title={incident.summary || `Incident ${incident.id}`}
               >
@@ -104,7 +119,7 @@ export function ReportingIncidents({
                 )}
 
                 {/* Match IncidentSelectionPane format (Row 1) */}
-                <span className="text-[11px] font-black text-orange-900 tracking-wider truncate w-full px-1 group-hover:text-blue-600 transition-colors">
+                <span className={textLabelClass}>
                   {label}
                 </span>
 

@@ -194,7 +194,7 @@ export default function InspectionPage() {
 
     try {
       const constraints = {
-        video: mode === "video" || mode === "image" ? { width: 640, height: 480 } : false,
+        video: mode === "video" || mode === "image" ? { width: 640, height: 480, facingMode: "environment" } : false,
         audio: true
       };
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -365,7 +365,7 @@ export default function InspectionPage() {
         setIsRecordingPaused(true);
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480, facingMode: "environment" } });
       setTempCameraStream(stream);
       setIsAudioPhotoTaking(true);
 
@@ -521,7 +521,7 @@ export default function InspectionPage() {
     try {
       const { uploadUrl, blobName } = await uploadFileToStorage(file, onProgress);
       setUploadProgress(null);
-      const { incidentId } = await registerIncident(selectedInspectionId, uploadUrl, [], blobName, []);
+      const { incidentId } = await registerIncident(selectedInspectionId, uploadUrl, [], blobName, [], category === "field_note" ? "fieldnote" : "incident");
 
       setIncidentUploads(prev => prev.map(inc => inc.id === newId ? {
         ...inc,

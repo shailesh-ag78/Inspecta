@@ -48,7 +48,7 @@ INSERT INTO inspectors (company_id, full_name, email) VALUES
 (2, 'Inspector A', 'inspectorA@precision.com'),
 (3, 'Inspector A', 'inspectorA@magicinteriors.com'),
 (4, 'Inspector A', 'inspectorA@agrocop.com')
-ON CONFLICT (id) DO NOTHING;
+ON CONFLICT (email) DO NOTHING;
 
 -- =========================================================================
 -- Adding new company and site for Interior Design industry

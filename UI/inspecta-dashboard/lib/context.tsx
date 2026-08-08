@@ -31,6 +31,7 @@ interface Incident {
   status: string;
   created: string;
   task_count: number;
+  incident_type?: string;
 }
 
 interface Task {
@@ -125,6 +126,12 @@ interface DashboardContextType {
   fetchRecentIncidents: () => Promise<void>;
   processUploadQueue: () => Promise<void>;
   clearLocalBundles: () => Promise<void>;
+  showIncidents: boolean;
+  setShowIncidents: (val: React.SetStateAction<boolean>) => void;
+  showFieldNotes: boolean;
+  setShowFieldNotes: (val: React.SetStateAction<boolean>) => void;
+  incidentDateFilter: 'All' | 'Today' | 'Last week';
+  setIncidentDateFilter: (val: React.SetStateAction<'All' | 'Today' | 'Last week'>) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -332,7 +339,14 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: "Registering incident..." } : inc));
           console.log(`[Queue] All files uploaded. Registering incident with additional ${additionalFileUrls.length} files.`);
 
-          const { incidentId } = await registerIncident(bundle.inspectionId, primaryUrl, additionalFileUrls, primaryBlobName, additionalBlobs);
+          const { incidentId } = await registerIncident(
+            bundle.inspectionId,
+            primaryUrl,
+            additionalFileUrls,
+            primaryBlobName,
+            additionalBlobs,
+            bundle.category === "field_note" ? "fieldnote" : "incident"
+          );
 
           console.log(`[Queue] Bundle ${bundle.id} uploaded and registered completely. Incident ID: ${incidentId}`);
 
@@ -752,7 +766,8 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           primaryResult.uploadUrl,
           additionalResults.map(r => r.uploadUrl),
           primaryResult.blobName,
-          additionalResults.map(r => r.blobName)
+          additionalResults.map(r => r.blobName),
+          "incident"
         );
 
         setLastUploadedFileName(primaryFile.name);
@@ -853,6 +868,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     sites: string[];
     inspections: string[];
     incidents: string[];
+    showIncidents?: boolean;
+    showFieldNotes?: boolean;
+    incidentDateFilter?: 'All' | 'Today' | 'Last week';
   }>>({});
 
   const [backendSites, setBackendSites] = useState<any[]>([]);
@@ -871,16 +889,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedMillerSites = useCallback((val: React.SetStateAction<string[]>) => {
     setSelectionsByPath(prev => {
-      const currentVal = prev[currentPath]?.sites !== undefined
-        ? prev[currentPath].sites
-        : backendSites.map((s: any) => String(s.site_name || s.name || ''));
-      const next = typeof val === 'function' ? (val as Function)(currentVal) : val;
+      const defaultState = {
+        sites: backendSites.map((s: any) => String(s.site_name || s.name || '')),
+        inspections: [],
+        incidents: [],
+        showIncidents: currentPath === '/reports' ? false : true,
+        showFieldNotes: currentPath === '/reports' ? true : false,
+        incidentDateFilter: 'All' as const
+      };
+      const currentObj = prev[currentPath] || defaultState;
+      const next = typeof val === 'function' ? (val as Function)(currentObj.sites) : val;
       return {
         ...prev,
         [currentPath]: {
-          sites: next,
-          inspections: prev[currentPath]?.inspections || [],
-          incidents: prev[currentPath]?.incidents || []
+          ...currentObj,
+          sites: next
         }
       };
     });
@@ -888,16 +911,21 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedMillerInspections = useCallback((val: React.SetStateAction<string[]>) => {
     setSelectionsByPath(prev => {
-      const currentVal = prev[currentPath]?.inspections || [];
-      const next = typeof val === 'function' ? (val as Function)(currentVal) : val;
+      const defaultState = {
+        sites: backendSites.map((s: any) => String(s.site_name || s.name || '')),
+        inspections: [],
+        incidents: [],
+        showIncidents: currentPath === '/reports' ? false : true,
+        showFieldNotes: currentPath === '/reports' ? true : false,
+        incidentDateFilter: 'All' as const
+      };
+      const currentObj = prev[currentPath] || defaultState;
+      const next = typeof val === 'function' ? (val as Function)(currentObj.inspections) : val;
       return {
         ...prev,
         [currentPath]: {
-          sites: prev[currentPath]?.sites !== undefined
-            ? prev[currentPath].sites
-            : backendSites.map((s: any) => String(s.site_name || s.name || '')),
-          inspections: next,
-          incidents: prev[currentPath]?.incidents || []
+          ...currentObj,
+          inspections: next
         }
       };
     });
@@ -905,16 +933,99 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const setSelectedMillerIncidents = useCallback((val: React.SetStateAction<string[]>) => {
     setSelectionsByPath(prev => {
-      const currentVal = prev[currentPath]?.incidents || [];
-      const next = typeof val === 'function' ? (val as Function)(currentVal) : val;
+      const defaultState = {
+        sites: backendSites.map((s: any) => String(s.site_name || s.name || '')),
+        inspections: [],
+        incidents: [],
+        showIncidents: currentPath === '/reports' ? false : true,
+        showFieldNotes: currentPath === '/reports' ? true : false,
+        incidentDateFilter: 'All' as const
+      };
+      const currentObj = prev[currentPath] || defaultState;
+      const next = typeof val === 'function' ? (val as Function)(currentObj.incidents) : val;
       return {
         ...prev,
         [currentPath]: {
-          sites: prev[currentPath]?.sites !== undefined
-            ? prev[currentPath].sites
-            : backendSites.map((s: any) => String(s.site_name || s.name || '')),
-          inspections: prev[currentPath]?.inspections || [],
+          ...currentObj,
           incidents: next
+        }
+      };
+    });
+  }, [currentPath, backendSites]);
+
+  const showIncidents = selectionsByPath[currentPath]?.showIncidents !== undefined
+    ? selectionsByPath[currentPath].showIncidents
+    : (currentPath === '/reports' ? false : true);
+
+  const showFieldNotes = selectionsByPath[currentPath]?.showFieldNotes !== undefined
+    ? selectionsByPath[currentPath].showFieldNotes
+    : (currentPath === '/reports' ? true : false);
+
+  const incidentDateFilter = selectionsByPath[currentPath]?.incidentDateFilter !== undefined
+    ? selectionsByPath[currentPath].incidentDateFilter
+    : 'All';
+
+  const setShowIncidents = useCallback((val: React.SetStateAction<boolean>) => {
+    setSelectionsByPath(prev => {
+      const defaultState = {
+        sites: backendSites.map((s: any) => String(s.site_name || s.name || '')),
+        inspections: [],
+        incidents: [],
+        showIncidents: currentPath === '/reports' ? false : true,
+        showFieldNotes: currentPath === '/reports' ? true : false,
+        incidentDateFilter: 'All' as const
+      };
+      const currentObj = prev[currentPath] || defaultState;
+      const next = typeof val === 'function' ? (val as Function)(currentObj.showIncidents) : val;
+      return {
+        ...prev,
+        [currentPath]: {
+          ...currentObj,
+          showIncidents: next
+        }
+      };
+    });
+  }, [currentPath, backendSites]);
+
+  const setShowFieldNotes = useCallback((val: React.SetStateAction<boolean>) => {
+    setSelectionsByPath(prev => {
+      const defaultState = {
+        sites: backendSites.map((s: any) => String(s.site_name || s.name || '')),
+        inspections: [],
+        incidents: [],
+        showIncidents: currentPath === '/reports' ? false : true,
+        showFieldNotes: currentPath === '/reports' ? true : false,
+        incidentDateFilter: 'All' as const
+      };
+      const currentObj = prev[currentPath] || defaultState;
+      const next = typeof val === 'function' ? (val as Function)(currentObj.showFieldNotes) : val;
+      return {
+        ...prev,
+        [currentPath]: {
+          ...currentObj,
+          showFieldNotes: next
+        }
+      };
+    });
+  }, [currentPath, backendSites]);
+
+  const setIncidentDateFilter = useCallback((val: React.SetStateAction<'All' | 'Today' | 'Last week'>) => {
+    setSelectionsByPath(prev => {
+      const defaultState = {
+        sites: backendSites.map((s: any) => String(s.site_name || s.name || '')),
+        inspections: [],
+        incidents: [],
+        showIncidents: currentPath === '/reports' ? false : true,
+        showFieldNotes: currentPath === '/reports' ? true : false,
+        incidentDateFilter: 'All' as const
+      };
+      const currentObj = prev[currentPath] || defaultState;
+      const next = typeof val === 'function' ? (val as Function)(currentObj.incidentDateFilter) : val;
+      return {
+        ...prev,
+        [currentPath]: {
+          ...currentObj,
+          incidentDateFilter: next
         }
       };
     });
@@ -1088,6 +1199,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         fetchRecentIncidents,
         processUploadQueue,
         clearLocalBundles,
+        showIncidents,
+        setShowIncidents,
+        showFieldNotes,
+        setShowFieldNotes,
+        incidentDateFilter,
+        setIncidentDateFilter,
       }}
     >
       {children}
