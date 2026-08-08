@@ -4,11 +4,11 @@ import { useDashboard } from '@/lib/context';
 import { ChevronDown, ChevronLeft, Filter, AlertTriangle, FileText } from 'lucide-react';
 import React from 'react';
 
-export default function IncidentSelectionPane({ 
+export default function IncidentSelectionPane({
   singleSiteMode = false,
   defaultShowIncidents = true,
   defaultShowFieldNotes = false
-}: { 
+}: {
   singleSiteMode?: boolean;
   defaultShowIncidents?: boolean;
   defaultShowFieldNotes?: boolean;
