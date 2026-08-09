@@ -291,6 +291,8 @@ class WorkflowExecutor:
             # Server generates ID to ensure uniqueness and security
             # 2. PERSISTENCE: Create the initial incident record
             # This ensures the UI can immediately see the incident exists
+            logger.info("Images count: %s", len(images) if images else 0)
+            logger.info("Image JSON : " + json.dumps(images or []))
             incident_id = await self.repo.create_incident(
                 company_id=company_id,
                 inspection_id=inspection_id,

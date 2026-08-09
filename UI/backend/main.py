@@ -5,6 +5,7 @@ sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 import os
 from pathlib import Path
+from typing import TypedDict, List, Optional
 
 # Windows asyncio event loop fix for Psycopg
 # Must be set BEFORE importing asyncio-dependent libraries
@@ -236,15 +237,37 @@ class SiteInput(BaseModel):
     site_name: str
     address: str
 
+class ImageURL(TypedDict):
+    url: str
+    blob: str
+    timestamp_sec: float
+
 class UIUploadIncidentRequest(BaseModel):
     inspector_id: int
     file_url: str
-    additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
-    additional_blobs: Optional[list[str]] = Field(None, description="List of blob names for additional files")
+    # additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
+    # additional_blobs: Optional[list[str]] = Field(None, description="List of blob names for additional files")
     blob_name: Optional[str] = None
     translation_language: Optional[str] = ""
     incident_type: Optional[str] = "incident"
+    image_urls: Optional[List[ImageURL]] = None # description="List of Image URLs and blobs with timestamp")
 
+    def create_imagefile_list(self)->List[dict]:
+        imagefile_list: list[dict] = []
+        if self.image_urls:
+            for image_url in self.image_urls:
+                if ENV_MODE != "local" and image_url["blob"]:
+                    file_url = f"gs://{INSPCTA_FILE_BUCKET}/{image_url['blob']}"
+                elif image_url["url"]:  
+                    file_url = image_url["url"]
+                else:
+                    continue
+
+                imagefile_list.append({
+                    "url": file_url,
+                    "timestamp_sec": image_url["timestamp_sec"]
+                })
+        return imagefile_list
 
     def fill_default_data(self, request: Request):
         self.inspector_id = 1  # ToDo : This also shall be filled using firebase custom claim
@@ -654,7 +677,7 @@ async def get_site_inspections(request: Request):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/api/upload-incident")
+@app.post("/api/create-site")
 async def upload_incident(
     request: Request,
     inspection_id: int,
@@ -885,7 +908,6 @@ async def get_upload_url(request: Request, fileName: str = Query(..., descriptio
         upload_url = resp_data.get("upload_url")
         blob_name = resp_data.get("blob_name")
         storage_type = resp_data.get("storage_type")
-        #print(f"✅ Received Upload Path: {upload_url} and  Received Blob Name: {blob_name} and Storage Type: {storage_type} and fileType = {fileType}")
         return {"status": "success", "data": {"upload_url": upload_url, "blob_name": blob_name, "storage_type": storage_type, "file_type": fileType}}
     except Exception as e:
         print(f"Error calling Executor: {e}")
@@ -936,17 +958,18 @@ async def upload_incident(
 
         file_url_payload = f"gs://{INSPCTA_FILE_BUCKET}/{data.blob_name}" if ENV_MODE != "local" and data.blob_name else data.file_url
         
-        additional_file_urls = []
-        if ENV_MODE != "local" and data.additional_blobs:
-            additional_file_urls = [f"gs://{INSPCTA_FILE_BUCKET}/{blob}" for blob in data.additional_blobs]
-        elif data.additional_file_urls:
-            additional_file_urls = data.additional_file_urls
+        # additional_file_urls = []
+        # if ENV_MODE != "local" and data.additional_blobs:
+        #     additional_file_urls = [f"gs://{INSPCTA_FILE_BUCKET}/{blob}" for blob in data.additional_blobs]
+        # elif data.additional_file_urls:
+        #     additional_file_urls = data.additional_file_urls
+        image_list = data.create_imagefile_list()
 
         inc_type_int = 1 if data.incident_type and data.incident_type.lower() == "fieldnote" else 0
         payload = {
             "inspector_id": data.inspector_id,
             "file_url": file_url_payload,
-            "additional_file_urls": additional_file_urls,
+            "images": image_list,
             "translation_language": data.translation_language,
             "incident_type": inc_type_int
         }

@@ -86,7 +86,6 @@ interface DashboardContextType {
   setLastUploadedFileName: (name: string | null) => void;
   selectedFile: File | null;
   setSelectedFile: (file: File | null) => void;
-  uploadIncidentVideo: (e: React.ChangeEvent<HTMLInputElement>) => Promise<void>;
   handleAddInspectionSubmit: (data: {
     siteId: string | null;
     newSiteName?: string;
@@ -341,18 +340,27 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
           const imagesPayload = attachments.map((att, index) => ({
             url: additionalFileUrls[index],
+            blob: additionalBlobs[index],
             timestamp_sec: att.timestampSec ?? 0
           }));
 
+          // const { incidentId } = await registerIncident(
+          //   bundle.inspectionId,
+          //   primaryUrl,
+          //   additionalFileUrls,
+          //   primaryBlobName,
+          //   additionalBlobs,
+          //   bundle.category === "field_note" ? "fieldnote" : "incident",
+          //   imagesPayload
+          // );
           const { incidentId } = await registerIncident(
             bundle.inspectionId,
             primaryUrl,
-            additionalFileUrls,
             primaryBlobName,
-            additionalBlobs,
             bundle.category === "field_note" ? "fieldnote" : "incident",
             imagesPayload
           );
+
 
           console.log(`[Queue] Bundle ${bundle.id} uploaded and registered completely. Incident ID: ${incidentId}`);
 
@@ -737,61 +745,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     fetchTasksForIncident(selectedIncidentId);
   }, [selectedIncidentId, selectedInspection, fetchTasksForIncident, pathname]);
 
-  const uploadIncidentVideo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedItem = siteInspections.find(
-        (item) => (item.inspection_id || item.site_id) === selectedInspection
-      );
 
-      if (!selectedInspection || !selectedItem || !selectedItem.inspection_id) {
-        alert("Please select a site with a valid inspection before uploading a video.");
-        return;
-      }
-
-      const files = Array.from(e.target.files);
-      const primaryFile = files.find(f => f.type.startsWith('video/') || f.type.startsWith('audio/')) || files[0];
-      const additionalFiles = files.filter(f => f !== primaryFile);
-
-      setSelectedFile(primaryFile);
-      document.body.style.cursor = 'wait';
-
-      try {
-        // Upload primary file
-        const primaryResult = await uploadFileToStorage(primaryFile);
-
-        // Upload additional files
-        const additionalResults = await Promise.all(
-          additionalFiles.map(file => uploadFileToStorage(file))
-        );
-
-        console.log("primaryResult : ", primaryResult);
-        console.log("additionalResults : ", additionalResults);
-
-        const imagesPayload = additionalResults.map(r => ({
-          url: r.uploadUrl,
-          timestamp_sec: 0
-        }));
-
-        const { incidentId } = await registerIncident(
-          selectedInspection,
-          primaryResult.uploadUrl,
-          additionalResults.map(r => r.uploadUrl),
-          primaryResult.blobName,
-          additionalResults.map(r => r.blobName),
-          "incident",
-          imagesPayload
-        );
-
-        setLastUploadedFileName(primaryFile.name);
-        console.log("Incident files uploaded and registered successfully. Incident ID: ", incidentId);
-      } catch (error) {
-        console.error("Upload failed:", error);
-        setLastUploadedFileName(`Failed to upload incident files: ${primaryFile.name}`);
-      } finally {
-        document.body.style.cursor = 'default';
-      }
-    }
-  };
 
   const handleAddInspectionSubmit = async (data: {
     siteId: string | null;
@@ -1176,7 +1130,6 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         setLastUploadedFileName,
         selectedFile,
         setSelectedFile,
-        uploadIncidentVideo,
         handleAddInspectionSubmit,
         handleLogin,
         handleLogout,

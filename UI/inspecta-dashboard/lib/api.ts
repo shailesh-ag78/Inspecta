@@ -118,6 +118,7 @@ export function formatIncidents(incidents: any[]): any[] {
         task_count: parseInt(incident.task_count),
         summary: incident.summary || "",
         incident_type: incident.incident_type ? String(incident.incident_type).toLowerCase() : "incident",
+        images: incident.images || [],
       };
     });
 }
@@ -206,11 +207,9 @@ export async function uploadFileToStorage(
 export async function registerIncident(
   inspectionId: string,
   primaryUrl: string,
-  additionalFileUrls: string[],
   blobName?: string,
-  additionalBlobs?: string[],
   incidentType: string = "incident",
-  images?: Array<{ url: string; timestamp_sec: number }>
+  imageURLs?: Array<{ url: string; blob: string; timestamp_sec: number }>
 ): Promise<{ incidentId: string }> {
 
   const registerResp = await authenticatedFetch(
@@ -222,11 +221,9 @@ export async function registerIncident(
         inspector_id: 0,
         file_url: primaryUrl,
         blob_name: blobName,
-        additional_file_urls: additionalFileUrls,
-        additional_blobs: additionalBlobs,
         translation_language: "",
         incident_type: incidentType,
-        images: images
+        image_urls: imageURLs
       }),
     }
   );

@@ -31,8 +31,8 @@ from .workflowexecutor import WorkflowExecutor, firebase_token_var
 from langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
 from google.cloud import storage
-from typing import Optional, Tuple
 from urllib.parse import urlparse
+from typing import Optional, Tuple, Dict, Any, List
 
 from contextlib import asynccontextmanager
 
@@ -249,19 +249,15 @@ async def create_inspection_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class IncidentImageItem(BaseModel):
-    url: str
-    timestamp_sec: float
-
 class IncidentUploadRequest(BaseModel):
     # Mandatory fields
     inspector_id: int
     file_url: str = Field(..., description="Full GCS path, e.g., gs://<bucket_name>/f83k-92js/uploads/file.mp4")
-    additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
+    # additional_file_urls: Optional[list[str]] = Field(None, description="List of GCS paths for additional files")
     gps_coordinates: Optional[Tuple[float, float]] = None # (lat, long)
     translation_language: Optional[str] = Field(None, description="Language to be used for translation of title and description of tasks, e.g., hindi, marathi")
     incident_type: Optional[int] = 0
-    images: Optional[list[IncidentImageItem]] = None
+    images: Optional[List[Dict[str, Any]]] = None
 
 @app.post("/inspections/{inspection_id}/upload-incident")
 async def upload_incident_endpoint(
@@ -280,18 +276,18 @@ async def upload_incident_endpoint(
         raise HTTPException(status_code=401, detail="Invalid storage")
 
     logger.info(f"[Request] Primary file : {data.file_url}")
-    logger.info(f"[Request] Additional file urls : {data.additional_file_urls}")
+    logger.info(f"[Request] Additional image urls : {data.images}")
 
-    additional_file_urls = []
+    image_file_urls = []
     file_size = 0
-    if data.additional_file_urls:
-        additional_file_urls.extend(data.additional_file_urls)
+    if data.images:
+        image_file_urls.extend(data.images)
           
     if ENV_MODE == "local":
         # Resolve the path to its absolute form to handle any "../" tricks
         data.file_url = os.path.abspath(os.path.normpath(data.file_url)).replace("/", "\\")
-        for index, file_url in enumerate(additional_file_urls):
-            additional_file_urls[index] = os.path.abspath(os.path.normpath(file_url)).replace("/", "\\")
+        for index, image_url in enumerate(data.images):
+            image_file_urls[index]["url"] = os.path.abspath(os.path.normpath(image_url["url"])).replace("/", "\\")
 
         # Define the ONLY allowed directory for this company
         allowed_prefix = os.path.join(LOCAL_STORAGE_ROOT, company_storage_id, UPLOADS_FOLDER)
@@ -304,17 +300,13 @@ async def upload_incident_endpoint(
         #if not data.file_url.startswith(f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"):
         allowed_prefix =  f"gs://{INSPCTA_FILE_BUCKET}/{company_storage_id}/{UPLOADS_FOLDER}/"
 
-    logger.info(f"Allowed prefix : {allowed_prefix}")
-    logger.info(f"File url : {data.file_url}")
     if not data.file_url.startswith(allowed_prefix):
         raise HTTPException(status_code=403, detail="Security Violation: Invalid storage path.")
     
-    logger.info("Checking for additional files")
     # Check Security Violation for additional files also
-    for file_url in additional_file_urls:
-        logger.info(f"File url : {file_url}")
-        if not file_url.startswith(allowed_prefix):
-            raise HTTPException(status_code=403, detail=f"Security Violation: Invalid storage path for {file_url}")
+    for image_file in image_file_urls:
+        if not image_file["url"].startswith(allowed_prefix):
+            raise HTTPException(status_code=403, detail=f"Security Violation: Invalid storage path for {image_file}")
         # ToDo: Check file type to ensure only supported format of image files are passed
         # ToDo: Check for file size or any other checks.
 
@@ -355,7 +347,7 @@ async def upload_incident_endpoint(
         translation_language=data.translation_language,
         gps_coordinates=data.gps_coordinates,
         incident_type=data.incident_type if data.incident_type is not None else 0,
-        images=[img.dict() for img in data.images] if data.images else None
+        images=image_file_urls
     )
 
     return {

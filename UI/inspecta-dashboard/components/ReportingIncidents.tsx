@@ -1,5 +1,5 @@
 import React from "react";
-import { Plus, RotateCw } from "lucide-react";
+import { Plus, RotateCw, Camera } from "lucide-react";
 
 interface Incident {
   id: string;
@@ -103,6 +103,17 @@ export function ReportingIncidents({
               textLabelClass = "text-[11px] font-black text-orange-900 tracking-wider truncate w-full px-1 group-hover:text-blue-600 transition-colors";
             }
 
+            let imgCount = 0;
+            if (incident.images) {
+              if (Array.isArray(incident.images)) {
+                imgCount = incident.images.length;
+              } else if (typeof incident.images === 'string') {
+                try {
+                  imgCount = JSON.parse(incident.images).length;
+                } catch (_) { }
+              }
+            }
+
             return (
               <div
                 key={incident.id}
@@ -115,7 +126,17 @@ export function ReportingIncidents({
               >
                 {/* Grey dot in top-right corner if already added to canvas */}
                 {isAlreadyAdded && (
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-slate-400 shadow-sm" title="Already added to report" />
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-slate-400 shadow-sm" title="Already added to report" />
+                )}
+
+                {/* Image icon aligned to the bottom right corner with a semi-transparent background */}
+                {imgCount > 0 && (
+                  <div
+                    className="absolute bottom-0.5 right-0.5 flex items-center justify-center w-6 h-6 bg-amber-100/40 border border-amber-300/40 text-amber-900 rounded-lg flex-shrink-0"
+                    title={`${imgCount} attached photos`}
+                  >
+                    <Camera className="w-4 h-4 text-amber-800" />
+                  </div>
                 )}
 
                 {/* Match IncidentSelectionPane format (Row 1) */}

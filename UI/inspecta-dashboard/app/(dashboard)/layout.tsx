@@ -28,7 +28,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     isAddInspectionOpen,
     setIsAddInspectionOpen,
     uniqueSites,
-    uploadIncidentVideo,
     handleAddInspectionSubmit,
     handleLogin,
     handleLogout,
@@ -44,7 +43,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
   const flexContainerRef = useRef<HTMLDivElement | null>(null);
   const inspectionDropdownRef = useRef<HTMLDivElement | null>(null);
   const incidentDropdownRef = useRef<HTMLDivElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const pathname = usePathname();
 

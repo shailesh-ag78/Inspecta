@@ -197,7 +197,8 @@ export default function ReportsPage() {
         incidents: droppedIncidents.map((inc) => ({
           id: inc.id,
           summary: inc.summary,
-          created: inc.created
+          created: inc.created,
+          images: inc.images
         })),
         userName,
         generatedAt: new Date().toISOString()

@@ -53,7 +53,6 @@ export default function TaskManagementPage() {
     lastUploadedFileName,
     uniqueSites,
     handleAddInspectionSubmit,
-    uploadIncidentVideo,
     selectedMillerSites,
     backendSites,
     selectedMillerInspections,
@@ -111,7 +110,6 @@ export default function TaskManagementPage() {
   const [hasAutoPaused, setHasAutoPaused] = useState(false);
 
   const playerRef = useRef<any>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -488,13 +486,6 @@ export default function TaskManagementPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={uploadIncidentVideo}
-        accept="video/*"
-        className="hidden"
-      />
 
       {/* Error Messages */}
       {(siteInspectionsError || incidentsError || tasksError) && (
@@ -1208,16 +1199,6 @@ export default function TaskManagementPage() {
           </button>
         )}
       </main>
-
-
-
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="video/*"
-        onChange={uploadIncidentVideo}
-        className="hidden"
-      />
 
       {/* Add Inspection Modal */}
       <AddInspectionModal

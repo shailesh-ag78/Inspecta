@@ -14,9 +14,9 @@ export function ActionOptions({
 }: ActionOptionsProps) {
   const labelHeaderStyle = "text-base font-bold text-slate-700 tracking-wide";
 
-  // Custom styled tile classes with 10% height reduction (88px -> 80px) and font size boost
-  const incidentTileStyle = "relative w-full h-[80px] border border-orange-200/80 bg-orange-50/60 hover:bg-orange-100/85 hover:border-orange-350 rounded-lg flex flex-col items-center justify-center gap-1 shadow-sm transition-all select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
-  const fieldNoteTileStyle = "relative w-full h-[80px] border border-blue-200/80 bg-blue-100/60 hover:bg-blue-200/85 hover:border-blue-350 rounded-lg flex flex-col items-center justify-center gap-1 shadow-sm transition-all select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
+  // Custom styled tile classes with 10% height reduction (80px -> 72px) and font size boost
+  const incidentTileStyle = "relative w-full h-[72px] border border-orange-200/80 bg-orange-50/60 hover:bg-orange-100/85 hover:border-orange-350 rounded-lg flex flex-col items-center justify-center gap-1 shadow-sm transition-all select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
+  const fieldNoteTileStyle = "relative w-full h-[72px] border border-blue-200/80 bg-blue-100/60 hover:bg-blue-200/85 hover:border-blue-350 rounded-lg flex flex-col items-center justify-center gap-1 shadow-sm transition-all select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
 
   return (
     <>

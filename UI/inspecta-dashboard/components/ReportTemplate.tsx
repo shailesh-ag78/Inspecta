@@ -1,5 +1,6 @@
 import React from "react";
-import { FileText, Trash2, Sparkles } from "lucide-react";
+import { FileText, Trash2, Sparkles, Camera } from "lucide-react";
+import { IncidentImages } from "./IncidentImages";
 
 interface Incident {
   id: string;
@@ -115,6 +116,17 @@ export function ReportTemplate({
               const timeStr = createdDate ? createdDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : 'N/A';
               const showIndicatorHere = isDragOver && calculatedInsertIndex === idx;
 
+              let imgCount = 0;
+              if (incident.images) {
+                if (Array.isArray(incident.images)) {
+                  imgCount = incident.images.length;
+                } else if (typeof incident.images === 'string') {
+                  try {
+                    imgCount = JSON.parse(incident.images).length;
+                  } catch (_) {}
+                }
+              }
+
               return (
                 <React.Fragment key={incident.id}>
                   {showIndicatorHere && (
@@ -130,35 +142,45 @@ export function ReportTemplate({
                       e.dataTransfer.setData("text/plain", incident.id);
                     }}
                     title={incident.summary || `Incident ${incident.id}`}
-                    className="flex items-center justify-between gap-3 bg-slate-2000 border border-slate-200/80 rounded-lg p-2.5 hover:bg-slate-100 transition-colors animate-fadeIn shadow-sm cursor-grab active:cursor-grabbing select-none"
+                    className="relative flex flex-col bg-slate-50 border border-slate-200/80 rounded-lg p-3.5 pr-12 hover:bg-slate-100 transition-colors animate-fadeIn shadow-sm cursor-grab active:cursor-grabbing select-none w-full"
                   >
-                    <div className="flex flex-col gap-1 truncate w-full">
-                      <span className="text-sm font-bold text-slate-800 truncate block w-full">
+                    <div className="flex flex-col gap-1 w-full">
+                      <span className="text-sm font-normal text-slate-800 break-words block w-full whitespace-normal">
                         {incident.summary || `Incident ${incident.id}`}
                       </span>
-                      <span className="text-[11px] text-slate-900 font-medium truncate block w-full">
-                        <div className="flex gap-2.5 items-center">
-                          <span className="inline-flex items-center">
-                            <span className="bg-gradient-to-br from-orange-100/60 to-orange-100 font-semibold ml-0.5 text-[11px]">
-                              {incident.id.slice(0, 8)}
-                            </span>
-                            {incident.id.length > 8 && (
-                              <span className="text-slate-900 font-normal ml-0.5 text-[11px]">
-                                {incident.id.slice(8)}
-                              </span>
-                            )}
-                          </span>
-                          <span className="text-slate-400">|</span>
-                          <span>{dateStr}</span>
-                          <span className="text-slate-400">|</span>
-                          <span>{timeStr}</span>
-                        </div>
-                      </span>
                     </div>
+
+                    {/* Reusable Image Component */}
+                    {imgCount > 0 && (
+                      <div className="mt-3 pb-2 w-full">
+                        <IncidentImages images={incident.images} />
+                      </div>
+                    )}
+
+                    {/* Incident metadata (ID, date, time) displayed below images */}
+                    <div className={`text-[11px] text-slate-900 font-medium truncate block w-full mt-1.5 ${imgCount > 0 ? "border-t border-slate-200/60 pt-2.5" : ""}`}>
+                      <div className="flex gap-2.5 items-center flex-wrap">
+                        <span className="inline-flex items-center">
+                          <span className="bg-gradient-to-br from-orange-100/60 to-orange-100 font-semibold ml-0.5 text-[11px]">
+                            {incident.id.slice(0, 8)}
+                          </span>
+                          {incident.id.length > 8 && (
+                            <span className="text-slate-900 font-normal ml-0.5 text-[11px]">
+                              {incident.id.slice(8)}
+                            </span>
+                          )}
+                        </span>
+                        <span className="text-slate-400">|</span>
+                        <span>{dateStr}</span>
+                        <span className="text-slate-400">|</span>
+                        <span>{timeStr}</span>
+                      </div>
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => onRemoveIncident(incident.id)}
-                      className="text-slate-600 hover:text-rose-600 p-1 rounded hover:bg-white border border-transparent hover:border-slate-200/50 transition-all shrink-0"
+                      className="absolute bottom-3.5 right-3.5 bg-slate-100 hover:bg-rose-50 text-slate-500 hover:text-rose-600 p-1.5 rounded-lg border border-slate-200 transition-colors shadow-sm cursor-pointer"
                       title="Remove from report"
                     >
                       <Trash2 className="w-4 h-4" />
