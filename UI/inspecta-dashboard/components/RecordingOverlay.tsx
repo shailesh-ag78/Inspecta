@@ -23,6 +23,8 @@ interface RecordingOverlayProps {
   uploadPhoto: () => void;
   setPhotoBlob: (blob: Blob | null) => void;
   setPhotoPreview: (preview: string | null) => void;
+  currentPhotosCount: number;
+  maxPhotosAllowed: number;
 }
 
 export function RecordingOverlay({
@@ -46,7 +48,9 @@ export function RecordingOverlay({
   snapPhoto,
   uploadPhoto,
   setPhotoBlob,
-  setPhotoPreview
+  setPhotoPreview,
+  currentPhotosCount,
+  maxPhotosAllowed
 }: RecordingOverlayProps) {
   if (!activeOverlay) return null;
 
@@ -116,6 +120,13 @@ export function RecordingOverlay({
                 <span>{formatTimer(recordDuration)}</span>
               </div>
             )}
+
+            {/* Photo counter badge */}
+            {isRecording && (activeOverlay === "video" || activeOverlay === "audio") && (
+              <div className="absolute top-3 right-3 bg-black/60 border border-blue-500/50 rounded-full px-2.5 py-0.5 text-[9px] text-blue-400 font-extrabold flex items-center gap-1.5">
+                <span>Photos: {currentPhotosCount} / {maxPhotosAllowed}</span>
+              </div>
+            )}
           </div>
 
           {/* Action buttons inside Overlay */}
@@ -134,7 +145,8 @@ export function RecordingOverlay({
                   <button
                     type="button"
                     onClick={snapSilentPhoto}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                    disabled={currentPhotosCount >= maxPhotosAllowed}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
                   >
                     <Camera className="w-4 h-4" /> Snap Photo
                   </button>
@@ -164,7 +176,8 @@ export function RecordingOverlay({
                     <button
                       type="button"
                       onClick={startAudioPhotoWorkflow}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      disabled={currentPhotosCount >= maxPhotosAllowed}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
                     >
                       <Camera className="w-4 h-4" /> Snap Photo
                     </button>
@@ -181,7 +194,8 @@ export function RecordingOverlay({
                     <button
                       type="button"
                       onClick={captureAudioPhoto}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      disabled={currentPhotosCount >= maxPhotosAllowed}
+                      className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
                     >
                       <Camera className="w-4 h-4" /> Capture Now
                     </button>

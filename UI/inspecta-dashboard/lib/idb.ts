@@ -2,6 +2,7 @@ export interface AttachedMedia {
   blob: Blob;
   filename: string;
   type: "image";
+  timestampSec?: number;
 }
 
 export interface IncidentBundle {

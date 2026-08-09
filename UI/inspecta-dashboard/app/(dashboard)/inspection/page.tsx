@@ -345,7 +345,7 @@ export default function InspectionPage() {
             }
             const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
             const filename = `${currentBundleIdRef.current}_snapshot_${overlayCategory}_${timestamp}_during_video.jpg`;
-            const newPhoto = { blob, filename, type: "image" as const };
+            const newPhoto = { blob, filename, type: "image" as const, timestampSec: recordDuration };
             setCurrentSessionPhotos(prev => [...prev, newPhoto]);
             currentSessionPhotosRef.current.push(newPhoto);
           }
@@ -400,7 +400,7 @@ export default function InspectionPage() {
               // Append timestamp
               const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
               const filename = `${currentBundleIdRef.current}_snapshot_${overlayCategory}_${timestamp}_at_${recordDuration}s.jpg`;
-              const newPhoto = { blob, filename, type: "image" as const };
+              const newPhoto = { blob, filename, type: "image" as const, timestampSec: recordDuration };
               setCurrentSessionPhotos(prev => [...prev, newPhoto]);
               currentSessionPhotosRef.current.push(newPhoto);
             } else {
@@ -709,6 +709,8 @@ export default function InspectionPage() {
         uploadPhoto={uploadPhoto}
         setPhotoBlob={setPhotoBlob}
         setPhotoPreview={setPhotoPreview}
+        currentPhotosCount={currentSessionPhotos.length}
+        maxPhotosAllowed={MAX_SESSION_PHOTOS}
       />
 
       <PermissionHelpModal

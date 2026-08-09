@@ -209,7 +209,8 @@ export async function registerIncident(
   additionalFileUrls: string[],
   blobName?: string,
   additionalBlobs?: string[],
-  incidentType: string = "incident"
+  incidentType: string = "incident",
+  images?: Array<{ url: string; timestamp_sec: number }>
 ): Promise<{ incidentId: string }> {
 
   const registerResp = await authenticatedFetch(
@@ -224,7 +225,8 @@ export async function registerIncident(
         additional_file_urls: additionalFileUrls,
         additional_blobs: additionalBlobs,
         translation_language: "",
-        incident_type: incidentType
+        incident_type: incidentType,
+        images: images
       }),
     }
   );

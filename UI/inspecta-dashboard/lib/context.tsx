@@ -339,13 +339,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           setIncidentUploads(prev => prev.map(inc => inc.id === bundle.id ? { ...inc, displayMessage: "Registering incident..." } : inc));
           console.log(`[Queue] All files uploaded. Registering incident with additional ${additionalFileUrls.length} files.`);
 
+          const imagesPayload = attachments.map((att, index) => ({
+            url: additionalFileUrls[index],
+            timestamp_sec: att.timestampSec ?? 0
+          }));
+
           const { incidentId } = await registerIncident(
             bundle.inspectionId,
             primaryUrl,
             additionalFileUrls,
             primaryBlobName,
             additionalBlobs,
-            bundle.category === "field_note" ? "fieldnote" : "incident"
+            bundle.category === "field_note" ? "fieldnote" : "incident",
+            imagesPayload
           );
 
           console.log(`[Queue] Bundle ${bundle.id} uploaded and registered completely. Incident ID: ${incidentId}`);
@@ -761,13 +767,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         console.log("primaryResult : ", primaryResult);
         console.log("additionalResults : ", additionalResults);
 
+        const imagesPayload = additionalResults.map(r => ({
+          url: r.uploadUrl,
+          timestamp_sec: 0
+        }));
+
         const { incidentId } = await registerIncident(
           selectedInspection,
           primaryResult.uploadUrl,
           additionalResults.map(r => r.uploadUrl),
           primaryResult.blobName,
           additionalResults.map(r => r.blobName),
-          "incident"
+          "incident",
+          imagesPayload
         );
 
         setLastUploadedFileName(primaryFile.name);

@@ -71,7 +71,8 @@ class IncidentRepository:
         gps_coordinates: Optional[tuple] = None, # (lat, long)
         audio_url: Optional[str] = None,
         metadata: Optional[dict] = None,
-        incident_type: int = 0
+        incident_type: int = 0,
+        images: Optional[List[Dict[str, Any]]] = None
     ) -> str:
         """Creates the incident record linked to an inspection."""
         async with self.session(company_id) as conn:
@@ -86,11 +87,11 @@ class IncidentRepository:
                 await cur.execute(
                     """
                     INSERT INTO incidents 
-                    (inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates, incident_type) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
+                    (inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates, incident_type, images) 
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
                     RETURNING id
                     """,
-                    (inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val, incident_type)
+                    (inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val, incident_type, json.dumps(images or []))
                 )
                 result = await cur.fetchone()
                 if result is None:

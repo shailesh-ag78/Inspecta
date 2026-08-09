@@ -273,7 +273,8 @@ class WorkflowExecutor:
         existing_incident_id: str | None, # Optional: if re-uploading for an ID
         translation_language: str = "",
         gps_coordinates: Optional[tuple] = None,  # (lat, long),
-        incident_type: int = 0
+        incident_type: int = 0,
+        images: Optional[List[dict]] = None
     ) -> str:
         # 1. VERIFY OWNERSHIP FIRST
         # Check if this inspection_id belongs to this company_id
@@ -296,7 +297,8 @@ class WorkflowExecutor:
                 video_url=file_url,
                 inspector_id=inspector_id,
                 gps_coordinates=gps_coordinates,
-                incident_type=incident_type
+                incident_type=incident_type,
+                images=images
             )
 
         # 3. BACKGROUND: Trigger LangGraph with LangSmith tracing

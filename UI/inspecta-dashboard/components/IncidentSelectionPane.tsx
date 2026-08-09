@@ -373,6 +373,10 @@ export default function IncidentSelectionPane({
                 [...filteredIncidents].sort((a, b) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime()).map(incident => {
                   const isChecked = selectedMillerIncidents.includes(incident.id);
                   const label = `${incident.id.slice(0, 8)}-XXX`;
+                  const createdDate = incident.created ? new Date(incident.created) : null;
+                  const dateStr = createdDate ? createdDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                  const timeStr = createdDate ? createdDate.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '';
+                  const timestampLabel = dateStr && timeStr ? `${dateStr} ${timeStr}` : '';
                   return (
                     <label key={incident.id} className="flex items-center gap-2 text-[13px] font-normal text-slate-800 hover:text-slate-950 cursor-pointer select-none py-0.5">
                       <input
@@ -390,7 +394,7 @@ export default function IncidentSelectionPane({
                       </div>
                       <span className="truncate flex items-center gap-1">
                         <span className={incident.incident_type === 'fieldnote' ? 'field-note-icon' : 'incident-icon'} />
-                        {label}
+                        <span>{label} &nbsp;&nbsp; {timestampLabel ? `(${timestampLabel})` : ''}</span>
                       </span>
                     </label>
                   );

@@ -249,6 +249,10 @@ async def create_inspection_endpoint(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class IncidentImageItem(BaseModel):
+    url: str
+    timestamp_sec: float
+
 class IncidentUploadRequest(BaseModel):
     # Mandatory fields
     inspector_id: int
@@ -257,6 +261,7 @@ class IncidentUploadRequest(BaseModel):
     gps_coordinates: Optional[Tuple[float, float]] = None # (lat, long)
     translation_language: Optional[str] = Field(None, description="Language to be used for translation of title and description of tasks, e.g., hindi, marathi")
     incident_type: Optional[int] = 0
+    images: Optional[list[IncidentImageItem]] = None
 
 @app.post("/inspections/{inspection_id}/upload-incident")
 async def upload_incident_endpoint(
@@ -349,7 +354,8 @@ async def upload_incident_endpoint(
         existing_incident_id = None,
         translation_language=data.translation_language,
         gps_coordinates=data.gps_coordinates,
-        incident_type=data.incident_type if data.incident_type is not None else 0
+        incident_type=data.incident_type if data.incident_type is not None else 0,
+        images=[img.dict() for img in data.images] if data.images else None
     )
 
     return {
