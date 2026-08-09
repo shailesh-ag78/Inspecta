@@ -342,9 +342,9 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
         {/* Main Content Area */}
         <div className="flex-1 overflow-hidden flex flex-col">
           {pathname !== "/inspection" && (
-            <IncidentSelectionPane 
-              key={pathname} 
-              singleSiteMode={pathname === "/reports"} 
+            <IncidentSelectionPane
+              key={pathname}
+              singleSiteMode={pathname === "/reports"}
               defaultShowIncidents={pathname !== "/reports"}
               defaultShowFieldNotes={pathname === "/reports"}
             />
