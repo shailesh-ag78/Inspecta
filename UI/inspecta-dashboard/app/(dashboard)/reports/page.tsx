@@ -65,7 +65,20 @@ export default function ReportsPage() {
     setDroppedIncidents((prev) => {
       // Find objects for idsToDrop (checking prev first, then millerIncidents)
       const objectsToDrop: any[] = idsToDrop
-        .map((id) => prev.find((item) => item.id === id) || millerIncidents.find((inc) => inc.id === id))
+        .map((id) => {
+          const existing = prev.find((item) => item.id === id);
+          if (existing) return existing;
+          const original = millerIncidents.find((inc) => inc.id === id);
+          if (original) {
+            return {
+              ...original,
+              images: typeof original.images === "string"
+                ? JSON.parse(original.images)
+                : JSON.parse(JSON.stringify(original.images || []))
+            };
+          }
+          return null;
+        })
         .filter(Boolean);
 
       if (objectsToDrop.length === 0) return prev;
@@ -97,7 +110,14 @@ export default function ReportsPage() {
       ids.forEach((id) => {
         if (!newItems.some((item) => item.id === id)) {
           const incident = millerIncidents.find((inc) => inc.id === id);
-          if (incident) newItems.push(incident);
+          if (incident) {
+            newItems.push({
+              ...incident,
+              images: typeof incident.images === "string"
+                ? JSON.parse(incident.images)
+                : JSON.parse(JSON.stringify(incident.images || []))
+            });
+          }
         }
       });
       return newItems;
@@ -110,6 +130,35 @@ export default function ReportsPage() {
 
   const handleClearCanvas = () => {
     setDroppedIncidents([]);
+  };
+
+  const handleUpdateIncidentText = (id: string, newText: string) => {
+    setDroppedIncidents((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, summary: newText } : item))
+    );
+  };
+
+  const handleRemoveIncidentImage = (incidentId: string, imgUrl: string) => {
+    setDroppedIncidents((prev) =>
+      prev.map((item) => {
+        if (item.id === incidentId) {
+          let currentImages = item.images;
+          if (typeof currentImages === "string") {
+            try {
+              currentImages = JSON.parse(currentImages);
+            } catch (_) {
+              currentImages = [];
+            }
+          }
+          const filtered = (currentImages || []).filter((img: any) => {
+            const url = typeof img === "string" ? img : (img.url || img.file_url || "");
+            return url !== imgUrl;
+          });
+          return { ...item, images: filtered };
+        }
+        return item;
+      })
+    );
   };
 
   const { companyName, selectedMillerSites, user } = useDashboard();
@@ -282,6 +331,8 @@ export default function ReportsPage() {
                   selectedSiteName={selectedSiteName}
                   userName={userName}
                   onExportReport={handleExportReport}
+                  onUpdateIncidentText={handleUpdateIncidentText}
+                  onRemoveIncidentImage={handleRemoveIncidentImage}
                 />
               </div>
 

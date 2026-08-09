@@ -9,9 +9,10 @@ interface IncidentImage {
 
 interface IncidentImagesProps {
   images: any; // Can be JSON string, array of objects, or array of strings
+  onRemoveImage?: (imgUrl: string) => void;
 }
 
-export function IncidentImages({ images }: IncidentImagesProps) {
+export function IncidentImages({ images, onRemoveImage }: IncidentImagesProps) {
   const [activeImage, setActiveImage] = useState<string | null>(null);
   const [resolvedUrls, setResolvedUrls] = useState<Record<string, string>>({});
   const [loadingStates, setLoadingStates] = useState<Record<string, boolean>>({});
@@ -90,7 +91,7 @@ export function IncidentImages({ images }: IncidentImagesProps) {
             <div
               key={i}
               className="group relative border border-slate-200 bg-slate-100 rounded-lg flex items-center justify-center shadow-inner flex-shrink-0 overflow-hidden transition-all duration-200"
-              style={{ width: "101px", height: "101px" }}
+              style={{ width: "135px", height: "90px" }}
             >
               {isLoading ? (
                 // Spinner inside the tile box while loading
@@ -102,10 +103,10 @@ export function IncidentImages({ images }: IncidentImagesProps) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={resolved}
-                    alt={`Incident Image ${i + 1}`}
+                    alt="Attachment"
                     className="w-full h-full object-cover animate-fadeIn"
                   />
-                  {/* Hover Maximize Overlay */}
+                  {/* Hover Overlay with Maximize icon only */}
                   <div
                     onClick={() => setActiveImage(resolved)}
                     className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200 cursor-pointer"
@@ -124,6 +125,21 @@ export function IncidentImages({ images }: IncidentImagesProps) {
                   <Camera className="w-5 h-5 text-slate-400 group-hover:scale-110 transition-transform duration-200" />
                 </div>
               )}
+
+              {/* Fixed Delete Button at Top-Right (visible for both resolved & placeholder states) */}
+              {onRemoveImage && !isLoading && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveImage(img.url);
+                  }}
+                  className="absolute top-1 right-1 p-0.5 bg-rose-650 hover:bg-rose-700 text-white rounded-full z-10 transition-colors shadow-sm cursor-pointer"
+                  title="Delete Image Attachment"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </button>
+              )}
             </div>
           );
         })}
@@ -141,7 +157,7 @@ export function IncidentImages({ images }: IncidentImagesProps) {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={activeImage}
-                alt="Incident Attachment Full"
+                alt="Attachment"
                 className="max-w-[85vw] max-h-[75vh] object-contain rounded"
               />
             </div>

@@ -19,6 +19,8 @@ interface ReportingCanvasProps {
   selectedSiteName: string;
   userName: string;
   onExportReport?: (summary: string) => void;
+  onUpdateIncidentText?: (id: string, newText: string) => void;
+  onRemoveIncidentImage?: (incidentId: string, imgUrl: string) => void;
 }
 
 export function ReportingCanvas({
@@ -30,6 +32,8 @@ export function ReportingCanvas({
   selectedSiteName,
   userName,
   onExportReport,
+  onUpdateIncidentText,
+  onRemoveIncidentImage,
 }: ReportingCanvasProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [reportSummary, setReportSummary] = useState("");
@@ -142,6 +146,8 @@ export function ReportingCanvas({
         handleSection2DragOver={handleSection2DragOver}
         handleSection2DragLeave={handleSection2DragLeave}
         handleSection2Drop={handleSection2Drop}
+        onUpdateIncidentText={onUpdateIncidentText}
+        onRemoveIncidentImage={onRemoveIncidentImage}
       />
     </div>
   );

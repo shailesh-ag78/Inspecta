@@ -20,7 +20,7 @@ export interface PDFReportData {
 function getBase64ImageFromUrl(url: string): Promise<string> {
   return new Promise(async (resolve, reject) => {
     try {
-      const response = await fetch(url);
+      const response = await authenticatedFetch(url);
       if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
       const blob = await response.blob();
       const reader = new FileReader();
@@ -36,6 +36,7 @@ function getBase64ImageFromUrl(url: string): Promise<string> {
     }
   });
 }
+
 
 /**
  * Generates and downloads a Daily Progress Report PDF using jsPDF based on JSON data.
@@ -104,7 +105,7 @@ export async function exportReportToPDF(reportData: PDFReportData): Promise<void
   doc.text("COMPILED INCIDENTS & OBSERVATIONS", 15, currentY);
   currentY += 8;
 
-  doc.setFontSize(10);
+  doc.setFontSize(11);
   if (reportData.incidents && reportData.incidents.length > 0) {
     for (const inc of reportData.incidents) {
       // 1. Extract image paths
@@ -123,35 +124,19 @@ export async function exportReportToPDF(reportData: PDFReportData): Promise<void
         .map((item) => typeof item === "string" ? item : (item.url || item.file_url || ""))
         .filter(Boolean);
 
-      // Resolve GCS/local paths
+      // Resolve GCS/local paths to backend proxy endpoint
       const resolvedUrls: string[] = [];
-      if (urls.length > 0) {
-        for (const url of urls) {
-          try {
-            let resolved = "";
-            if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
-              resolved = url;
-            } else {
-              const response = await authenticatedFetch(
-                `/api/get-video-url?path=${encodeURIComponent(url)}`
-              );
-              if (response.ok) {
-                const json = await response.json();
-                resolved = json.data?.url || "";
-              }
-            }
-            if (resolved) {
-              resolvedUrls.push(resolved);
-            }
-          } catch (e) {
-            console.error("Failed to resolve URL for PDF", e);
-          }
+      for (const url of urls) {
+        if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("data:")) {
+          resolvedUrls.push(url);
+        } else {
+          resolvedUrls.push(`/api/get-image-forpdf?path=${encodeURIComponent(url)}`);
         }
       }
 
       // 2. Pre-calculate layout sizes for the card
       const splitIncSummary = doc.splitTextToSize(inc.summary || "No summary", 170);
-      const textHeight = splitIncSummary.length * 5;
+      const textHeight = splitIncSummary.length * 5.5;
 
       const imgWidth = 52;
       const imgHeight = 52;

@@ -24,6 +24,8 @@ interface ReportTemplateProps {
   handleSection2DragOver: (e: React.DragEvent) => void;
   handleSection2DragLeave: (e: React.DragEvent) => void;
   handleSection2Drop: (e: React.DragEvent) => void;
+  onUpdateIncidentText?: (id: string, newText: string) => void;
+  onRemoveIncidentImage?: (incidentId: string, imgUrl: string) => void;
 }
 
 export function ReportTemplate({
@@ -40,6 +42,8 @@ export function ReportTemplate({
   handleSection2DragOver,
   handleSection2DragLeave,
   handleSection2Drop,
+  onUpdateIncidentText,
+  onRemoveIncidentImage,
 }: ReportTemplateProps) {
   return (
     <div className="flex-1 flex flex-col divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
@@ -145,15 +149,23 @@ export function ReportTemplate({
                     className="relative flex flex-col bg-slate-50 border border-slate-200/80 rounded-lg p-3.5 pr-12 hover:bg-slate-100 transition-colors animate-fadeIn shadow-sm cursor-grab active:cursor-grabbing select-none w-full"
                   >
                     <div className="flex flex-col gap-1 w-full">
-                      <span className="text-sm font-normal text-slate-800 break-words block w-full whitespace-normal">
-                        {incident.summary || `Incident ${incident.id}`}
-                      </span>
+                      <textarea
+                        value={incident.summary || ""}
+                        onChange={(e) => onUpdateIncidentText?.(incident.id, e.target.value)}
+                        placeholder="Add incident summary/observation..."
+                        rows={Math.max(1, Math.ceil((incident.summary || "").length / 80))}
+                        className="w-full text-sm font-normal text-slate-800 bg-transparent border-0 hover:bg-slate-200/40 focus:bg-white rounded p-1 transition-all resize-y outline-none focus:ring-1 focus:ring-slate-350 scrollbar-none"
+                        style={{ minHeight: '36px' }}
+                      />
                     </div>
 
                     {/* Reusable Image Component */}
                     {imgCount > 0 && (
                       <div className="mt-3 pb-2 w-full">
-                        <IncidentImages images={incident.images} />
+                        <IncidentImages
+                          images={incident.images}
+                          onRemoveImage={onRemoveIncidentImage ? (imgUrl) => onRemoveIncidentImage(incident.id, imgUrl) : undefined}
+                        />
                       </div>
                     )}
 

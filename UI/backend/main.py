@@ -889,6 +889,60 @@ async def stream_local_video(request: Request, path: str = Query(..., descriptio
 
     return FileResponse(path)
 
+# HYBRID DESIGN FOR IMAGES:
+# This endpoint acts as a Backend-For-Frontend (BFF) proxy exclusively for PDF report generation.
+# Normally, the UI fetches Pre-Signed URLs to download directly from GCS (zero server bandwidth cost).
+# However, the PDF compiler in the browser (jsPDF) strictly enforces CORS when fetching raw bytes.
+# Bypassing this via the backend proxy guarantees reliable PDF generation without requiring 
+# complex CORS configuration on every GCS bucket, while keeping heavy UI traffic directly on GCS.
+@app.get("/api/get-image-forpdf")
+async def get_image_for_pdf(request: Request, path: str = Query(..., description="GCS path or local path")):
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    owns_video = await repository.verify_video_ownership(company_id, path)
+    if not owns_video:
+        raise HTTPException(status_code=403, detail="Access denied to the requested resource.")
+
+    if path.startswith("gs://"):
+        try:
+            gcs_path = path[5:]
+            parts = gcs_path.split("/", 1)
+            if len(parts) < 2:
+                raise HTTPException(status_code=400, detail="Invalid GCS path")
+            bucket_name, blob_name = parts[0], parts[1]
+            
+            global gcs_client
+            if ENV_MODE.startswith("local"):
+                datastore_path = Path(__file__).parent.parent.parent / "DataStore"
+                gcp_key_file = (datastore_path / "gcp-key.json").resolve()
+                gcs_client = storage.Client.from_service_account_json(gcp_key_file)
+            else:
+                gcs_client = storage.Client()
+
+            bucket = gcs_client.bucket(bucket_name)
+            blob = bucket.blob(blob_name)
+            content = blob.download_as_bytes()
+            
+            _, file_ext = os.path.splitext(blob_name)
+            file_ext = file_ext.lower()
+            media_type = next((mime for mime, ext in ALLOWED_TYPES.items() if ext == file_ext), "image/jpeg")
+            
+            from fastapi import Response
+            return Response(content=content, media_type=media_type)
+        except Exception as e:
+            print(f"Error downloading image from GCS: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    else:
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="File not found")
+        _, file_ext = os.path.splitext(path)
+        file_ext = file_ext.lower()
+        media_type = next((mime for mime, ext in ALLOWED_TYPES.items() if ext == file_ext), "image/jpeg")
+        return FileResponse(path, media_type=media_type)
+
+
 @app.get("/api/get-upload-url")
 async def get_upload_url(request: Request, fileName: str = Query(..., description="Name of the file")):
     company_id = getattr(request.state, "company_id", None)
