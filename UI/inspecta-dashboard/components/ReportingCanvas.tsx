@@ -18,8 +18,7 @@ interface ReportingCanvasProps {
   companyName: string;
   selectedSiteName: string;
   userName: string;
-  onGenerateReport?: (summary: string) => void;
-  onExportReport?: () => void;
+  onExportReport?: (summary: string) => void;
 }
 
 export function ReportingCanvas({
@@ -30,7 +29,6 @@ export function ReportingCanvas({
   companyName,
   selectedSiteName,
   userName,
-  onGenerateReport,
   onExportReport,
 }: ReportingCanvasProps) {
   const [isDragOver, setIsDragOver] = useState(false);
@@ -39,17 +37,7 @@ export function ReportingCanvas({
 
   const section2Ref = React.useRef<HTMLDivElement>(null);
 
-  // Auto-generate summary when droppedIncidents changes
-  const prevCount = React.useRef(droppedIncidents.length);
-  React.useEffect(() => {
-    if (droppedIncidents.length !== prevCount.current) {
-      prevCount.current = droppedIncidents.length;
-      const summaries = droppedIncidents
-        .map((inc) => inc.summary)
-        .filter(Boolean);
-      setReportSummary(summaries.join("\n\n"));
-    }
-  }, [droppedIncidents]);
+
 
   // Section 2 Drag Over Handler with edge auto-scrolling & Y-coordinate insertion calculation
   const handleSection2DragOver = (e: React.DragEvent) => {
@@ -121,16 +109,7 @@ export function ReportingCanvas({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={() => onGenerateReport?.(reportSummary)}
-            disabled={droppedIncidents.length === 0}
-            className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 disabled:opacity-50 flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100/80 px-2 py-1 rounded transition-colors disabled:cursor-not-allowed cursor-pointer"
-          >
-            <Download className="w-3 h-3" />
-            <span>Generate Report</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => onExportReport?.()}
+            onClick={() => onExportReport?.(reportSummary)}
             disabled={droppedIncidents.length === 0}
             className="text-[11px] font-bold text-blue-600 hover:text-blue-700 disabled:opacity-50 flex items-center gap-1 bg-blue-50 hover:bg-blue-100/80 px-2 py-1 rounded transition-colors disabled:cursor-not-allowed cursor-pointer"
           >

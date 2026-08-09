@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, Trash2 } from "lucide-react";
+import { FileText, Trash2, Sparkles } from "lucide-react";
 
 interface Incident {
   id: string;
@@ -43,7 +43,7 @@ export function ReportTemplate({
   return (
     <div className="flex-1 flex flex-col divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
       {/* Section 1: Header Meta & Summary (Pale Green) */}
-      <div className="p-3.5 bg-emerald-50/20 space-y-2.5">
+      <div className="p-4.5 bg-emerald-50/20 space-y-2.5">
         <div className="grid grid-cols-3 gap-4 text-xs font-bold text-slate-700">
           <div className="text-slate-800">
             {new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -55,13 +55,38 @@ export function ReportTemplate({
             {companyName}
           </div>
         </div>
-        <div className="flex flex-col gap-1 mt-1">
+        <div className="flex flex-col gap-2 mt-1 relative">
           <textarea
             value={reportSummary}
             onChange={(e) => setReportSummary(e.target.value)}
-            placeholder="Report summary will generate here automatically based on selection..."
-            className="w-full text-xs bg-white border border-slate-200/80 rounded-lg p-2.5 text-slate-800 focus:outline-none focus:border-emerald-500 min-h-[50px] resize-y scrollbar-thin font-medium"
+            placeholder="Click the sparkles button to generate the report summary from selected incidents..."
+            rows={4}
+            // className="w-full text-sm bg-white border border-slate-200/80 rounded-lg p-2.5 text-slate-950 focus:outline-none focus:border-slate-500 min-h-[100px] resize-y scrollbar-thin font-large"
+            className="
+                        w-full min-h-[100px] resize-y
+                        p-3 pr-12 rounded-lg
+                        text-sm font-lg text-slate-900
+                        bg-gradient-to-br from-white to-slate-50
+                        border-2 border-emerald-200 shadow-sm
+                        focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-slate-500
+                        placeholder-slate-400
+                        scrollbar-thin
+                      "
           />
+          <button
+            type="button"
+            onClick={() => {
+              const summaries = droppedIncidents
+                .map((inc) => inc.summary)
+                .filter(Boolean);
+              setReportSummary(summaries.join("\n\n"));
+            }}
+            disabled={droppedIncidents.length === 0}
+            className="absolute right-3.5 bottom-3.5 p-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100/80 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg border border-emerald-200 transition-colors shadow-sm cursor-pointer"
+            title="Generate Summary"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-800 animate-pulse" />
+          </button>
         </div>
       </div>
 
@@ -71,20 +96,19 @@ export function ReportTemplate({
         onDragOver={handleSection2DragOver}
         onDragLeave={handleSection2DragLeave}
         onDrop={handleSection2Drop}
-        className={`flex-1 p-3.5 flex flex-col min-h-[180px] overflow-y-auto scrollbar-thin transition-colors ${
-          isDragOver && droppedIncidents.length === 0 ? "bg-emerald-50/20 border-2 border-dashed border-emerald-400" : ""
-        }`}
+        className={`flex-1 p-3.5 flex flex-col min-h-[180px] overflow-y-auto scrollbar-thin transition-colors ${isDragOver && droppedIncidents.length === 0 ? "bg-emerald-50/20 border-2 border-dashed border-emerald-400" : ""
+          }`}
       >
         {droppedIncidents.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-6 select-none pointer-events-none">
             <FileText className="w-10 h-10 text-slate-800 mb-2.5 stroke-[1.5]" />
             <p className="text-sm font-bold text-slate-800 mb-1">Drag Incidents Here</p>
-            <p className="text-xs text-slate-650 max-w-[240px] leading-relaxed">
+            <p className="text-xs text-slate-800 max-w-[240px] leading-relaxed">
               Drag tiles from the list and drop them here to compile your report.
             </p>
           </div>
         ) : (
-          <div className="flex flex-col min-h-full gap-1.5">
+          <div className="flex flex-col min-h-full gap-2.5">
             {droppedIncidents.map((incident, idx) => {
               const createdDate = incident.created ? new Date(incident.created) : null;
               const dateStr = createdDate ? createdDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A';
@@ -106,7 +130,7 @@ export function ReportTemplate({
                       e.dataTransfer.setData("text/plain", incident.id);
                     }}
                     title={incident.summary || `Incident ${incident.id}`}
-                    className="flex items-center justify-between gap-3 bg-slate-50 border border-slate-200/80 rounded-lg p-2.5 hover:bg-slate-100 transition-colors animate-fadeIn shadow-sm cursor-grab active:cursor-grabbing select-none"
+                    className="flex items-center justify-between gap-3 bg-slate-2000 border border-slate-200/80 rounded-lg p-2.5 hover:bg-slate-100 transition-colors animate-fadeIn shadow-sm cursor-grab active:cursor-grabbing select-none"
                   >
                     <div className="flex flex-col gap-1 truncate w-full">
                       <span className="text-sm font-bold text-slate-800 truncate block w-full">
@@ -119,14 +143,14 @@ export function ReportTemplate({
                               {incident.id.slice(0, 8)}
                             </span>
                             {incident.id.length > 8 && (
-                              <span className="text-slate-400 font-normal ml-0.5 text-[10px]">
+                              <span className="text-slate-900 font-normal ml-0.5 text-[11px]">
                                 {incident.id.slice(8)}
                               </span>
                             )}
                           </span>
-                          <span className="text-slate-300">|</span>
+                          <span className="text-slate-400">|</span>
                           <span>{dateStr}</span>
-                          <span className="text-slate-300">|</span>
+                          <span className="text-slate-400">|</span>
                           <span>{timeStr}</span>
                         </div>
                       </span>

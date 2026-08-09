@@ -5,6 +5,7 @@ import { useDashboard } from "@/lib/context";
 import { ChevronDown, BarChart2 } from "lucide-react";
 import { ReportingIncidents } from "@/components/ReportingIncidents";
 import { ReportingCanvas } from "@/components/ReportingCanvas";
+import { exportReportToPDF } from "@/lib/pdfGenerator";
 
 export default function ReportsPage() {
   const { theme, millerIncidents, selectedMillerIncidents, setSelectedMillerIncidents, setIsIncidentPaneCollapsed } = useDashboard();
@@ -156,168 +157,61 @@ export default function ReportsPage() {
     });
   };
 
-  const handleGenerateReport = (summaryText: string) => {
-    const generatedSummary = generateReportSummary(droppedIncidents);
-    const reportData = {
-      date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
-      companyName: companyName || "Inspecta Inc.",
-      selectedSiteName,
-      summary: generatedSummary && generatedSummary.trim() !== "" ? generatedSummary : summaryText,
-      incidents: droppedIncidents.map((inc) => ({
-        id: inc.id,
-        summary: inc.summary,
-        created: inc.created
-      })),
-      userName,
-      generatedAt: new Date().toISOString()
-    };
-
-    const request = indexedDB.open("InspectaReportsDB", 1);
-
-    request.onupgradeneeded = (event: any) => {
-      const db = event.target.result;
-      if (!db.objectStoreNames.contains("reports")) {
-        db.createObjectStore("reports", { keyPath: "id" });
-      }
-    };
-
-    request.onsuccess = (event: any) => {
-      const db = event.target.result;
-      const transaction = db.transaction("reports", "readwrite");
-      const store = transaction.objectStore("reports");
-
-      // Store using a static key so only one report exists at any point in time
-      const record = {
-        id: "active_report",
-        data: reportData
+  const writeReportToIndexedDB = (reportData: any): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const request = indexedDB.open("InspectaReportsDB", 1);
+      request.onupgradeneeded = (event: any) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains("reports")) {
+          db.createObjectStore("reports", { keyPath: "id" });
+        }
       };
-
-      const putRequest = store.put(record);
-      putRequest.onsuccess = () => {
-        alert("Report generated successfully!");
+      request.onsuccess = (event: any) => {
+        const db = event.target.result;
+        try {
+          const transaction = db.transaction("reports", "readwrite");
+          const store = transaction.objectStore("reports");
+          const record = {
+            id: "active_report",
+            data: reportData
+          };
+          const putRequest = store.put(record);
+          putRequest.onsuccess = () => resolve();
+          putRequest.onerror = () => reject(new Error("Failed to write to store"));
+        } catch (e) {
+          reject(e);
+        }
       };
-      putRequest.onerror = (err: any) => {
-        console.error("Failed to store report in IndexedDB:", err);
-      };
-    };
-
-    request.onerror = (event: any) => {
-      console.error("IndexedDB error:", event);
-    };
+      request.onerror = () => reject(new Error("Failed to open DB"));
+    });
   };
 
-  const handleExportReport = async () => {
+  const handleExportReport = async (summaryText: string) => {
     try {
-      // 1. Try to fetch the active report JSON from IndexedDB
-      let reportData: any = null;
+      const generatedSummary = generateReportSummary(droppedIncidents);
+      const reportData = {
+        date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+        companyName: companyName || "Inspecta Inc.",
+        selectedSiteName,
+        summary: summaryText && summaryText.trim() !== "" ? summaryText : generatedSummary,
+        incidents: droppedIncidents.map((inc) => ({
+          id: inc.id,
+          summary: inc.summary,
+          created: inc.created
+        })),
+        userName,
+        generatedAt: new Date().toISOString()
+      };
+
+      // 1. Internally save the report generation data (indexedDB storage)
       try {
-        reportData = await getActiveReportFromIndexedDB();
-      } catch (e) {
-        console.warn("Could not read from IndexedDB, generating PDF from current state...", e);
+        await writeReportToIndexedDB(reportData);
+      } catch (err) {
+        console.warn("Failed to store report in IndexedDB internally:", err);
       }
 
-      // Fallback to active state if IndexedDB was empty or failed
-      if (!reportData) {
-        const generatedSummary = generateReportSummary(droppedIncidents);
-        reportData = {
-          date: new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
-          companyName: companyName || "Inspecta Inc.",
-          selectedSiteName,
-          summary: generatedSummary,
-          incidents: droppedIncidents.map((inc) => ({
-            id: inc.id,
-            summary: inc.summary,
-            created: inc.created
-          })),
-          userName,
-          generatedAt: new Date().toISOString()
-        };
-      }
-
-      // 2. Generate PDF from the JSON object using jsPDF
-      const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF();
-
-      // Page styling / Header
-      doc.setFillColor(30, 41, 59); // Dark slate header
-      doc.rect(0, 0, 210, 22, "F"); // Reduced height from 35 to 22
-
-      doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      doc.text(`DPR : ${reportData.selectedSiteName}`, 15, 14);
-
-      // Company name in the header, top right corner
-      doc.setFontSize(11);
-      doc.text(reportData.companyName, 195, 14, { align: "right" });
-
-      // Metadata section (Y coordinates shifted up and Company removed)
-      doc.setTextColor(51, 65, 85);
-      doc.setFontSize(11);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Site:", 15, 35);
-      doc.setFont("helvetica", "normal");
-      doc.text(reportData.selectedSiteName, 45, 35);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Inspector:", 15, 42);
-      doc.setFont("helvetica", "normal");
-      doc.text(reportData.userName, 45, 42);
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Report Date:", 15, 49);
-      doc.setFont("helvetica", "normal");
-      doc.text(reportData.date, 45, 49);
-
-      // Divider line
-      doc.setDrawColor(226, 232, 240);
-      doc.line(15, 56, 195, 56);
-
-      // Summary section
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("EXECUTIVE SUMMARY", 15, 66);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      const splitSummary = doc.splitTextToSize(reportData.summary || "No summary provided.", 180);
-      doc.text(splitSummary, 15, 74);
-
-      // Calculate Y position after summary
-      let currentY = 74 + (splitSummary.length * 5) + 10;
-
-      // Divider line
-      doc.line(15, currentY, 195, currentY);
-      currentY += 10;
-
-      // Incidents list
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(12);
-      doc.text("COMPILED INCIDENTS & OBSERVATIONS", 15, currentY);
-      currentY += 8;
-
-      doc.setFontSize(10);
-      if (reportData.incidents && reportData.incidents.length > 0) {
-        reportData.incidents.forEach((inc: any) => {
-          // Check page overflow
-          if (currentY > 270) {
-            doc.addPage();
-            currentY = 20;
-          }
-
-          doc.setFont("helvetica", "normal");
-          const splitIncSummary = doc.splitTextToSize(inc.summary || "No summary", 180);
-          doc.text(splitIncSummary, 15, currentY);
-          currentY += (splitIncSummary.length * 5) + 6;
-        });
-      } else {
-        doc.setFont("helvetica", "normal");
-        doc.text("No incidents selected in this report.", 15, currentY);
-      }
-
-      // 3. Download the PDF
-      doc.save(`DPR_${reportData.companyName.replace(/\s+/g, '_')}_${Date.now()}.pdf`);
+      // 2. Generate and download PDF from the JSON object
+      await exportReportToPDF(reportData);
     } catch (err) {
       console.error("Failed to generate PDF:", err);
       alert("Failed to export PDF report.");
@@ -386,7 +280,6 @@ export default function ReportsPage() {
                   companyName={companyName || "Inspecta Inc."}
                   selectedSiteName={selectedSiteName}
                   userName={userName}
-                  onGenerateReport={handleGenerateReport}
                   onExportReport={handleExportReport}
                 />
               </div>
