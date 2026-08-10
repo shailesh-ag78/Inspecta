@@ -59,7 +59,7 @@ export function RecordingOverlay({
       <div className="max-w-[480px] w-full bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col border border-slate-200">
         {/* Modal Header */}
         <div className="bg-slate-900 px-5 py-3 flex items-center justify-between border-b border-slate-855">
-          <h4 className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-2">
+          <h4 className="text-[10px] font-black text-white uppercase tracking-wider flex items-center gap-2">
             {activeOverlay === "audio" && <Mic className="w-4 h-4 text-red-550" />}
             {activeOverlay === "video" && <Video className="w-4 h-4 text-blue-550" />}
             {activeOverlay === "image" && <Camera className="w-4 h-4 text-emerald-400" />}
@@ -107,7 +107,7 @@ export function RecordingOverlay({
                 <div className={`p-4 rounded-full bg-slate-900 text-blue-400 ${isRecording && !isRecordingPaused ? "animate-pulse border-2 border-red-500 text-red-500" : ""}`}>
                   <Mic className="w-6 h-6" />
                 </div>
-                <span className="text-xs font-bold text-slate-400">
+                <span className="text-[10px] font-bold text-slate-400">
                   {isRecording ? (isRecordingPaused ? "Audio paused for photo..." : "Live audio recording active...") : "Microphone ready"}
                 </span>
               </div>
@@ -136,7 +136,7 @@ export function RecordingOverlay({
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="flex items-center gap-1.5 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                 >
                   <Video className="w-4 h-4" /> Start Video Record
                 </button>
@@ -146,14 +146,14 @@ export function RecordingOverlay({
                     type="button"
                     onClick={snapSilentPhoto}
                     disabled={currentPhotosCount >= maxPhotosAllowed}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                   >
                     <Camera className="w-4 h-4" /> Snap Photo
                   </button>
                   <button
                     type="button"
                     onClick={stopRecording}
-                    className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                    className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                   >
                     <Square className="w-4 h-4 fill-white" /> Stop & Save
                   </button>
@@ -166,7 +166,7 @@ export function RecordingOverlay({
                 <button
                   type="button"
                   onClick={startRecording}
-                  className="flex items-center gap-1.5 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-6 py-2 bg-red-600 hover:bg-red-700 text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                 >
                   <Mic className="w-4 h-4" /> Start Audio Record
                 </button>
@@ -177,14 +177,14 @@ export function RecordingOverlay({
                       type="button"
                       onClick={startAudioPhotoWorkflow}
                       disabled={currentPhotosCount >= maxPhotosAllowed}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                     >
                       <Camera className="w-4 h-4" /> Snap Photo
                     </button>
                     <button
                       type="button"
                       onClick={stopRecording}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      className="flex items-center gap-1.5 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                     >
                       <Square className="w-4 h-4 fill-white" /> Stop & Save
                     </button>
@@ -195,14 +195,14 @@ export function RecordingOverlay({
                       type="button"
                       onClick={captureAudioPhoto}
                       disabled={currentPhotosCount >= maxPhotosAllowed}
-                      className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                     >
                       <Camera className="w-4 h-4" /> Capture Now
                     </button>
                     <button
                       type="button"
                       onClick={cancelAudioPhoto}
-                      className="flex items-center gap-1.5 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                      className="flex items-center gap-1.5 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                     >
                       <X className="w-4 h-4" /> Cancel
                     </button>
@@ -216,7 +216,7 @@ export function RecordingOverlay({
                 <button
                   type="button"
                   onClick={snapPhoto}
-                  className="flex items-center gap-1.5 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                 >
                   <Camera className="w-4 h-4" /> Snap Snapshot
                 </button>
@@ -225,14 +225,14 @@ export function RecordingOverlay({
                   <button
                     type="button"
                     onClick={uploadPhoto}
-                    className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-750 text-white rounded-full text-xs font-bold shadow-md active:scale-95 transition-all"
+                    className="flex items-center gap-1.5 px-6 py-2 bg-green-600 hover:bg-green-750 text-white rounded-full text-[10px] font-bold shadow-md active:scale-95 transition-all"
                   >
                     <CheckCircle2 className="w-4 h-4" /> Upload Photo
                   </button>
                   <button
                     type="button"
                     onClick={() => { setPhotoBlob(null); setPhotoPreview(null); }}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-255 text-slate-600 rounded-full text-xs font-bold"
+                    className="px-4 py-2 bg-slate-100 hover:bg-slate-255 text-slate-600 rounded-full text-[10px] font-bold"
                   >
                     Retake
                   </button>

@@ -44,7 +44,7 @@ function getTileTitle(incident: IncidentUpload) {
 }
 
 export function IncidentsUploadList({ incidentUploads, clearLocalBundles }: IncidentsUploadListProps) {
-  const labelHeaderStyle = "text-base font-bold text-slate-700 tracking-wide";
+  const labelHeaderStyle = "text-sm font-bold text-slate-700 tracking-wide";
   const getTotalSize = (incident: IncidentUpload) => {
     let totalSizeKB = 0;
     if (incident.primarySizeKB !== undefined) {
@@ -68,23 +68,23 @@ export function IncidentsUploadList({ incidentUploads, clearLocalBundles }: Inci
   };
 
   return (
-    <div className="flex flex-col gap-3 mt-2 border-t border-slate-200/70 pt-4">
-      <div className="flex justify-between items-center max-w-[485px]">
+    <div className="flex flex-col gap-3 mt-2 border-t border-slate-200/70 pt-4 w-full">
+      <div className="flex justify-between items-center w-full max-w-[485px]">
         <h3 className={labelHeaderStyle}>Recorded Incidents & Field Notes</h3>
         <button
           onClick={clearLocalBundles}
-          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-xs font-bold transition-colors"
+          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg text-[10px] font-bold transition-colors"
         >
           Clear Local Storage
         </button>
       </div>
 
       {incidentUploads.length === 0 ? (
-        <div className="text-slate-400 text-sm italic">
+        <div className="text-slate-400 text-xs italic">
           No recordings or field notes in this session yet.
         </div>
       ) : (
-        <div className="flex flex-col gap-2.5 max-w-[485px]">
+        <div className="flex flex-col gap-2.5 w-full max-w-[485px]">
           {[...incidentUploads]
             .sort((a, b) => {
               const timeA = a.timestamp || (a.uploadedAt ? new Date(a.uploadedAt).getTime() : 0);
@@ -116,10 +116,10 @@ export function IncidentsUploadList({ incidentUploads, clearLocalBundles }: Inci
 
                 {/* Row 1 : Col 3 : Show file name */}
                 <div className="col-span-1 flex justify-between items-center min-w-0">
-                  <span className="text-sm font-bold text-slate-800 truncate block">
+                  <span className="text-xs font-bold text-slate-800 truncate block">
                     {getTileTitle(incident)}
                   </span>
-                  <span className="text-sm text-slate-600 text-right">
+                  <span className="text-xs text-slate-600 text-right">
                     {getTotalSize(incident)}
                   </span>
                 </div>
@@ -129,14 +129,14 @@ export function IncidentsUploadList({ incidentUploads, clearLocalBundles }: Inci
                   {/* Category Icon */}
                   {incident.category === "field_note" ? (
                     <span
-                      className="field-note-icon text-base bg-amber-50 rounded-lg border border-amber-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
+                      className="field-note-icon text-xs bg-amber-50 rounded-lg border border-amber-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
                       title="Field Note"
                       role="img"
                       aria-label="Field Note"
                     />
                   ) : (
                     <span
-                      className="incident-icon text-base bg-blue-50 rounded-lg border border-blue-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
+                      className="incident-icon text-xs bg-blue-50 rounded-lg border border-blue-100/70 w-8 h-8 flex items-center justify-center flex-shrink-0"
                       title="Incident"
                       role="img"
                       aria-label="Incident"
@@ -180,7 +180,7 @@ export function IncidentsUploadList({ incidentUploads, clearLocalBundles }: Inci
                 <div className="col-span-1 text-left min-w-0 flex items-center">
                   {incident.displayMessage && (
                     <span
-                      className={`text-sm truncate font-semibold ${incident.status === "Failed" ? "text-rose-700" : "text-slate-500"
+                      className={`text-xs truncate font-semibold ${incident.status === "Failed" ? "text-rose-700" : "text-slate-500"
                         }`}
                       title={incident.displayMessage}
                     >

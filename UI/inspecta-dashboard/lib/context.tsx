@@ -581,21 +581,26 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setSiteInspectionsError(null);
       const response = await authenticatedFetch(`/api/site-inspections`);
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch site-inspections: ${response.statusText}`);
+      let combinedData: any[] = [];
+      if (response.ok) {
+        const apiResponse = await response.json();
+        combinedData = formatSiteInspections(apiResponse.data || []);
+      } else {
+        console.warn(`Failed to fetch site-inspections: ${response.statusText}. Treating as empty list.`);
       }
 
-      const apiResponse = await response.json();
-      const combinedData = formatSiteInspections(apiResponse.data || []);
       setSiteInspections(combinedData);
 
       // Auto-select first inspection (must have valid inspection_id)
       if (combinedData.length > 0 && combinedData[0].inspection_id) {
         setSelectedInspection(combinedData[0].inspection_id);
+      } else {
+        setSelectedInspection('');
       }
     } catch (error) {
-      console.error('Error fetching site-inspections:', error);
-      setSiteInspectionsError(error instanceof Error ? error.message : 'Failed to fetch site-inspections');
+      console.warn('Network error or unexpected error fetching site-inspections. Treating as empty list.', error);
+      setSiteInspections([]);
+      setSiteInspectionsError(null); // Do not show error message for empty/failed sites fetch
     } finally {
       setSiteInspectionsLoading(false);
     }
