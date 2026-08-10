@@ -5,7 +5,8 @@ sys.stdout.reconfigure(encoding='utf-8')
 sys.stderr.reconfigure(encoding='utf-8')
 import os
 from pathlib import Path
-from typing import TypedDict, List, Optional
+from typing import List, Optional
+from typing_extensions import TypedDict
 
 # Windows asyncio event loop fix for Psycopg
 # Must be set BEFORE importing asyncio-dependent libraries

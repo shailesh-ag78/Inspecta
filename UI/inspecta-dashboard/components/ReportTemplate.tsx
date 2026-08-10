@@ -8,6 +8,7 @@ interface Incident {
   summary: string;
   created?: string;
   incident_type?: string;
+  images?: any;
 }
 
 interface ReportTemplateProps {
@@ -127,7 +128,7 @@ export function ReportTemplate({
                 } else if (typeof incident.images === 'string') {
                   try {
                     imgCount = JSON.parse(incident.images).length;
-                  } catch (_) {}
+                  } catch (_) { }
                 }
               }
 

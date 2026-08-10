@@ -6,6 +6,7 @@ interface Incident {
   summary?: string;
   created?: string;
   incident_type?: string;
+  images?: any;
 }
 
 interface ReportingIncidentsProps {

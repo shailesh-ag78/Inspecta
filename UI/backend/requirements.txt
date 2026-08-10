@@ -7,3 +7,4 @@ google-cloud-storage
 google-auth
 pydantic
 python-multipart
+typing-extensions
