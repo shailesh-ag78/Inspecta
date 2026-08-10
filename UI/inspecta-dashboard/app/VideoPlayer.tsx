@@ -55,7 +55,7 @@ const VideoPlayer = forwardRef<any, VideoPlayerProps>(
                     const url = new URL(`${BACKEND_URL}/api/get-video-url`);
                     url.searchParams.set('path', filePath);
                     const headers: Record<string, string> = {};
-                    
+
                     let activeToken = token;
                     if (auth.currentUser) {
                         try {
@@ -91,7 +91,7 @@ const VideoPlayer = forwardRef<any, VideoPlayerProps>(
             : { position: 'relative', paddingTop: '56.25%' /* 16:9 aspect ratio */ };
 
         const playerStyle: React.CSSProperties = isAudio
-            ? { width: '100%', height: '50px' }
+            ? { width: '100%', height: '80px' }
             : { position: 'absolute', top: 0, left: 0 };
 
         // Don't mount the player on the server, or before the media URL has

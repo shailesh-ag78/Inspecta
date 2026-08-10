@@ -670,14 +670,6 @@ export default function InspectionPage() {
                 <span>{uploadProgress}</span>
               </div>
             )}
-
-            {incidentError && (
-              <div className="flex items-center gap-2 text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl px-3 py-2.5 shadow-sm max-w-[485px]">
-                <AlertCircle className="w-4 h-4" />
-                <span>{incidentError}</span>
-              </div>
-            )}
-
             <IncidentsUploadList
               incidentUploads={incidentUploads}
               clearLocalBundles={clearLocalBundles}

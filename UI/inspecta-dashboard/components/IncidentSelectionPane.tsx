@@ -368,7 +368,7 @@ export default function IncidentSelectionPane({
               )}
 
               {filteredIncidents.length === 0 ? (
-                <div className="text-[13px] text-slate-450 italic px-2 py-1">No incidents found</div>
+                <div className="text-[13px] text-slate-500 italic px-2 py-1">No incidents found</div>
               ) : (
                 [...filteredIncidents].sort((a, b) => new Date(b.created || 0).getTime() - new Date(a.created || 0).getTime()).map(incident => {
                   const isChecked = selectedMillerIncidents.includes(incident.id);

@@ -629,30 +629,37 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
         // Fetch all incidents
         const incidentsResponse = await authenticatedFetch('/api/incidents');
-        if (!incidentsResponse.ok) {
-          throw new Error(`Failed to fetch all incidents: ${incidentsResponse.statusText}`);
+        let formattedInc: any[] = [];
+        if (incidentsResponse.ok) {
+          const incidentsJson = await incidentsResponse.json();
+          formattedInc = formatIncidents(incidentsJson.data || []);
+        } else {
+          console.warn(`Failed to fetch all incidents: ${incidentsResponse.statusText}. Treating as empty.`);
         }
-        const incidentsJson = await incidentsResponse.json();
-        const formattedInc = formatIncidents(incidentsJson.data || []);
         setIncidents(formattedInc);
 
         // Fetch all tasks (only on taskmanagement page)
         if (pathname === '/taskmanagement') {
           const tasksResponse = await authenticatedFetch('/api/tasks');
-          if (!tasksResponse.ok) {
-            throw new Error(`Failed to fetch all tasks: ${tasksResponse.statusText}`);
+          let formattedTsk: any[] = [];
+          if (tasksResponse.ok) {
+            const tasksJson = await tasksResponse.json();
+            formattedTsk = formatTasks(
+              Array.isArray(tasksJson) ? tasksJson : (tasksJson.data || [])
+            );
+          } else {
+            console.warn(`Failed to fetch all tasks: ${tasksResponse.statusText}. Treating as empty.`);
           }
-          const tasksJson = await tasksResponse.json();
-          const formattedTsk = formatTasks(
-            Array.isArray(tasksJson) ? tasksJson : (tasksJson.data || [])
-          );
           setTasks(formattedTsk);
         } else {
           setTasks([]);
         }
       } catch (error) {
-        console.error('Error fetching company wide data:', error);
-        setIncidentsError(error instanceof Error ? error.message : 'Failed to fetch company data');
+        console.warn('Error fetching company wide data, treating as empty:', error);
+        setIncidents([]);
+        setTasks([]);
+        setIncidentsError(null);
+        setTasksError(null);
       } finally {
         setIncidentsLoading(false);
         setTasksLoading(false);
