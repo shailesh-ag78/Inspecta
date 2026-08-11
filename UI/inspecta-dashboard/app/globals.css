@@ -123,4 +123,7 @@ body {
 /* Field Note Icon */
 .field-note-icon::before {
   content: "📋";
+  font-size: 1.0rem;
+  color: slate-600;
+  display: inline-flex;
 }

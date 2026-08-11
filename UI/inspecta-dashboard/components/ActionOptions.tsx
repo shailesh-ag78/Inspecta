@@ -13,108 +13,132 @@ export function ActionOptions({
   triggerFileUpload
 }: ActionOptionsProps) {
   const labelHeaderStyle = "text-sm font-bold text-slate-700 tracking-wide";
+  // Glassmorphism classes: added backdrop-blur-md, semi-transparent borders, and inner highlight reflections
+  // const incidentCommonClass = "relative rounded-xl p-3 flex flex-col items-center justify-center text-white font-medium text-xs shadow-md border border-white/20 backdrop-blur-md shadow-[inset_0_1.5px_0_rgba(255,255,255,0.35)] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-b before:from-white/20 before:via-transparent before:to-transparent before:pointer-events-none hover:brightness-110 active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed select-none";
+  // const fieldNoteCommonClass = "relative rounded-xl p-3 flex flex-col items-center justify-center font-medium text-xs shadow-sm border border-white/30 backdrop-blur-md shadow-[inset_0_1.5px_0_rgba(255,255,255,0.65)] before:absolute before:inset-0 before:rounded-xl before:bg-gradient-to-b before:from-white/45 before:via-transparent before:to-transparent before:pointer-events-none hover:brightness-105 active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed select-none";
+  const incidentCommonClass = `
+  relative rounded-xl p-3 flex flex-col items-center justify-center text-white font-medium text-xs
+  shadow-md border border-white/20 backdrop-blur-md
+  shadow-[inset_0_1.5px_0_rgba(255,255,255,0.45)]
+  before:absolute before:inset-0 before:rounded-xl
+  before:bg-gradient-to-b before:from-white/25 before:via-white/10 before:to-transparent
+  after:absolute after:top-0 after:left-0 after:right-0 after:h-[40%]
+  after:rounded-t-xl after:bg-gradient-to-b after:from-white/40 after:to-transparent
+  before:pointer-events-none after:pointer-events-none
+  hover:brightness-110 active:scale-95 transition-all duration-200
+  disabled:opacity-40 disabled:cursor-not-allowed select-none
+`;
+  const fieldNoteCommonClass = `
+  relative rounded-xl p-3 flex flex-col items-center justify-center font-medium text-xs
+  shadow-sm border border-white/30 backdrop-blur-md
+  shadow-[inset_0_1.5px_0_rgba(255,255,255,0.65)]
+  before:absolute before:inset-0 before:rounded-xl
+  before:bg-gradient-to-b before:from-white/50 before:via-white/20 before:to-transparent
+  after:absolute after:top-0 after:left-0 after:right-0 after:h-[35%]
+  after:rounded-t-xl after:bg-gradient-to-b after:from-white/60 after:to-transparent
+  before:pointer-events-none after:pointer-events-none
+  hover:brightness-105 active:scale-95 transition-all duration-200
+  disabled:opacity-40 disabled:cursor-not-allowed select-none
+`;
 
-  // Using w-full and aspect-square so they automatically scale as perfect squares
-  const incidentTileStyle = "relative w-full aspect-square border border-orange-200/80 bg-gradient-to-br from-amber-500/10 to-orange-500/15 hover:from-amber-500/20 hover:to-orange-500/25 hover:border-orange-350 rounded-xl flex flex-col items-center justify-center gap-1 shadow-sm transform hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 active:translate-y-0 select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
-  const fieldNoteTileStyle = "relative w-full aspect-square border border-blue-200/80 bg-gradient-to-br from-blue-500/10 to-indigo-500/15 hover:from-blue-500/20 hover:to-indigo-500/25 hover:border-blue-350 rounded-xl flex flex-col items-center justify-center gap-1 shadow-sm transform hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 active:translate-y-0 select-none disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer p-1 text-center font-bold";
 
   return (
     <>
       {/* Option A: Add New Incident */}
-      <div className="flex flex-col gap-2 border-t border-slate-100 pt-4">
+      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3.5">
         <h4 className={`${labelHeaderStyle} flex items-center gap-3`}>
           <span className="incident-icon text-sm bg-blue-50 p-1.5 rounded-lg border border-blue-100/70 inline-flex items-center justify-center w-8 h-8 select-none" />
           <span>Add New Incident</span>
         </h4>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-[360px] px-1 mt-1.5">
+        <div className="grid grid-cols-4 gap-3 max-w-[435px] mt-1.5">
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("audio", "incident")}
-            className={incidentTileStyle}
+            className={`${incidentCommonClass} bg-gradient-to-b from-amber-500 to-amber-600 shadow-md`}
           >
-            <Mic className="w-6 h-6 text-[#800000] shrink-0" />
-            <span className="text-[10px] text-[#800000] tracking-wide">Record Audio</span>
+            <Mic className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Record Audio</span>
           </button>
 
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("video", "incident")}
-            className={incidentTileStyle}
+            className={`${incidentCommonClass} bg-gradient-to-b from-blue-500 to-blue-600`}
           >
-            <Video className="w-6 h-6 text-blue-600 shrink-0" />
-            <span className="text-[10px] text-blue-600 tracking-wide">Record Video</span>
+            <Video className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Record Video</span>
           </button>
 
           <button
             type="button"
             disabled={true}
             onClick={() => openRecordingOverlay("image", "incident")}
-            className={incidentTileStyle}
+            className="relative rounded-xl p-3 flex flex-col items-center justify-center text-white font-medium text-xs bg-gradient-to-b from-green-500 to-green-600 shadow-md opacity-40 cursor-not-allowed select-none border border-black/10"
             title="Picture option under Add New Incident is disabled (will be implemented at a later stage)"
           >
-            <Camera className="w-6 h-6 text-green-600 shrink-0 opacity-50" />
-            <span className="text-[10px] text-green-600 opacity-50 tracking-wide">Picture</span>
+            <Camera className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Picture</span>
           </button>
 
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => triggerFileUpload("incident")}
-            className={incidentTileStyle}
+            className={`${incidentCommonClass} bg-gradient-to-b from-purple-400 to-purple-500`}
           >
-            <Upload className="w-6 h-6 text-purple-600 shrink-0" />
-            <span className="text-[10px] text-purple-600 tracking-wide">Upload File</span>
+            <Upload className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Upload File</span>
           </button>
         </div>
       </div>
 
       {/* Option B: Add Field Note */}
-      <div className="flex flex-col gap-2 border-t border-slate-100 pt-4">
+      <div className="flex flex-col gap-2 border-t border-slate-100 pt-3.5">
         <h4 className={`${labelHeaderStyle} flex items-center gap-3`}>
           <span className="field-note-icon text-sm bg-slate-50 p-1.5 rounded-lg border border-slate-100/70 inline-flex items-center justify-center w-8 h-8 select-none" />
           <span>Add Field Note</span>
         </h4>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-[360px] px-1 mt-1.5">
+        <div className="grid grid-cols-4 gap-3 max-w-[435px] mt-1.5">
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("audio", "field_note")}
-            className={fieldNoteTileStyle}
+            className={`${fieldNoteCommonClass} text-red-600 bg-gradient-to-b from-red-100 to-red-200`}
           >
-            <Mic className="w-6 h-6 text-[#800000] shrink-0" />
-            <span className="text-[10px] text-[#800000] tracking-wide">Record Audio</span>
+            <Mic className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Record Audio</span>
           </button>
 
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("video", "field_note")}
-            className={fieldNoteTileStyle}
+            className={`${fieldNoteCommonClass} text-blue-600 bg-gradient-to-b from-blue-100 to-blue-200`}
           >
-            <Video className="w-6 h-6 text-blue-600 shrink-0" />
-            <span className="text-[10px] text-blue-600 tracking-wide">Record Video</span>
+            <Video className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Record Video</span>
           </button>
 
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => openRecordingOverlay("image", "field_note")}
-            className={fieldNoteTileStyle}
+            className={`${fieldNoteCommonClass} text-green-600 bg-gradient-to-b from-green-100 to-green-200`}
           >
-            <Camera className="w-6 h-6 text-green-600 shrink-0" />
-            <span className="text-[10px] text-green-600 tracking-wide">Picture</span>
+            <Camera className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Picture</span>
           </button>
 
           <button
             type="button"
             disabled={isSiteDisabled}
             onClick={() => triggerFileUpload("field_note")}
-            className={fieldNoteTileStyle}
+            className={`${fieldNoteCommonClass} text-purple-600 bg-gradient-to-b from-purple-100 to-purple-200`}
           >
-            <Upload className="w-6 h-6 text-purple-600 shrink-0" />
-            <span className="text-[10px] text-purple-600 tracking-wide">Upload File</span>
+            <Upload className="w-7 h-7 mb-1.5 shrink-0 z-10" />
+            <span className="z-10 text-center">Upload File</span>
           </button>
         </div>
       </div>

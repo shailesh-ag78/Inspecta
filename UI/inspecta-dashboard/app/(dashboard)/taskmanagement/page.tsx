@@ -1116,8 +1116,7 @@ export default function TaskManagementPage() {
                   <ChevronLeft className="w-5 h-5 rotate-180" />
                 </button>
               </div>
-
-              <div className={`relative w-full h-[75%] shrink-0 bg-black rounded-2xl overflow-hidden border transition-all duration-500 shadow-2xl flex flex-col ${activeTask?.severity_id === 1 ? 'border-red-500/50 shadow-red-500/10' :
+              <div className={`relative w-full h-[85%] shrink-0 bg-black rounded-2xl overflow-hidden border transition-all duration-500 shadow-2xl flex flex-col ${activeTask?.severity_id === 1 ? 'border-red-500/50 shadow-red-500/10' :
                 activeTask?.severity_id === 2 ? 'border-yellow-500/50 shadow-yellow-500/10' :
                   activeTask?.severity_id === 3 ? 'border-green-500/50 shadow-green-500/10' :
                     'border-slate-700'

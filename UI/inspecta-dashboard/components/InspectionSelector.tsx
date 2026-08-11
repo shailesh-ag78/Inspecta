@@ -87,7 +87,7 @@ export function InspectionSelector({
             onClick={() => setIsSiteDropdownOpen(!isSiteDropdownOpen)}
             className={`${triggerStyle} ${isSiteDropdownOpen ? "border-blue-500 ring-1 ring-blue-500" : ""}`}
           >
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider select-none leading-none mb-1.5">
+            <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider select-none leading-none mb-1.5">
               Site for Incident
             </span>
             <span className="text-xs font-semibold text-slate-800 truncate pr-6 leading-normal">
@@ -134,7 +134,7 @@ export function InspectionSelector({
             onClick={() => setIsInspectionDropdownOpen(!isInspectionDropdownOpen)}
             className={`${triggerStyle} ${isInspectionDropdownOpen ? "border-blue-500 ring-1 ring-blue-500" : ""} disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider select-none leading-none mb-1.5">
+            <span className="text-[9px] font-semibold text-blue-500 uppercase tracking-wider select-none leading-none mb-1.5">
               Inspection for Incident
             </span>
             <span className="text-xs font-semibold text-slate-800 truncate pr-6 leading-normal">
