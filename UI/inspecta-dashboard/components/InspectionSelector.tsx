@@ -1,5 +1,5 @@
-import React from "react";
-import { Plus, AlertCircle } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Plus, AlertCircle, ChevronDown } from "lucide-react";
 
 interface InspectionSelectorProps {
   backendSites: any[];
@@ -40,56 +40,135 @@ export function InspectionSelector({
   inspectionError,
   formatDate
 }: InspectionSelectorProps) {
-  const labelHeaderStyle = "text-sm font-bold text-slate-700 tracking-wide";
+  const [isSiteDropdownOpen, setIsSiteDropdownOpen] = useState(false);
+  const [isInspectionDropdownOpen, setIsInspectionDropdownOpen] = useState(false);
+
+  const siteRef = useRef<HTMLDivElement>(null);
+  const inspectionRef = useRef<HTMLDivElement>(null);
+
+  // Click outside detection to close dropdowns
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (siteRef.current && !siteRef.current.contains(event.target as Node)) {
+        setIsSiteDropdownOpen(false);
+      }
+      if (inspectionRef.current && !inspectionRef.current.contains(event.target as Node)) {
+        setIsInspectionDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedSite = backendSites.find(s => String(s.site_id || s.id) === selectedSiteId);
+  const selectedSiteName = selectedSite ? (selectedSite.site_name || selectedSite.name) : "Select Site...";
+
+  const selectedInspection = filteredInspections.find(ins => String(ins.inspection_id) === selectedInspectionId);
+  let selectedInspectionLabel = "Select Inspection...";
+  if (isSiteDisabled) {
+    selectedInspectionLabel = "Select a site first...";
+  } else if (filteredInspections.length === 0) {
+    selectedInspectionLabel = "No Inspections Available under Site";
+  } else if (selectedInspection) {
+    const dateStr = formatDate(selectedInspection.inspection_created_at);
+    selectedInspectionLabel = dateStr ? `${selectedInspection.label} (${dateStr})` : selectedInspection.label;
+  }
+
+  // Exact styles matching native select, but holding 2 lines and height h-13
+  const triggerStyle = "w-full bg-white border border-slate-200 rounded-lg flex flex-col justify-center items-start px-3 text-left transition-all cursor-pointer h-13 relative focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm";
 
   return (
     <>
-      {/* Site Selector (Bounded/fixed width) */}
-      <div className="flex flex-col gap-2 w-full max-w-[485px]">
-        <label className={labelHeaderStyle}>
-          Site for Incident
-        </label>
-        <select
-          value={selectedSiteId}
-          onChange={(e) => setSelectedSiteId(e.target.value)}
-          className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11"
-        >
-          {backendSites.length === 0 ? (
-            <option value="">No Sites Available</option>
-          ) : (
-            backendSites.map((site) => (
-              <option key={site.site_id || site.id} value={site.site_id || site.id} className="text-xs">
-                🏢  {site.site_name || site.name}
-              </option>
-            ))
+      {/* Site Selector Custom Dropdown */}
+      <div className="flex flex-col gap-2.0 w-full max-w-[485px]" ref={siteRef}>
+        <div className="relative w-full">
+          <button
+            type="button"
+            onClick={() => setIsSiteDropdownOpen(!isSiteDropdownOpen)}
+            className={`${triggerStyle} ${isSiteDropdownOpen ? "border-blue-500 ring-1 ring-blue-500" : ""}`}
+          >
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider select-none leading-none mb-1.5">
+              Site for Incident
+            </span>
+            <span className="text-xs font-semibold text-slate-800 truncate pr-6 leading-normal">
+              🏢  {selectedSiteName}
+            </span>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          </button>
+
+          {isSiteDropdownOpen && (
+            <div className="absolute top-[105%] left-0 z-30 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 mt-1 animate-fadeIn">
+              {backendSites.length === 0 ? (
+                <div className="px-4 py-2.5 text-xs text-slate-400 italic">No Sites Available</div>
+              ) : (
+                backendSites.map((site) => {
+                  const id = String(site.site_id || site.id);
+                  const name = site.site_name || site.name;
+                  const isSelected = id === selectedSiteId;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedSiteId(id);
+                        setIsSiteDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 ${isSelected ? "bg-blue-50/50 text-blue-600 font-bold" : ""}`}
+                    >
+                      🏢  {name}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           )}
-        </select>
+        </div>
       </div>
 
-      {/* Inspection Selector & Inline Action (Bounded/fixed width) with increased gap */}
-      <div className="flex flex-col gap-3 w-full max-w-[485px]">
-        <div className="flex flex-col gap-2">
-          <label className={labelHeaderStyle}>Inspection for Incident</label>
-          <select
-            value={selectedInspectionId}
+      {/* Inspection Selector Custom Dropdown */}
+      <div className="flex flex-col gap-3 w-full max-w-[485px]" ref={inspectionRef}>
+        <div className="relative w-full">
+          <button
+            type="button"
             disabled={isSiteDisabled}
-            onChange={(e) => setSelectedInspectionId(e.target.value)}
-            className="w-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 rounded-lg px-3 py-3 focus:outline-none focus:border-blue-500 transition-all cursor-pointer h-11 disabled:opacity-50"
+            onClick={() => setIsInspectionDropdownOpen(!isInspectionDropdownOpen)}
+            className={`${triggerStyle} ${isInspectionDropdownOpen ? "border-blue-500 ring-1 ring-blue-500" : ""} disabled:opacity-50 disabled:cursor-not-allowed`}
           >
-            {filteredInspections.length === 0 ? (
-              <option value="">No Inspections Available under Site</option>
-            ) : (
-              filteredInspections.map((ins) => {
-                const dateStr = formatDate(ins.inspection_created_at);
-                const displayLabel = dateStr ? `${ins.label} (${dateStr})` : ins.label;
-                return (
-                  <option key={ins.inspection_id} value={ins.inspection_id || ""} className="text-xs">
-                    🔍  {displayLabel}
-                  </option>
-                );
-              })
-            )}
-          </select>
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider select-none leading-none mb-1.5">
+              Inspection for Incident
+            </span>
+            <span className="text-xs font-semibold text-slate-800 truncate pr-6 leading-normal">
+              🔍  {selectedInspectionLabel}
+            </span>
+            <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+          </button>
+
+          {isInspectionDropdownOpen && !isSiteDisabled && (
+            <div className="absolute top-[105%] left-0 z-30 w-full bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto py-1 mt-1 animate-fadeIn">
+              {filteredInspections.length === 0 ? (
+                <div className="px-4 py-2.5 text-xs text-slate-400 italic">No Inspections Available under Site</div>
+              ) : (
+                filteredInspections.map((ins) => {
+                  const dateStr = formatDate(ins.inspection_created_at);
+                  const displayLabel = dateStr ? `${ins.label} (${dateStr})` : ins.label;
+                  const isSelected = String(ins.inspection_id) === selectedInspectionId;
+                  return (
+                    <button
+                      key={ins.inspection_id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedInspectionId(String(ins.inspection_id));
+                        setIsInspectionDropdownOpen(false);
+                      }}
+                      className={`w-full px-4 py-2.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2 ${isSelected ? "bg-blue-50/50 text-blue-600 font-bold" : ""}`}
+                    >
+                      🔍  {displayLabel}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
 
         {/* Inline Action Trigger */}

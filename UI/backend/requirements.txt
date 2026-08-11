@@ -8,3 +8,4 @@ google-auth
 pydantic
 python-multipart
 typing-extensions
+tenacity

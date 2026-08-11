@@ -635,11 +635,10 @@ export default function InspectionPage() {
       //fetchSiteInspections();
     }
   };
-
   return (
     <div className="h-full w-full overflow-y-auto bg-bg dropdown-scrollbar">
-      <div className="p-6 flex flex-col items-start justify-start w-full">
-        <div className="w-full bg-pane-bg/98 rounded-2xl border border-slate-200/70 shadow-md overflow-hidden flex flex-col">
+      <div className="p-0 flex flex-col items-start justify-start w-full">
+        <div className="w-full bg-pane-bg/98 border-b border-slate-200/70 overflow-hidden flex flex-col">
 
           {/* Configuration Body Content */}
           <div className="p-5 flex flex-col gap-6">

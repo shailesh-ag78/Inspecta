@@ -7,6 +7,19 @@ from contextlib import asynccontextmanager, contextmanager
 from enum import IntEnum
 from typing import List, Dict, Any, Optional
 
+from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
+
+def neon_retry():
+    """
+    Standardized retry decorator for Neon DB transient connection errors.
+    Uses exponential backoff with jitter to prevent thundering herds.
+    """
+    return retry(
+        stop=stop_after_attempt(3),
+        wait=wait_random_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type((psycopg.OperationalError, psycopg.errors.ConnectionException)),
+        reraise=True
+    )
 # --- 1. Production Enums (Matching SQL Seed Script) ---
 class Industry(IntEnum):
     SOLAR = 1
@@ -98,6 +111,7 @@ class IncidentRepository:
                     raise RuntimeError(f"Failed to create incident for inspection {inspection_id}: No ID returned.")
                 return str(result['id']) 
                 
+    @neon_retry()
     async def bulk_add_incident_tasks(self, company_id: int, incident_id: str, inspection_id: str, tasks: List[Dict[str, Any]]):
         """
         High-performance bulk insert for Agent 2. 
@@ -137,6 +151,7 @@ class IncidentRepository:
             async with conn.cursor() as cur:
                 await cur.executemany(query, data)
 
+    @neon_retry()
     async def get_tasks_for_incident(self, company_id: int, incident_id: str) -> List[Dict]:
         """Fetches all tasks for a specific incident, filtered by RLS."""
         async with self.session(company_id) as conn:
@@ -147,6 +162,7 @@ class IncidentRepository:
                 )
                 return [dict(row) for row in await cur.fetchall()]
 
+    @neon_retry()
     async def get_incident(self, company_id: int, incident_id: str) -> Optional[Dict]:
         """Fetches incident details by ID."""
         async with self.session(company_id) as conn:
@@ -158,6 +174,7 @@ class IncidentRepository:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
+    @neon_retry()
     async def update_incident_audio(self, company_id: int, incident_id: str, audio_path: str):
         """Updates incident with audio path and metadata."""
         async with self.session(company_id) as conn:
@@ -171,6 +188,7 @@ class IncidentRepository:
                     (audio_path, incident_id)
                 )
 
+    @neon_retry()
     async def update_task(self, company_id: int, task_id: str, title: str, description: str, severity_id: Optional[int] = None, status_id: Optional[int] = None):
         """Human-in-the-loop: Update task."""
         async with self.session(company_id) as conn:
@@ -190,6 +208,7 @@ class IncidentRepository:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
+    @neon_retry()
     async def update_task_review(self, company_id: int, task_id: str, comments: str, status_id: Optional[int] = None):
         """Human-in-the-loop: Update task after expert review."""
         async with self.session(company_id) as conn:
@@ -208,6 +227,7 @@ class IncidentRepository:
                 return dict(row) if row else None
 
     
+    @neon_retry()
     async def update_incident_summary(self, company_id: int, incident_id: str, summary: str):
         """Update incident summary"""
         async with self.session(company_id) as conn:
@@ -300,6 +320,7 @@ class IncidentRepository:
                     )
                     return await cur.fetchone() is not None
 
+    @neon_retry()
     async def get_company_info(self, company_id: int) -> Optional[Dict[str, Any]]:
         """Fetches company name + industry for a given company id.
 
