@@ -466,17 +466,15 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pollIncidentStatus]);
 
-  // Trigger loading when user successfully logs in
+  // Clear states when logged out (or do nothing on login so it stays session-bound)
   useEffect(() => {
-    if (token) {
-      fetchRecentIncidents();
-    } else {
+    if (!token) {
       // Clear states when logged out
       setIncidentUploads([]);
       setNotifications([]);
       localStorage.removeItem("inspecta_notifications");
     }
-  }, [token, fetchRecentIncidents]);
+  }, [token]);
 
   // Cleanup polling intervals on unmount
   useEffect(() => {
