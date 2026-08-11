@@ -189,15 +189,25 @@ foreach ($SA in $SAs) {
 # -------------------------------------------------------------
 Write-Host "`n[4/7] Setting up Artifact Registry..." -ForegroundColor Yellow
 $RegistryName = "inspecta-registry"
-# Check if repository already exists by describing it (suppressing standard error and output)
-gcloud artifacts repositories describe $RegistryName --location=$Region >$null 2>&1
-if ($LastExitCode -ne 0) {
+$RegistryExists = gcloud artifacts repositories list --location=$Region --filter="id=$RegistryName" --format="value(name)"
+if (-not $RegistryExists) {
     Write-Host "Creating Artifact Registry repository: $RegistryName..."
-    gcloud artifacts repositories create $RegistryName `
-        --repository-format=docker `
-        --location=$Region `
-        --description="Docker repository for Inspecta services" `
-        --quiet
+    # Wrap in try/catch to prevent non-zero exit codes from halting the script
+    try {
+        gcloud artifacts repositories create $RegistryName `
+            --repository-format=docker `
+            --location=$Region `
+            --description="Docker repository for Inspecta services" `
+            --quiet
+    }
+    catch {
+        if ($_ -like "*ALREADY_EXISTS*") {
+            Write-Host "Artifact Registry $RegistryName already exists (handled catch)."
+        }
+        else {
+            throw $_
+        }
+    }
 }
 else {
     Write-Host "Artifact Registry $RegistryName already exists."
