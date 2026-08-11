@@ -28,7 +28,7 @@ Write-Host "Starting deployment via deploy-gcp.ps1..." -ForegroundColor Cyan
 # Call deploy-gcp.ps1 with specified parameters
 & ".\deploy-gcp.ps1" `
     -ProjectID "inspecta-495004" `
-    -DatabaseURL "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require" `
+    -DatabaseURL "postgresql://neondb_owner:npg_U8BPRXgnzT6L@ep-floral-hat-ajkt7oqc.c-3.us-east-2.aws.neon.tech/inspecta_db?sslmode=require" `
     -GcpViewerEmail "shailesh.ag78@gmail.com" `
     -GcpAdminEmail "sa.socialprofile@gmail.com" `
     -DeployUI:$true `
