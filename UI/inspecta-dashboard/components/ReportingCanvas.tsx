@@ -115,18 +115,18 @@ export function ReportingCanvas({
             type="button"
             onClick={() => onExportReport?.(reportSummary)}
             disabled={droppedIncidents.length === 0}
-            className="text-[11px] font-bold text-blue-600 hover:text-blue-700 disabled:opacity-50 flex items-center gap-1 bg-blue-50 hover:bg-blue-100/80 px-2 py-1 rounded transition-colors disabled:cursor-not-allowed cursor-pointer"
+            className="text-xs font-semibold text-blue-600 hover:text-blue-700 disabled:opacity-50 flex items-center gap-1 bg-blue-50 hover:bg-blue-100/80 px-2 py-1 rounded transition-colors disabled:cursor-not-allowed cursor-pointer"
           >
-            <Download className="w-3 h-3" />
+            <Download className="w-4 h-4" />
             <span>Export Report</span>
           </button>
           <button
             type="button"
             onClick={onClear}
             disabled={droppedIncidents.length === 0}
-            className="text-[11px] font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50 flex items-center gap-1 bg-rose-50/60 hover:bg-rose-50 px-2 py-1 rounded transition-colors disabled:cursor-not-allowed cursor-pointer"
+            className="text-xs font-semibold text-rose-600 hover:text-rose-700 disabled:opacity-50 flex items-center gap-1 bg-rose-50/60 hover:bg-rose-50 px-2 py-1 rounded transition-colors disabled:cursor-not-allowed cursor-pointer"
           >
-            <Trash2 className="w-3 h-3" />
+            <Trash2 className="w-4 h-4" />
             <span>Clear Canvas</span>
           </button>
         </div>

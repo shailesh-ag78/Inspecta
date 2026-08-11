@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChevronDown, ChevronLeft, Play, AlertCircle, Loader, Upload, Plus } from 'lucide-react';
 import { useDashboard } from '@/lib/context';
-import AddInspectionModal from '@/components/AddInspectionModal';
+
 import VideoPlayer from '@/app/VideoPlayer';
 import { authenticatedFetch } from '@/lib/api';
 
@@ -48,11 +48,8 @@ export default function TaskManagementPage() {
     tasksError,
     activeTask,
     setActiveTask,
-    isAddInspectionOpen,
-    setIsAddInspectionOpen,
     lastUploadedFileName,
     uniqueSites,
-    handleAddInspectionSubmit,
     selectedMillerSites,
     backendSites,
     selectedMillerInspections,
@@ -1200,13 +1197,7 @@ export default function TaskManagementPage() {
         )}
       </main>
 
-      {/* Add Inspection Modal */}
-      <AddInspectionModal
-        isOpen={isAddInspectionOpen}
-        onClose={() => setIsAddInspectionOpen(false)}
-        sites={uniqueSites}
-        onSubmit={handleAddInspectionSubmit}
-      />
+
     </div >
   );
 }

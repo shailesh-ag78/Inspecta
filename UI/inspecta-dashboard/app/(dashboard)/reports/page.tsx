@@ -269,13 +269,13 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className={`h-full flex flex-col p-4 overflow-hidden ${theme.background.section}`}>
+    <div className={`h-full flex flex-col pt-0 pb-4 px-0 overflow-hidden ${theme.background.section}`}>
       {/* Report Builder Pane - Matches IncidentSelectionPane look and feel, takes full height */}
-      <div className="bg-white border border-slate-200/70 rounded-xl overflow-hidden shadow-md w-full flex-1 flex flex-col">
+      <div className="bg-white border-b border-slate-200/70 overflow-hidden shadow-md w-full flex-1 flex flex-col">
         {/* Pane Header */}
         <div
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="flex items-center justify-between px-4 py-3 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors shrink-0"
+          className="flex items-center justify-between px-3 py-2 bg-slate-100 border-b border-slate-200/70 cursor-pointer select-none hover:bg-slate-200/50 transition-colors shrink-0"
         >
           <div className="flex items-center gap-2 text-[15px] font-bold text-slate-700">
             <BarChart2 className="w-5 h-5 text-blue-600 mr-1" />

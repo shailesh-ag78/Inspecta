@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useDashboard } from "@/lib/context";
 import { Loader2, AlertCircle } from "lucide-react";
-import { authenticatedFetch, uploadFileToStorage, registerIncident } from "@/lib/api";
+import { authenticatedFetch, uploadFileToStorage, registerIncident, getSites } from "@/lib/api";
 import { saveBundleToIdb, AttachedMedia, IncidentBundle } from "@/lib/idb";
 
 // Import Refactored Components
@@ -21,9 +21,8 @@ const POLLING_INTERVAL_MS = 5000; // Poll every 5 seconds
 
 export default function InspectionPage() {
   const {
-    backendSites,
+    token,
     siteInspections,
-    handleAddInspectionSubmit,
     fetchSiteInspections,
     incidentUploads,
     setIncidentUploads,
@@ -36,6 +35,22 @@ export default function InspectionPage() {
     clearLocalBundles,
   } = useDashboard();
 
+  const [sites, setSites] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchSites = async () => {
+      try {
+        const list = await getSites();
+        setSites(list);
+      } catch (err) {
+        console.error("Failed to fetch sites on inspection page:", err);
+      }
+    };
+    if (token) {
+      fetchSites();
+    }
+  }, [token]);
+
   // Selection states
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [selectedInspectionId, setSelectedInspectionId] = useState<string>("");
@@ -46,7 +61,7 @@ export default function InspectionPage() {
   const [inspectionError, setInspectionError] = useState<string | null>(null);
 
   // Active Site & Inspection objects
-  const activeSite = backendSites.find(s => String(s.site_id || s.id) === selectedSiteId);
+  const activeSite = sites.find(s => String(s.site_id || s.id) === selectedSiteId);
   const filteredInspections = siteInspections.filter(
     ins => String(ins.site_id) === selectedSiteId && ins.inspection_id
   );
@@ -90,10 +105,10 @@ export default function InspectionPage() {
 
   // Auto-select first site
   useEffect(() => {
-    if (backendSites.length > 0 && !selectedSiteId) {
-      setSelectedSiteId(String(backendSites[0].site_id || backendSites[0].id));
+    if (sites.length > 0 && !selectedSiteId) {
+      setSelectedSiteId(String(sites[0].site_id || sites[0].id));
     }
-  }, [backendSites, selectedSiteId]);
+  }, [sites, selectedSiteId]);
 
   // Reset selected inspection when site changes
   useEffect(() => {
@@ -617,7 +632,7 @@ export default function InspectionPage() {
     } finally {
       setIsCreatingInspection(false);
       // Refetch inspections to show the new one
-      fetchSiteInspections();
+      //fetchSiteInspections();
     }
   };
 
@@ -630,7 +645,7 @@ export default function InspectionPage() {
           <div className="p-5 flex flex-col gap-6">
 
             <InspectionSelector
-              backendSites={backendSites}
+              backendSites={sites}
               selectedSiteId={selectedSiteId}
               setSelectedSiteId={setSelectedSiteId}
               filteredInspections={filteredInspections}

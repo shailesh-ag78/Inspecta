@@ -13,6 +13,7 @@ import {
   getRecentIncidents,
   uploadFileToStorage,
   registerIncident,
+  getSites,
 } from '@/lib/api';
 
 interface SiteInspection {
@@ -79,19 +80,11 @@ interface DashboardContextType {
   tasksError: string | null;
   activeTask: Task | null;
   setActiveTask: (task: Task | null) => void;
-  isAddInspectionOpen: boolean;
-  setIsAddInspectionOpen: (open: boolean) => void;
   uniqueSites: any[];
   lastUploadedFileName: string | null;
   setLastUploadedFileName: (name: string | null) => void;
   selectedFile: File | null;
   setSelectedFile: (file: File | null) => void;
-  handleAddInspectionSubmit: (data: {
-    siteId: string | null;
-    newSiteName?: string;
-    newSiteAddress?: string;
-    friendlyName?: string;
-  }) => Promise<void>;
   handleLogin: () => Promise<void>;
   handleLogout: () => Promise<void>;
   fetchSiteInspections: () => Promise<void>;
@@ -499,8 +492,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [lastUploadedFileName, setLastUploadedFileName] = useState<string | null>(null);
 
-  // Add Inspection Modal State
-  const [isAddInspectionOpen, setIsAddInspectionOpen] = useState(false);
+
 
   // Listen for Firebase auth state changes and token refreshes
   useEffect(() => {
@@ -759,82 +751,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
 
 
-  const handleAddInspectionSubmit = async (data: {
-    siteId: string | null;
-    newSiteName?: string;
-    newSiteAddress?: string;
-    friendlyName?: string;
-  }) => {
-    document.body.style.cursor = 'wait';
-    try {
-      const executionPromise = (async () => {
-        let targetSiteId = data.siteId;
 
-        if (data.siteId === null) {
-          if (!data.newSiteName || !data.newSiteAddress) {
-            throw new Error("Site Name and Address are required to add a new site.");
-          }
-
-          const siteResponse = await authenticatedFetch('/api/sites', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              site_name: data.newSiteName,
-              address: data.newSiteAddress,
-            }),
-          });
-
-          if (!siteResponse.ok) {
-            const errData = await siteResponse.json().catch(() => null);
-            throw new Error(errData?.detail || 'Failed to create new site');
-          }
-
-          const siteResult = await siteResponse.json();
-          targetSiteId = String(siteResult.data?.site_id);
-        }
-
-        if (!targetSiteId) {
-          throw new Error("Invalid Site ID");
-        }
-
-        const query = data.friendlyName
-          ? `/api/inspections?siteId=${targetSiteId}&friendlyName=${encodeURIComponent(data.friendlyName)}`
-          : `/api/inspections?siteId=${targetSiteId}`;
-
-        const inspectionResponse = await authenticatedFetch(query, {
-          method: 'POST',
-        });
-
-        if (!inspectionResponse.ok) {
-          const errData = await inspectionResponse.json().catch(() => null);
-          throw new Error(errData?.detail || 'Failed to create new inspection');
-        }
-
-        const inspectionResult = await inspectionResponse.json();
-        const newInspectionId = inspectionResult.data?.inspection_id;
-
-        setIsAddInspectionOpen(false);
-
-        await fetchSiteInspections();
-        if (newInspectionId) {
-          setSelectedInspection(newInspectionId);
-        }
-      })();
-
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Timeout : Failed to add new Inspection")), 60000)
-      );
-
-      await Promise.race([executionPromise, timeoutPromise]);
-    } catch (error) {
-      console.error("Error adding inspection:", error);
-      alert(error instanceof Error ? error.message : 'Unknown error');
-    } finally {
-      document.body.style.cursor = 'default';
-    }
-  };
 
   const [isIncidentPaneCollapsed, setIsIncidentPaneCollapsed] = useState(true);
   const [isSiteColumnCollapsed, setIsSiteColumnCollapsed] = useState(false);
@@ -1010,23 +927,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, [currentPath, backendSites]);
 
   useEffect(() => {
-    const getSites = async () => {
+    const fetchBackendSites = async () => {
       try {
-        const res = await authenticatedFetch('/api/sites');
-        if (res.ok) {
-          const json = await res.json();
-          const list = json.data || json || [];
-          setBackendSites(list);
-          setSelectedMillerSites(list.map((s: any) => String(s.site_name || s.name || '')));
-        }
+        const list = await getSites();
+        setBackendSites(list);
+        setSelectedMillerSites(list.map((s: any) => String(s.site_name || s.name || '')));
       } catch (e) {
         console.error("Error fetching backend sites:", e);
       }
     };
     if (token) {
-      getSites();
+      fetchBackendSites();
     }
-  }, [token, token]);
+  }, [token]);
 
   useEffect(() => {
     const availableIns = siteInspections.filter(ins => selectedMillerSites.includes(ins.site_name));
@@ -1135,14 +1048,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         tasksError,
         activeTask,
         setActiveTask,
-        isAddInspectionOpen,
-        setIsAddInspectionOpen,
         uniqueSites,
         lastUploadedFileName,
         setLastUploadedFileName,
         selectedFile,
         setSelectedFile,
-        handleAddInspectionSubmit,
         handleLogin,
         handleLogout,
         fetchSiteInspections,

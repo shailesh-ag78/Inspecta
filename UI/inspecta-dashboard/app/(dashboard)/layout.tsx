@@ -5,7 +5,6 @@ import { ChevronDown, Loader, LogOut, User, Plus, Upload, Gauge, ClipboardList, 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import AddInspectionModal from "@/components/AddInspectionModal";
 import IncidentSelectionPane from "@/components/IncidentSelectionPane";
 import { themes } from "@/lib/themes";
 
@@ -25,10 +24,6 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
     selectedIncidentId,
     setSelectedIncidentId,
     incidentsLoading,
-    isAddInspectionOpen,
-    setIsAddInspectionOpen,
-    uniqueSites,
-    handleAddInspectionSubmit,
     handleLogin,
     handleLogout,
     authLoading,

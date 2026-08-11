@@ -247,3 +247,13 @@ export async function getRecentIncidents(days: number = 7, limit: number = 10): 
   const result = await response.json();
   return result.data || [];
 }
+
+/** Fetches all sites for the active company. */
+export async function getSites(): Promise<any[]> {
+  const response = await authenticatedFetch('/api/sites');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch sites: ${response.statusText}`);
+  }
+  const json = await response.json();
+  return json.data || json || [];
+}

@@ -101,7 +101,7 @@ app.add_middleware(
     # allow_origin_regex=r"https://inspecta-360\.web\.app|https://inspecta-ai\.web\.app",
     # The current regex is broad and allows any Firebase-hosted application.
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://127.0.0.1:3000", "http://127.0.0.1:3001"],
     allow_origin_regex=r"https://.*\.web\.app|https://.*\.firebaseapp\.com",
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -623,6 +623,8 @@ async def get_sites(request: Request):
             }
             formatted_sites.append(formatted_site)
         
+        print(f"✅ Fetched {len(formatted_sites)} sites for companyId {company_id}")
+
         return {"status": "success", "data": formatted_sites}
     except Exception as e:
         print(f"❌ Error fetching sites: {e}")
