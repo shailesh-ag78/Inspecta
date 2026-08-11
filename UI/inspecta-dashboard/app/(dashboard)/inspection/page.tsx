@@ -196,7 +196,7 @@ export default function InspectionPage() {
 
   const openRecordingOverlay = async (mode: "audio" | "video" | "image", category: "incident" | "field_note") => {
     setIncidentError(null);
-    currentBundleIdRef.current = `bundle_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+    currentBundleIdRef.current = `b_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     if (!selectedInspectionId) {
       setIncidentError("Please select or create an inspection before recording.");
       return;

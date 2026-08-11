@@ -230,6 +230,13 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         );
 
         if (isFinished) {
+          try {
+            const { deleteBundleFromIdb } = await import('./idb');
+            await deleteBundleFromIdb(sessionId);
+          } catch (e) {
+            console.error("Failed to delete bundle from IDB on poll completion:", e);
+          }
+
           const type = isFailed ? 'error' : 'success';
           const prefix = isFailed ? '❌' : '✅';
           setNotifications(prev => [
