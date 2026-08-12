@@ -56,14 +56,25 @@ class IncidentRepository:
         """
         self.dsn = dsn
 
-        # 2. Define the local connection pool
+        # 2. Define the local connection pool.
+        # check=_check_conn: runs a lightweight ping before handing out any connection.
+        # This discards connections that went BAD while idle (e.g. Neon SSL timeout)
+        # so callers never see a BAD connection — the pool silently opens a fresh one.
         self.pool = AsyncConnectionPool(
             conninfo=self.dsn,
             min_size=1,
             max_size=30,        # Max 30 connections.
-            max_idle=4.0,       # Crucial: Must be under 5 seconds for Neon's pooler
+            max_idle=3.0,       # Prune idle connections every 3 s (below Neon's 5 s timeout)
             open=False,         # Don't open immediately on init
-            kwargs={"row_factory": dict_row} # Automatically applies dict_row to all connections
+            check=AsyncConnectionPool.check_connection,  # Ping conn before checkout
+            kwargs={
+                "row_factory": dict_row,
+                # TCP keepalives: detect dead connections at the OS level
+                "keepalives": 1,
+                "keepalives_idle": 30,
+                "keepalives_interval": 10,
+                "keepalives_count": 5,
+            }
         )
 
     async def open_pool(self):
@@ -283,6 +294,7 @@ class IncidentRepository:
                     row = await cur.fetchone()
             return dict(row) if row else None
 
+    @neon_retry
     async def create_inspection(self, company_id: int, site_id: int, friendly_name: Optional[str] = None) -> Optional[str]:
             """Inserts a new inspection record and returns the UUID."""
             async with self.session(company_id) as conn:
@@ -299,6 +311,7 @@ class IncidentRepository:
                         result = await cur.fetchone()
                 return str(result['id']) if result else None
 
+    @neon_retry
     async def create_site(self, company_id: int, site_name: str, address: str, industry_id: int = 1) -> int:
         """Creates a new site and returns its ID."""
         async with self.session(company_id) as conn:
@@ -317,6 +330,7 @@ class IncidentRepository:
                         raise RuntimeError("Failed to create site: No ID returned.")
             return int(result['id'])
 
+    @neon_retry
     async def verify_inspection_ownership(self, company_id: int, inspection_id: str) -> bool:
             """
             Verifies if an inspection belongs to the given company.
@@ -330,6 +344,7 @@ class IncidentRepository:
                     )
                     return await cur.fetchone() is not None
 
+    @neon_retry
     async def verify_incident_ownership(self, company_id: int, incident_id: str) -> bool:
             """
             Security Check: Verifies the incident belongs to the company.
@@ -343,6 +358,7 @@ class IncidentRepository:
                     )
                     return await cur.fetchone() is not None
 
+    @neon_retry
     async def verify_video_ownership(self, company_id: int, video_path: str) -> bool:
             """
             Security Check: Verifies the video path belongs to the company.
@@ -385,6 +401,7 @@ class IncidentRepository:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
+    @neon_retry
     async def get_incident_progress(self, company_id: int, incident_id: str):
         """Fetches basic status from the incident table."""
         async with self.session(company_id) as conn:
@@ -395,6 +412,7 @@ class IncidentRepository:
                 )
                 return await cur.fetchone()
             
+    @neon_retry
     async def get_sites_for_company(self, company_id: int) -> List[Dict]:
         """Fetches all sites for a specific company, filtered by RLS."""
         async with self.session(company_id) as conn:
@@ -405,6 +423,7 @@ class IncidentRepository:
                 )
                 return [dict(row) for row in await cur.fetchall()]
 
+    @neon_retry
     async def get_incidents_for_site(self, site_id: int, company_id: int) -> List[Dict]:
         """Fetches incidents for a site by joining through inspections table."""
         async with self.session(company_id) as conn:
@@ -420,6 +439,7 @@ class IncidentRepository:
                 )
                 return [dict(row) for row in await cur.fetchall()]
 
+    @neon_retry
     async def get_incidents_for_inspection(self, inspection_id: str, company_id: int) -> List[Dict]:
         """Fetches all incidents for a specific inspection, filtered by RLS."""
         async with self.session(company_id) as conn:
@@ -434,6 +454,7 @@ class IncidentRepository:
                 )
                 return [dict(row) for row in await cur.fetchall()]
             
+    @neon_retry
     async def get_site_inspection_combinations(self, company_id: int) -> List[Dict]:
         """Fetches Site-Inspection combinations for a company. Uses LEFT JOIN to include sites without inspections."""
         async with self.session(company_id) as conn:
@@ -461,6 +482,7 @@ class IncidentRepository:
                 rows = [dict(row) for row in await cur.fetchall()]
                 return rows
 
+    @neon_retry
     async def get_recent_incidents(self, company_id: int, days: int = 7, limit: int = 10) -> List[Dict]:
         """Fetches incidents created in the last X days for a company, limited by limit."""
         async with self.session(company_id) as conn:
@@ -492,6 +514,7 @@ class IncidentRepository:
     #             rows = await cur.fetchall()
     #             return {str(row["id"]): str(row["inspection_id"]) for row in rows}
 
+    @neon_retry
     async def get_all_incidents_for_company(self, company_id: int) -> List[Dict]:
         """Fetches all incidents for the company, filtered by RLS."""
         async with self.session(company_id) as conn:
@@ -502,6 +525,7 @@ class IncidentRepository:
                 )
                 return [dict(row) for row in await cur.fetchall()]
 
+    @neon_retry
     async def get_all_tasks_for_company(self, company_id: int) -> List[Dict]:
         """Fetches all tasks for the company, filtered by RLS."""
         async with self.session(company_id) as conn:

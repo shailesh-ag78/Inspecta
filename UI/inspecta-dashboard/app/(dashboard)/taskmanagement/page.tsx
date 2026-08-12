@@ -111,11 +111,7 @@ export default function TaskManagementPage() {
 
   const playerRef = useRef<any>(null);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsKpisCollapsed(window.innerWidth < 1024);
-    }
-  }, []);
+
 
   const isAudioFile = useCallback((url?: string) => {
     if (!url) return false;
@@ -230,7 +226,7 @@ export default function TaskManagementPage() {
     switch (type?.toLowerCase()?.trim()) {
       case 'install':
       case 'insatll':
-        return 'fa-tools';
+        return 'fa-screwdriver-wrench';
       case 'repair':
         return 'fa-wrench';
       case 'verify':
@@ -895,7 +891,7 @@ export default function TaskManagementPage() {
                               task.severity_id === 3 ? 'bg-gradient-to-br from-green-400 to-green-600' :
                                 'bg-gradient-to-br from-yellow-400 to-orange-500'
                             }`}>
-                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[11.5px] bg-gradient-to-r from-white to-gray-200 bg-clip-text text-transparent`}></i>
+                            <i className={`fa-solid ${getTaskTypeIcon(task.task_type)} text-[11.5px] text-white`}></i>
                           </div>
                           {editingTaskId === task.id ? (
                             <input

@@ -276,9 +276,8 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
         <header className={`${theme.header.bg} ${theme.header.text} shrink-0 border-b border-slate-300/20 shadow-lg h-12 flex items-center`}>
-          <div className="max-w-[1600px] w-full mx-auto px-4 lg:px-6 flex items-center justify-between h-full">
+          <div className="max-w-[1600px] w-full mx-auto pl-2 lg:pl-3 pr-4 lg:pr-6 flex items-center justify-between h-full">
             <div className="flex items-center justify-between w-full sm:w-auto gap-6 h-full">
               <div className="flex items-center gap-3">
                 {/* Mobile Hamburger menu */}
@@ -327,7 +326,7 @@ function DashboardLayoutContent({ children }: { children: React.ReactNode }) {
                 })}
               </div>
             )}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end w-full sm:w-auto">
+            <div className="hidden sm:flex items-center justify-end sm:w-auto">
               {/* Desktop Settings Menu */}
               {renderSettingsMenu(false)}
             </div>

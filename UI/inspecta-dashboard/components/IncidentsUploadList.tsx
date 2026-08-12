@@ -40,7 +40,8 @@ function getTileTitle(incident: IncidentUpload) {
   };
   const dateStr = getFormattedDate(incident.uploadedAt)
 
-  return `${typeLabel} :: ${displayId} ${dateStr}`;
+  return `${displayId} ${dateStr}`;
+  // return `${typeLabel} :: ${displayId} ${dateStr}`;
 }
 
 export function IncidentsUploadList({ incidentUploads, clearLocalBundles }: IncidentsUploadListProps) {
