@@ -187,6 +187,7 @@ async def startup_event():
 
     # Initialize repository with connection pool
     repository = IncidentRepository(dsn=db_dsn)
+    await repository.open_pool()
     
     print("✅ Connection pool initialized and ready")
 
@@ -195,8 +196,8 @@ async def shutdown_event():
     """Close connection pool on application shutdown"""
     global repository
     
-    if repository and hasattr(repository, 'close'):
-        await repository.close()
+    if repository and hasattr(repository, 'close_pool'):
+        await repository.close_pool()
         print("✅ Repository closed")
 
 
@@ -237,6 +238,9 @@ class TaskReviewInput(BaseModel):
 class SiteInput(BaseModel):
     site_name: str
     address: str
+
+class BulkTasksInput(BaseModel):
+    incident_ids: List[str]
 
 class ImageURL(TypedDict):
     url: str
@@ -508,6 +512,22 @@ async def get_tasks_for_incident(
 
     try:
         tasks = await repository.get_tasks_for_incident(company_id, incidentId)
+        return {"status": "success", "data": tasks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/tasks/bulk")
+async def get_tasks_for_incidents_bulk(
+    request: Request,
+    body: BulkTasksInput
+):
+    """Fetch all tasks for multiple incidents"""
+    company_id = getattr(request.state, "company_id", None)
+    if company_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    try:
+        tasks = await repository.get_tasks_for_incidents_bulk(company_id, body.incident_ids)
         return {"status": "success", "data": tasks}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

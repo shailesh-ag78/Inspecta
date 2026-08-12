@@ -46,6 +46,9 @@ export default function TaskManagementPage() {
     incidentsError,
     tasksLoading,
     tasksError,
+    updateTaskInCache,
+    isTasksLimitModalOpen,
+    setIsTasksLimitModalOpen,
     activeTask,
     setActiveTask,
     lastUploadedFileName,
@@ -336,15 +339,17 @@ export default function TaskManagementPage() {
 
       const updatedResponse = await response.json();
       const updatedTask = updatedResponse?.data || updatedResponse;
-      setTasks((prevTasks) => prevTasks.map((item) => item.id === task.id ? {
-        ...item,
+      
+      const updatedData = {
         task_title: updatedTask?.task_title || trimmedTitle,
         task_description: updatedTask?.task_description || trimmedDescription,
         severity_id: updatedTask?.severity_id || editingSeverity,
         status_id: updatedTask?.status_id || editingStatus,
         task_status: getStatusLabelFromId(updatedTask?.status_id || editingStatus),
         status_label: getStatusLabelFromId(updatedTask?.status_id || editingStatus),
-      } : item));
+      };
+      
+      updateTaskInCache(task.id, 'update', updatedData);
 
       if (activeTask?.id === task.id) {
         setActiveTask({

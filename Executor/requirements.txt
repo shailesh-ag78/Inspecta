@@ -20,3 +20,4 @@ google-genai
 Pydantic
 openai>=2.0.0
 tenacity 
+psycopg_pool

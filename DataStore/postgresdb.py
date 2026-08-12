@@ -7,19 +7,18 @@ from contextlib import asynccontextmanager, contextmanager
 from enum import IntEnum
 from typing import List, Dict, Any, Optional
 
-from tenacity import retry, stop_after_attempt, wait_random_exponential, retry_if_exception_type
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from psycopg import OperationalError, InterfaceError
+from psycopg_pool import AsyncConnectionPool
 
-def neon_retry():
-    """
-    Standardized retry decorator for Neon DB transient connection errors.
-    Uses exponential backoff with jitter to prevent thundering herds.
-    """
-    return retry(
-        stop=stop_after_attempt(3),
-        wait=wait_random_exponential(multiplier=1, min=2, max=10),
-        retry=retry_if_exception_type((psycopg.OperationalError, psycopg.errors.ConnectionException)),
-        reraise=True
-    )
+# Reusable retry configuration for Neon Database
+neon_retry = retry(
+    reraise=True, # Critical: allows the final exception to bubble up if all retries fail
+    stop=stop_after_attempt(3), # Retry up to 3 times
+    wait=wait_exponential(multiplier=0.5, min=0.5, max=4), # Exponential backoff (0.5s, 1s, 2s...)
+    retry=retry_if_exception_type((OperationalError, InterfaceError)) # ONLY retry on network drops
+)
+
 # --- 1. Production Enums (Matching SQL Seed Script) ---
 class Industry(IntEnum):
     SOLAR = 1
@@ -51,8 +50,29 @@ class IncidentType(IntEnum):
 # --- 2. The Repository ---
 class IncidentRepository:
     def __init__(self, dsn: str):
-        """DSN: 'dbname=... user=... password=... host=... port=...'"""
+        """DSN: 'dbname=... user=... password=... host=... port=...'  
+           Use connection pooler DSN
+           Neon requires SSL. Ensure your DSN includes 'sslmode=require'.
+        """
         self.dsn = dsn
+
+        # 2. Define the local connection pool
+        self.pool = AsyncConnectionPool(
+            conninfo=self.dsn,
+            min_size=1,
+            max_size=30,        # Max 30 connections.
+            max_idle=4.0,       # Crucial: Must be under 5 seconds for Neon's pooler
+            open=False,         # Don't open immediately on init
+            kwargs={"row_factory": dict_row} # Automatically applies dict_row to all connections
+        )
+
+    async def open_pool(self):
+        """Call this function when starting up your application/worker."""
+        await self.pool.open()
+
+    async def close_pool(self):
+        """Call this function when shutting down your application."""
+        await self.pool.close()
 
     @asynccontextmanager
     async def session(self, company_id: int):
@@ -60,19 +80,18 @@ class IncidentRepository:
         Maintains Row-Level Security by setting the session-level 
         company_id variable before any query is executed.
         """
-        # Neon requires SSL. Ensure your DSN includes 'sslmode=require' or we can add args here.
-        # Added connect_timeout to handle Neon compute "cold starts" (wake-up time).
-        async with await psycopg.AsyncConnection.connect(
-            self.dsn, 
-            row_factory=dict_row,
-            connect_timeout=10 
-        ) as conn:  # type: ignore
-            async with conn.transaction():
-                await conn.execute(
-                    "SELECT set_config('app.current_company_id', %s, true)", 
-                    (str(company_id),)
-                )
-                yield conn
+        # 1. Borrow a pre-warmed connection from your pool instead of connecting fresh
+        async with self.pool.connection() as conn:
+            # 2. Set the RLS configuration directly on the session.
+            # Notice we don't use conn.transaction() here so that individual 
+            # app queries can manage their own transactions if needed.
+            await conn.execute(
+                "SELECT set_config('app.current_company_id', %s, true)", 
+                (str(company_id),)
+            )
+
+            # 3. Hand the active connection over to your query method
+            yield conn
             
 
     async def create_incident(
@@ -88,30 +107,32 @@ class IncidentRepository:
         images: Optional[List[Dict[str, Any]]] = None
     ) -> str:
         """Creates the incident record linked to an inspection."""
+        result = None
         async with self.session(company_id) as conn:
-            async with conn.cursor() as cur:
-                # FIX: Validate tuple content before string formatting
-                gps_val = None
-                if gps_coordinates and len(gps_coordinates) == 2:
-                    lat, lon = gps_coordinates
-                    if lat is not None and lon is not None:
-                        gps_val = f"({lat},{lon})"   # Format as '(x,y)' string for Postgres POINT type
+            # Validate tuple content before string formatting
+            gps_val = None
+            if gps_coordinates and len(gps_coordinates) == 2:
+                lat, lon = gps_coordinates
+                if lat is not None and lon is not None:
+                    gps_val = f"({lat},{lon})"   # Format as '(x,y)' string for Postgres POINT type
+
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        INSERT INTO incidents 
+                        (inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates, incident_type, images) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                        RETURNING id
+                        """,
+                        (inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val, incident_type, json.dumps(images or []))
+                    )
+                    result = await cur.fetchone()
+                    if result is None:
+                        raise RuntimeError(f"Failed to create incident for inspection {inspection_id}: No ID returned.")
+            return str(result['id']) 
                 
-                await cur.execute(
-                    """
-                    INSERT INTO incidents 
-                    (inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates, incident_type, images) 
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
-                    RETURNING id
-                    """,
-                    (inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val, incident_type, json.dumps(images or []))
-                )
-                result = await cur.fetchone()
-                if result is None:
-                    raise RuntimeError(f"Failed to create incident for inspection {inspection_id}: No ID returned.")
-                return str(result['id']) 
-                
-    @neon_retry()
+    @neon_retry
     async def bulk_add_incident_tasks(self, company_id: int, incident_id: str, inspection_id: str, tasks: List[Dict[str, Any]]):
         """
         High-performance bulk insert for Agent 2. 
@@ -146,12 +167,12 @@ class IncidentRepository:
                 task_artifacts, status_id, severity_id, task_type_id
             ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
-
         async with self.session(company_id) as conn:
-            async with conn.cursor() as cur:
-                await cur.executemany(query, data)
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.executemany(query, data)
 
-    @neon_retry()
+    @neon_retry
     async def get_tasks_for_incident(self, company_id: int, incident_id: str) -> List[Dict]:
         """Fetches all tasks for a specific incident, filtered by RLS."""
         async with self.session(company_id) as conn:
@@ -162,7 +183,21 @@ class IncidentRepository:
                 )
                 return [dict(row) for row in await cur.fetchall()]
 
-    @neon_retry()
+    @neon_retry
+    async def get_tasks_for_incidents_bulk(self, company_id: int, incident_ids: List[str]) -> List[Dict]:
+        """Fetches all tasks for multiple incidents, filtered by RLS."""
+        if not incident_ids:
+            return []
+        async with self.session(company_id) as conn:
+            async with conn.cursor() as cur:
+                # Use ANY() for postgres array lookup
+                await cur.execute(
+                    "SELECT * FROM incident_tasks WHERE incident_id = ANY(%s) ORDER BY created_at ASC", 
+                    (incident_ids,)
+                )
+                return [dict(row) for row in await cur.fetchall()]
+
+    @neon_retry
     async def get_incident(self, company_id: int, incident_id: str) -> Optional[Dict]:
         """Fetches incident details by ID."""
         async with self.session(company_id) as conn:
@@ -174,108 +209,113 @@ class IncidentRepository:
                 row = await cur.fetchone()
                 return dict(row) if row else None
 
-    @neon_retry()
+    @neon_retry
     async def update_incident_audio(self, company_id: int, incident_id: str, audio_path: str):
         """Updates incident with audio path and metadata."""
         async with self.session(company_id) as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    UPDATE incidents 
-                    SET audio_url = %s 
-                    WHERE id = %s
-                    """,
-                    (audio_path, incident_id)
-                )
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        UPDATE incidents 
+                        SET audio_url = %s 
+                        WHERE id = %s
+                        """,
+                        (audio_path, incident_id)
+                    )
 
-    @neon_retry()
+    @neon_retry
     async def update_task(self, company_id: int, task_id: str, title: str, description: str, severity_id: Optional[int] = None, status_id: Optional[int] = None):
         """Human-in-the-loop: Update task."""
         async with self.session(company_id) as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    UPDATE incident_tasks 
-                    SET task_title = %s, 
-                        task_description = %s,
-                        severity_id = COALESCE(%s, severity_id),
-                        status_id = COALESCE(%s, status_id)
-                    WHERE id = %s
-                    RETURNING *
-                    """,
-                    (title, description, severity_id, status_id, task_id)
-                )
-                row = await cur.fetchone()
-                return dict(row) if row else None
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        UPDATE incident_tasks 
+                        SET task_title = %s, 
+                            task_description = %s,
+                            severity_id = COALESCE(%s, severity_id),
+                            status_id = COALESCE(%s, status_id)
+                        WHERE id = %s
+                        RETURNING *
+                        """,
+                        (title, description, severity_id, status_id, task_id)
+                    )
+                    row = await cur.fetchone()
+            return dict(row) if row else None
 
-    @neon_retry()
+    @neon_retry
     async def update_task_review(self, company_id: int, task_id: str, comments: str, status_id: Optional[int] = None):
         """Human-in-the-loop: Update task after expert review."""
         async with self.session(company_id) as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    UPDATE incident_tasks 
-                    SET task_review_comments = %s,
-                        status_id = COALESCE(%s, status_id)
-                    WHERE id = %s
-                    RETURNING *
-                    """,
-                    (comments, status_id, task_id)
-                )
-                row = await cur.fetchone()
-                return dict(row) if row else None
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        UPDATE incident_tasks 
+                        SET task_review_comments = %s,
+                            status_id = COALESCE(%s, status_id)
+                        WHERE id = %s
+                        RETURNING *
+                        """,
+                        (comments, status_id, task_id)
+                    )
+                    row = await cur.fetchone()
+            return dict(row) if row else None
 
     
-    @neon_retry()
+    @neon_retry
     async def update_incident_summary(self, company_id: int, incident_id: str, summary: str):
         """Update incident summary"""
         async with self.session(company_id) as conn:
-            async with conn.cursor() as cur:
-                
-                await cur.execute(
-                    """
-                    UPDATE incidents 
-                    SET summary = %s
-                    WHERE id = %s
-                    RETURNING *
-                    """,
-                    (summary, incident_id)
-                )
-                row = await cur.fetchone()
-                return dict(row) if row else None
+            async with conn.transaction():
+                async with conn.cursor() as cur:    
+                    await cur.execute(
+                        """
+                        UPDATE incidents 
+                        SET summary = %s
+                        WHERE id = %s
+                        RETURNING *
+                        """,
+                        (summary, incident_id)
+                    )
+                    row = await cur.fetchone()
+            return dict(row) if row else None
 
     async def create_inspection(self, company_id: int, site_id: int, friendly_name: Optional[str] = None) -> Optional[str]:
             """Inserts a new inspection record and returns the UUID."""
             async with self.session(company_id) as conn:
-                async with conn.cursor() as cur:
-                    await cur.execute(
-                        """
-                        INSERT INTO inspections (company_id, site_id, friendly_name) 
-                        VALUES (%s, %s, %s) 
-                        RETURNING id
-                        """,
-                        (company_id, site_id, friendly_name)
-                    )
-                    result = await cur.fetchone()
-                    return str(result['id']) if result else None
+                async with conn.transaction():
+                    async with conn.cursor() as cur:
+                        await cur.execute(
+                            """
+                            INSERT INTO inspections (company_id, site_id, friendly_name) 
+                            VALUES (%s, %s, %s) 
+                            RETURNING id
+                            """,
+                            (company_id, site_id, friendly_name)
+                        )
+                        result = await cur.fetchone()
+                return str(result['id']) if result else None
 
     async def create_site(self, company_id: int, site_name: str, address: str, industry_id: int = 1) -> int:
         """Creates a new site and returns its ID."""
         async with self.session(company_id) as conn:
-            async with conn.cursor() as cur:
-                await cur.execute(
-                    """
-                    INSERT INTO sites (company_id, site_name, address, industry_id) 
-                    VALUES (%s, %s, %s, %s) 
-                    RETURNING id
-                    """,
-                    (company_id, site_name, address, industry_id)
-                )
-                result = await cur.fetchone()
-                if result is None:
-                    raise RuntimeError("Failed to create site: No ID returned.")
-                return int(result['id'])
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        """
+                        INSERT INTO sites (company_id, site_name, address, industry_id) 
+                        VALUES (%s, %s, %s, %s) 
+                        RETURNING id
+                        """,
+                        (company_id, site_name, address, industry_id)
+                    )
+                    result = await cur.fetchone()
+                    if result is None:
+                        raise RuntimeError("Failed to create site: No ID returned.")
+            return int(result['id'])
 
     async def verify_inspection_ownership(self, company_id: int, inspection_id: str) -> bool:
             """
@@ -320,7 +360,7 @@ class IncidentRepository:
                     )
                     return await cur.fetchone() is not None
 
-    @neon_retry()
+    @neon_retry
     async def get_company_info(self, company_id: int) -> Optional[Dict[str, Any]]:
         """Fetches company name + industry for a given company id.
 

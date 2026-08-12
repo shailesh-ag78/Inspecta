@@ -65,6 +65,7 @@ function getSeverityLabel(severityId: number): string {
 export function formatTasks(tasks: any[]): any[] {
   return (tasks || []).map((task) => ({
     id: String(task.id),
+    incident_id: task.incident_id ? String(task.incident_id) : '',
     task_title: task.task_title,
     task_description: task.task_description || '',
     task_translated_title: task.task_translated_title || '',
@@ -137,6 +138,21 @@ export function formatSiteInspections(combinations: any[]): any[] {
       inspection_created_at: combo.inspection_created_at || null,
       label: combo.inspection_friendly_name?.substring(0, 25) || `Inspection ${combo.inspection_id?.substring(0, 8)}`,
     }));
+}
+
+export async function bulkFetchTasks(incidentIds: string[]): Promise<any> {
+  if (!incidentIds || incidentIds.length === 0) return { data: [] };
+  const response = await authenticatedFetch('/api/tasks/bulk', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ incident_ids: incidentIds }),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch tasks in bulk: ${response.statusText}`);
+  }
+  return response.json();
 }
 
 /**

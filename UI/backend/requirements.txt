@@ -9,3 +9,4 @@ pydantic
 python-multipart
 typing-extensions
 tenacity
+psycopg_pool

@@ -192,6 +192,7 @@ class WorkflowExecutor:
         """
         # 1. Internalize Repository Creation
         repo = IncidentRepository(db_dsn)
+        await repo.open_pool()
         
         # 2. Internalize Checkpointer Creation
         # We create the saver but we need to manage the connection context
@@ -255,9 +256,13 @@ class WorkflowExecutor:
 
     async def close(self):
         """
-        Closes the database connection pool gracefully.
+        Closes the database connection pools gracefully.
         Called by main.py during server shutdown.
         """
+        if self.repo and hasattr(self.repo, 'close_pool'):
+            await self.repo.close_pool()
+            logger.info("IncidentRepository connection pool closed.")
+            
         if self._manager:
             # This triggers the cleanup and closes the Postgres pool
             await self._manager.__aexit__(None, None, None)

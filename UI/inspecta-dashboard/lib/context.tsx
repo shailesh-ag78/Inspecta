@@ -42,6 +42,7 @@ interface Task {
   task_translated_title?: string;
   task_translated_description?: string;
   task_original_description?: string;
+  incident_id?: string;
   severity_id: number;
   status_id: number;
   task_type_id: number;
@@ -78,6 +79,9 @@ interface DashboardContextType {
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   tasksLoading: boolean;
   tasksError: string | null;
+  updateTaskInCache: (taskId: string, action: 'update' | 'delete', updatedData?: Partial<Task>) => void;
+  isTasksLimitModalOpen: boolean;
+  setIsTasksLimitModalOpen: React.Dispatch<React.SetStateAction<boolean>>;
   activeTask: Task | null;
   setActiveTask: (task: Task | null) => void;
   uniqueSites: any[];
@@ -144,7 +148,42 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>('');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const tasksCacheRef = useRef<Record<string, Task[]>>({}); // LRU-ish cache mapped by incident_id
+  const [isTasksLimitModalOpen, setIsTasksLimitModalOpen] = useState(false);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+
+  const updateTaskInCache = useCallback((taskId: string, action: 'update' | 'delete', updatedData?: Partial<Task>) => {
+    let foundAndUpdated = false;
+    for (const incId of Object.keys(tasksCacheRef.current)) {
+      const cachedTasks = tasksCacheRef.current[incId];
+      if (!cachedTasks) continue;
+      const taskIndex = cachedTasks.findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        if (action === 'delete') {
+          cachedTasks.splice(taskIndex, 1);
+        } else if (action === 'update' && updatedData) {
+          cachedTasks[taskIndex] = { ...cachedTasks[taskIndex], ...updatedData };
+        }
+        foundAndUpdated = true;
+        break;
+      }
+    }
+    
+    // Also update the current displayed tasks to match
+    setTasks(prev => {
+      const taskIndex = prev.findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        const next = [...prev];
+        if (action === 'delete') {
+          next.splice(taskIndex, 1);
+        } else if (action === 'update' && updatedData) {
+          next[taskIndex] = { ...next[taskIndex], ...updatedData };
+        }
+        return next;
+      }
+      return prev;
+    });
+  }, []);
 
   // Custom header site and inspection name states
   const [headerSiteName, setHeaderSiteName] = useState<string>('');
@@ -564,6 +603,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       setSiteInspections([]);
       setIncidents([]);
       setTasks([]);
+      tasksCacheRef.current = {};
       setCompanyName(null);
       setIncidentUploads([]);
       setBackendSites([]);
@@ -1000,14 +1040,57 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        const promises = selectedMillerIncidents.map(async (incId) => {
-          const res = await authenticatedFetch(`/api/incidents/${incId}/tasks`);
-          if (!res.ok) return [];
-          const json = await res.json();
-          return formatTasks(Array.isArray(json) ? json : (json.data || []));
-        });
-        const results = await Promise.all(promises);
-        const mergedTasks = results.flat();
+        const missingIncidents = selectedMillerIncidents.filter(id => !tasksCacheRef.current[id]);
+        
+        if (missingIncidents.length > 0) {
+          const { bulkFetchTasks } = await import('@/lib/api');
+          const res = await bulkFetchTasks(missingIncidents);
+          const fetchedTasks = formatTasks(Array.isArray(res) ? res : (res.data || []));
+          
+          // Group by incident_id
+          const grouped: Record<string, Task[]> = {};
+          for (const id of missingIncidents) {
+             grouped[id] = [];
+          }
+          for (const task of fetchedTasks) {
+             if (task.incident_id && grouped[task.incident_id]) {
+                grouped[task.incident_id].push(task);
+             } else if (task.incident_id) {
+                grouped[task.incident_id] = [task];
+             }
+          }
+          
+          // Enforce Cache Limit (e.g., max 50 incidents in cache)
+          const MAX_CACHED_INCIDENTS = 50;
+          const currentKeys = Object.keys(tasksCacheRef.current);
+          if (currentKeys.length + missingIncidents.length > MAX_CACHED_INCIDENTS) {
+             // Delete oldest keys
+             const numToDelete = (currentKeys.length + missingIncidents.length) - MAX_CACHED_INCIDENTS;
+             for (let i = 0; i < numToDelete; i++) {
+                if (currentKeys[i] && !selectedMillerIncidents.includes(currentKeys[i])) {
+                   delete tasksCacheRef.current[currentKeys[i]];
+                }
+             }
+          }
+          
+          // Merge into cache
+          Object.assign(tasksCacheRef.current, grouped);
+        }
+        
+        // Limit display to max 50 selected incidents to avoid blowing up memory
+        let selectedToDisplay = [...selectedMillerIncidents];
+        if (selectedToDisplay.length > 50) {
+           setIsTasksLimitModalOpen(true);
+           selectedToDisplay = selectedToDisplay.slice(0, 50);
+        }
+        
+        const mergedTasks: Task[] = [];
+        for (const incId of selectedToDisplay) {
+          if (tasksCacheRef.current[incId]) {
+            mergedTasks.push(...tasksCacheRef.current[incId]);
+          }
+        }
+        
         mergedTasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         setTasks(mergedTasks);
       } catch (e) {
@@ -1051,6 +1134,9 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         setTasks,
         tasksLoading,
         tasksError,
+        updateTaskInCache,
+        isTasksLimitModalOpen,
+        setIsTasksLimitModalOpen,
         activeTask,
         setActiveTask,
         uniqueSites,
