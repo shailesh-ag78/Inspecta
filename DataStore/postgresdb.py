@@ -47,6 +47,28 @@ class IncidentType(IntEnum):
     INCIDENT = 0
     FIELDNOTE = 1
 
+
+# import psycopg
+# from psycopg import OperationalError
+# from psycopg.errors import AdminShutdown, ConnectionFailure
+
+# psycopg.errors.AdminShutdown: terminating connection due to administrator command
+
+
+# try:
+#     # Your database operation here
+#     async with conn.cursor() as cur:
+#         await cur.execute("SELECT 1")
+# except AdminShutdown as e:
+#     print(f"Database server is shutting down or restarting: {e}")
+#     # Trigger reconnect logic
+# except OperationalError as e:
+#     print(f"Database connection error or connection closed: {e}")
+#     # Trigger reconnect logic
+# except psycopg.Error as e:
+#     print(f"Generic psycopg error: {e}")
+
+
 # --- 2. The Repository ---
 class IncidentRepository:
     def __init__(self, dsn: str):

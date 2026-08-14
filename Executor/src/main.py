@@ -499,6 +499,7 @@ async def get_upload_url(request: Request, fileType: str):
         # 2. Extract the credentials that the client is actively using
         creds = gcs_client._credentials
         # ---- SCENARIO A: Local Development (JSON Key File is Present) ----
+        logger.info("SCENARIO A: Local Development (JSON Key File is Present)")
         # If the credentials have a private key, sign completely OFFLINE (instant, no network hops)
         if hasattr(creds, 'private_key') and creds.private_key:
             url = blob.generate_signed_url(
@@ -510,15 +511,17 @@ async def get_upload_url(request: Request, fileType: str):
         # ---- SCENARIO B: Cloud Run Production (Token-Based Managed Identity) ----
         # If no private key exists, refresh the metadata token and use the remote IAM SignBlob API
         else:
+            logger.info("SCENARIO B: Cloud Run  (Token-Based Managed Identity)")
             # 1. Define the explicit scope required for IAM infrastructure interactions
             #CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/iam'] # Set this preferably
             CLOUD_PLATFORM_SCOPE = ['https://www.googleapis.com/auth/cloud-platform']
-
             # 2. Force the credentials object to request the required scope footprint
             credentials, project = google.auth.default(scopes=CLOUD_PLATFORM_SCOPE)
 
             auth_req = google.auth.transport.requests.Request()
             credentials.refresh(auth_req)
+
+            logger.debug("Generating pre-signed URL ")
             
             url = blob.generate_signed_url(
                 version="v4",
