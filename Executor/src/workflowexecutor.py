@@ -10,17 +10,25 @@ from pathlib import Path
 import time
 from typing import Any, Literal, TypedDict, Annotated, List, Optional
 from typing import cast
-import operator
 import httpx
 from google.cloud import storage
 from google import genai
-from google.genai import types
 from pydantic import BaseModel, Field
 from typing import Tuple
 from urllib.parse import urlparse
 import dotenv
 from openai import OpenAI
-from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
+from typing import Dict, Any, Optional
+from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
+
+EXTRACT_AUDIO_NODE = "extract_audio"
+TRANSCRIBE_NODE = "transcribe"
+GENERATE_TASKS_NODE = "generate_tasks"
+
+
+# ToDo: Use Ngrok for testing Google Task locally
 
 # Add the project root to sys.path so we can import from the 'datastore' package
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
@@ -32,22 +40,6 @@ dotenv.load_dotenv(dotenv_path=env_path)
 
 # Import the Repository
 from DataStore.postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType
-
-# LangChain / LangGraph imports
-from langgraph.graph import StateGraph, START, END
-#from langgraph.checkpoint.postgres import PostgresSaver
-#from langchain_core.runnables import RunnableConfig
-from langgraph.types import RetryPolicy
-from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver # Use .aio
-
-# LangSmith imports
-from .langsmith_config import get_langsmith_config, WorkflowTracer
-
-logger = logging.getLogger(__name__)
-
-EXTRACT_AUDIO_NODE = "extract_audio"
-TRANSCRIBE_NODE = "transcribe"
-GENERATE_TASKS_NODE = "generate_tasks"
 
 def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
     """
@@ -125,7 +117,7 @@ class ExternalAgentProxy:
             headers["Authorization"] = f"Bearer {oidc_token}"
 
         try:
-            # We use a long timeout because agents might take time to think
+            # We use a long timeout because agents might take time to process
             async with httpx.AsyncClient(timeout=300.0) as client:
                 resp = await client.post(self.url, json=payload, headers=headers)
                 resp.raise_for_status()  # Ensure we don't proceed on 500 errors
@@ -170,7 +162,7 @@ class ExternalAgentProxy:
 
 # --- 1. Define the State ---
 # This is the "memory" passed between AI nodes
-class IncidentState(TypedDict):
+class IncidentState(TypedDict, total=False):
     company_id: int
     inspection_id: str
     incident_id: str
@@ -179,80 +171,40 @@ class IncidentState(TypedDict):
     transcript: str
     transcript_segments_json_url: str
     translation_language: str
-    # 'operator.add' allows nodes to append to this list without overwriting
-    generated_tasks: Annotated[List[dict], operator.add]
-    analysisfailed : bool
+    generated_tasks: List[dict]
+    analysisfailed: bool
+    status: str
+    step: str
+    error: Optional[str]
 
 class WorkflowExecutor:
     @classmethod
     async def create(cls, db_dsn):
         """
-        The Factory Method: This is the ONLY place that knows 
-        about Postgres Checkpointers.
+        The Factory Method.
         """
         # 1. Internalize Repository Creation
         repo = IncidentRepository(db_dsn)
         await repo.open_pool()
         
-        # 2. Internalize Checkpointer Creation
-        # We create the saver but we need to manage the connection context
-        serde = JsonPlusSerializer(allowed_msgpack_modules=[
-            ('DataStore.postgresdb', 'TaskStatus'),
-            ('DataStore.postgresdb', 'TaskSeverity'),
-            ('DataStore.postgresdb', 'TaskType'),
-            ('DataStore.postgresdb', 'Industry'),
-        ])
-        manager = AsyncPostgresSaver.from_conn_string(db_dsn, serde=serde)
-        
-        # 3. MANUALLY enter the async context to get the actual saver object
-
-
-        # This is where the database connection is actually opened.
-        saver = await manager.__aenter__()
-        
-        # 4. Run LangGraph migrations (creates the necessary tables)
-        await saver.setup()
-        
-        # 5. Return the instance with the active saver and its manager
-        return cls(repo, saver, manager)
+        # 2. Return the instance
+        return cls(repo)
     
-    def __init__(self, repo: IncidentRepository, saver: AsyncPostgresSaver, manager: Any):
+    def __init__(self, repo: IncidentRepository):
         self.repo = repo
         self.tracer = WorkflowTracer()
-        self.langsmith_config = get_langsmith_config()
-        
-        self.repo = repo
-        self.saver = saver
-        self._manager = manager # We store this to close the connection later
+        # self.langsmith_config = get_langsmith_config()
 
-        # 4. Proxies and Graph
+        # Proxies
         self.extract_audio_agent = ExternalAgentProxy("extract_audio", extract_audio_agent_url)
         self.transcribe_agent = ExternalAgentProxy("transcribe", transcribe_agent_url)
         self.task_generator_agent = ExternalAgentProxy("generate_tasks", task_generator_agent_url)
-        
-        # Compile the workflow once during initialization
-        self.workflow = self._build_graph()
-        logger.info("✅ WorkflowExecutor initialized with LangSmith tracing")
 
-    def _build_graph(self):
-        """Constructs the Agentic workflow with retries and state."""
-        builder = StateGraph(IncidentState)
-
-        # Retry policy: Automatically handles API flickers or LLM timeouts
-        retry=RetryPolicy(max_attempts=3, backoff_factor=2.0)
-        builder.add_node(EXTRACT_AUDIO_NODE, self._extract_audio_node, retry_policy=retry)
-        builder.add_node(TRANSCRIBE_NODE, self._transcribe_node, retry_policy=retry)
-        builder.add_node(GENERATE_TASKS_NODE, self._generate_tasks_node, retry_policy=retry)
-
-
-        # Define Edges
-        builder.add_edge(START, EXTRACT_AUDIO_NODE)
-        builder.add_edge(EXTRACT_AUDIO_NODE, TRANSCRIBE_NODE)
-        builder.add_edge(TRANSCRIBE_NODE, GENERATE_TASKS_NODE)
-        builder.add_edge(GENERATE_TASKS_NODE, END)
-
-        # Compile with checkpointer for pause/resume capability
-        return builder.compile(checkpointer=self.saver)
+        # Maintain backgroudn tasks so that Python garbage collector doesn't delete the task mid-execution, 
+        # thereby causing incident processing to randomly halt
+        self.background_tasks = set()
+    
+        logger.info("✅ WorkflowExecutor initialized with LangSmith tracing (Stateless Python Flow)")
 
     async def close(self):
         """
@@ -262,11 +214,6 @@ class WorkflowExecutor:
         if self.repo and hasattr(self.repo, 'close_pool'):
             await self.repo.close_pool()
             logger.info("IncidentRepository connection pool closed.")
-            
-        if self._manager:
-            # This triggers the cleanup and closes the Postgres pool
-            await self._manager.__aexit__(None, None, None)
-            logger.info("LangGraph Checkpointer connection closed.")
             
     # --- UI ENTRY POINT ---
     async def handle_incident_upload(
@@ -309,12 +256,12 @@ class WorkflowExecutor:
             )
 
         # 3. BACKGROUND: Trigger LangGraph with LangSmith tracing
-        config = self.langsmith_config.create_run_config(
-            thread_id=incident_id,
-            incident_id=incident_id,
-            company_id=company_id,
-            user_id=inspector_id
-        )
+        # config = self.langsmith_config.create_run_config(
+        #     thread_id=incident_id,
+        #     incident_id=incident_id,
+        #     company_id=company_id,
+        #     user_id=inspector_id
+        # )
         
         # Tell the type checker: "This dict is specifically an IncidentState"
         input_state = cast(IncidentState, {
@@ -327,29 +274,57 @@ class WorkflowExecutor:
             "transcript_segments_json_url": "", # Initialize as empty string
             "generated_tasks": [],     # Initialize the list for operator.add
             "translation_language": translation_language,
-            "analysisfailed" : False
+            "analysisfailed": False,
+            "status": "queued",
+            "step": "incident_queued"
         })
         
-        # We do NOT 'await' this so the UI response is instant
-        task = asyncio.create_task(self.workflow.ainvoke(input_state, config=config))
-        
-        # Add a callback to log errors if the background graph fails
-        def handle_result(t: asyncio.Task):
-            try:
-                t.result()
-                logger.info(f"✅ Workflow completed successfully for incident {incident_id}")
-            except Exception as e:
-                logger.error(f"❌ Background Workflow Error for {incident_id}: {e}", exc_info=True)
-                # Optionally: Update the incident status in DB to "failed"
-                # try:
-                #     self.update_incident_status(company_id, incident_id, "failed")
-                # except Exception as db_error:
-                #     logger.error(f"Failed to update incident status: {db_error}")
-        
-        task.add_done_callback(handle_result)
+        await self.repo.update_incident_status(company_id, incident_id, input_state)
         logger.info(f"📝 Incident {incident_id} uploaded and queued for processing")
 
+        # We do NOT 'await' this so the UI response is instant
+        task = asyncio.create_task(self.process_incident(input_state))
+
+        self.background_tasks.add(task)
+        task.add_done_callback(self.background_tasks.discard) # Automatically removes task when done
+
         return incident_id
+
+    # --- STATELESS PYTHON WORKFLOW ---
+
+    async def process_incident(self, state: IncidentState):
+        incident_id = state["incident_id"]
+        company_id = state["company_id"]
+        try:
+            state["status"] = "processing"
+            state["step"] = "extract_audio"
+            await self.repo.update_incident_status(company_id, incident_id, state)
+            audio_result = await self._extract_audio_node(state)
+            state.update(audio_result)
+
+            state["status"] = "processing"
+            state["step"] = "transcribe"
+            await self.repo.update_incident_status(company_id, incident_id, state)
+            transcribe_result = await self._transcribe_node(state)
+            state.update(transcribe_result)
+
+            state["status"] = "processing"
+            state["step"] = "generate_tasks"
+            await self.repo.update_incident_status(company_id, incident_id, state)
+            tasks_result = await self._generate_tasks_node(state)
+            state.update(tasks_result)
+
+            state["status"] = "completed"
+            await self.repo.update_incident_status(company_id, incident_id, state)
+            logger.info(f"✅ Workflow completed successfully for incident {incident_id}")
+        except Exception as e:
+            logger.error(f"❌ Background Workflow Error for {incident_id}: {e}", exc_info=True)
+            try:
+                state["status"] = "failed"
+                state["error"] = str(e)
+                await self.repo.update_incident_status(company_id, incident_id, state)
+            except Exception as db_err:
+                logger.error(f"Failed to update metadata to failed: {db_err}")
 
     # --- GRAPH NODES (The 'Intelligence' and 'DB Persistence' steps) ---
 
@@ -377,8 +352,6 @@ class WorkflowExecutor:
             result = await self.extract_audio_agent.post(
                 data, 
                 incident_id=incident_id,
-                # This makes the incident_id appear in the LangSmith Trace Metadata tab
-                #langsmith_extra={"metadata": {"incident_id": incident_id}}
             )
             audio_url = result.get("audio_url")
             
@@ -414,15 +387,6 @@ class WorkflowExecutor:
                 error=e
             )
             logger.error(f"❌ Audio Extraction failed for {incident_id}: {str(e)}", exc_info=True)
-            try:
-                config = self.langsmith_config.create_run_config(
-                    thread_id=incident_id,
-                    incident_id=incident_id,
-                    company_id=state["company_id"]
-                )
-                await self.workflow.aupdate_state(config, {"analysisfailed": True})
-            except Exception as update_err:
-                logger.error(f"Failed to update state with analysisfailed flag: {update_err}")
             raise
 
     async def _transcribe_node(self, state: IncidentState):
@@ -501,15 +465,6 @@ class WorkflowExecutor:
                 error=e
             )
             logger.error(f"❌ Transcription failed: {e}", exc_info=True)
-            try:
-                config = self.langsmith_config.create_run_config(
-                    thread_id=incident_id,
-                    incident_id=incident_id,
-                    company_id=state["company_id"]
-                )
-                await self.workflow.aupdate_state(config, {"analysisfailed": True})
-            except Exception as update_err:
-                logger.error(f"Failed to update state with analysisfailed flag: {update_err}")
             raise
 
     async def _generate_tasks_node(self, state: IncidentState):
@@ -603,72 +558,48 @@ class WorkflowExecutor:
                 error=e
             )
             logger.error(f"❌ Task generation failed: {e}", exc_info=True)
-            try:
-                config = self.langsmith_config.create_run_config(
-                    thread_id=incident_id,
-                    incident_id=incident_id,
-                    company_id=state["company_id"]
-                )
-                await self.workflow.aupdate_state(config, {"analysisfailed": True})
-            except Exception as update_err:
-                logger.error(f"Failed to update state with analysisfailed flag: {update_err}")
             raise
 
     async def get_status(self, company_id: int, incident_id: str):
         # 1. SECURITY CHECK (Ownership)
-        # If this fails, the user gets nothing.
-        db_record = await self.repo.get_incident_progress(company_id, incident_id)
+        db_record = await self.repo.get_incident(company_id, incident_id)
         if not db_record:
             raise PermissionError("Unauthorized: Incident does not belong to your company.")
 
-        # 2. GRANULAR CHECK (LangGraph Checkpointer)
-        # We ask LangGraph: "Where is the thread for this incident_id?"
-        config = self.langsmith_config.create_run_config(
-            thread_id=incident_id,
-            incident_id=incident_id,
-            company_id=company_id
-        )
+        # 2. STATUS DERIVATION FROM METADATA
+        metadata = db_record.get("metadata")
+        if not metadata:
+            metadata = {}
+        elif isinstance(metadata, str):
+            try:
+                metadata = json.loads(metadata)
+            except Exception:
+                metadata = {}
+        elif not isinstance(metadata, dict):
+            metadata = {}
+
+        status_key = metadata.get("status", "processing")
+        current_step = metadata.get("step", "extract_audio")
         
-        state = await self.workflow.aget_state(config)
+        has_audio = bool(metadata.get("audio_url"))
+        has_transcript = bool(metadata.get("transcript"))
+        has_tasks = bool(metadata.get("generated_tasks"))
         
-        # 3. STATUS DERIVATION (FIXED)
-        # Check if the workflow has produced meaningful output
-        has_audio = bool(state.values.get("audio_url"))
-        has_transcript = bool(state.values.get("transcript"))
-        has_tasks = bool(state.values.get("generated_tasks"))
-        
-        analysis_failed = bool(state.values.get("analysisfailed"))
-        
-        # Determine current status based on execution state
-        if analysis_failed:
-            status_key = "failed"
-            logger.error(f"❌ Analysis failed for {incident_id}")
-            message = "Step - Failed: Analysis failed."
-        elif not state.next:
-            # Graph has reached END node
+        if status_key == "failed":
+            message = f"Step - Failed: {metadata.get('error', 'Analysis failed')}"
+        elif status_key == "completed":
             if has_tasks:
-                status_key = "completed"
-                logger.info(f"✅ Complete: Analysis complete! Tasks generated for {incident_id}")
                 message = "Step - Complete: Analysis complete! Tasks generated."
             else:
-                # Graph finished but failed to generate tasks
-                status_key = "completed"
-                logger.warning(f"⚠️ No tasks generated for {incident_id}")
                 message = "Step - Complete: Analysis complete: No tasks were generated."
         else:
-            # Graph is still running
-            status_key = "processing"
-            current_node = state.next[0]
-            
             messages = {
-                EXTRACT_AUDIO_NODE: "Step - Audio: Extracting audio...",
-                TRANSCRIBE_NODE: "Step - Transcription: Transcribing audio...",
-                GENERATE_TASKS_NODE: "Step - Tasks Generation: Generating inspection tasks..."
+                "extract_audio": "Step - Audio: Extracting audio...",
+                "transcribe": "Step - Transcription: Transcribing audio...",
+                "generate_tasks": "Step - Tasks Generation: Generating inspection tasks..."
             }
-            message = messages.get(current_node, f"Processing ({current_node})")
+            message = messages.get(current_step, f"Processing ({current_step})")
 
-        logger.debug(f"Status check for {incident_id}: {status_key}")
-        
         return {
             "incident_id": incident_id,
             "status": status_key,
@@ -702,7 +633,8 @@ class WorkflowExecutor:
                 friendly_name=friendly_name
             )
             return inspection_id
-            
+
+# ToDo: Make it async and part of WorkflowExecutor        
 def translate_tasks(tasks: List[dict], translation_language: str) -> List[dict]:
     """
     Translates task titles and descriptions using Gemini 1.5 Flash.
@@ -798,6 +730,7 @@ def translate_tasks(tasks: List[dict], translation_language: str) -> List[dict]:
 
     return tasks
          
+# ToDo: Make it async and part of WorkflowExecutor
 def get_tasklist_from_url(tasks_json_url: str, video_url : str, translation_language: str, env_mode: str = "LOCAL") -> tuple[str, List[dict]]:
     """
     Utility function to fetch the generated tasks JSON from a URL.
@@ -866,3 +799,74 @@ def get_tasklist_from_url(tasks_json_url: str, video_url : str, translation_lang
     #5 ToDo : Handle Clarification Needed element  
           
     return summary, tasks
+
+class WorkflowTracer:
+    """
+    Utility class for manual instrumentation of workflow steps.
+    Use this to create custom spans in LangSmith for better visibility.
+    """
+    def log_node_execution(
+        self,
+        node_name: str,
+        incident_id: str,
+        input_data: Dict[str, Any],
+        output_data: Dict[str, Any],
+        duration_ms: float,
+        error: Optional[Exception] = None
+    ):
+        """
+        Log detailed information about a node execution.
+        Useful for debugging stuck workflows or performance issues.
+        """
+        status = "error" if error else "success"
+        
+        log_entry = {
+            "node": node_name,
+            "incident_id": incident_id,
+            "status": status,
+            "duration_ms": duration_ms,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "input_keys": list(input_data.keys()),
+            "output_keys": list(output_data.keys()),
+        }
+        
+        if error:
+            log_entry["error"] = {
+                "type": type(error).__name__,
+                "message": str(error)
+            }
+        
+        logger.info(f"Node Execution: {log_entry}")
+    
+    def log_external_agent_call(
+        self,
+        agent_name: str,
+        agent_url: str,
+        incident_id: str,
+        request_payload: Dict[str, Any],
+        response: Optional[Dict[str, Any]] = None,
+        error: Optional[Exception] = None,
+        duration_ms: float = 0
+    ):
+        """
+        Log external agent API calls for debugging integration issues.
+        """
+        log_entry = {
+            "event": "external_agent_call",
+            "agent": agent_name,
+            "url": agent_url,
+            "incident_id": incident_id,
+            "status": "error" if error else "success",
+            "duration_ms": duration_ms,
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+        
+        if error:
+            log_entry["error"] = {
+                "type": type(error).__name__,
+                "message": str(error)
+            }
+        else:
+            log_entry["response_keys"] = list(response.keys()) if response else []
+        
+        logger.info(f"External Agent Call: {log_entry}")
