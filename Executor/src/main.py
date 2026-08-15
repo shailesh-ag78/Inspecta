@@ -184,23 +184,27 @@ async def verify_firebase_token(request: Request, call_next):
     firebase_token = request.headers.get("X-Firebase-Token")
     token_ctx_token = firebase_token_var.set(firebase_token)
 
+    request.state.company_id = None
+    request.state.company_storage_id = None
+
     try:
-        try:
-            # Verify with Firebase
-            decoded_token = auth.verify_id_token(firebase_token)
-            
-            # Extract the SECURE company_id and company_storage_id from token claims
-            request.state.company_id = decoded_token.get("company_id")
-            request.state.company_storage_id = decoded_token.get("company_storage_id")
-        except Exception as e:
-            # If token is fake or expired, we don't set the company_id
-            request.state.company_id = None
-            request.state.company_storage_id = None
-            print(f"❌ Token verification failed: {e}")
-            
+        if firebase_token:
+            try:
+                # Verify with Firebase
+                decoded_token = auth.verify_id_token(firebase_token)
+                
+                # Extract the SECURE company_id and company_storage_id from token claims
+                request.state.company_id = decoded_token.get("company_id")
+                request.state.company_storage_id = decoded_token.get("company_storage_id")
+            except Exception as e:
+                # It is expected that task will call intrernal endpoint without Firebase token
+                if request.url.path != "/internal/process/incident":
+                    logger.error(f"❌ Firebase token verification failed: {e}")
+                    
         return await call_next(request)
     finally:
         firebase_token_var.reset(token_ctx_token)
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):

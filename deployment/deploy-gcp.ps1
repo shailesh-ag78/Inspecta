@@ -66,7 +66,7 @@ $TRANSLATION_MODEL = "qwen/qwen-2.5-7b-instruct"
 $LLM_PROVIDER = "openrouter"
 $OPENROUTER_URL = "https://openrouter.ai/api/v1"
 $CLOUD_TASKS_QUEUE_NAME = "inspecta-incident-queue"
-$EXECUTOR_BASE_URL = "https://executor-service-860462670211"
+$EXECUTOR_BASE_URL = "https://executor-service-860462670211.$Region.run.app"
 
 # Environment variables to be injected
 $EnvVars = @{
@@ -469,6 +469,7 @@ if ($DeployAgents) {
         --cpu-boost `
         --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,`
                         UI_PROJECT_ID=$UiProjectId,TRANSLATION_MODEL=$TRANSLATION_MODEL,OPENROUTER_URL=$OPENROUTER_URL,`
+                        GCP_SA_EMAIL=executor-service-sa@$ProjectID.iam.gserviceaccount.com,`
                         GCP_PROJECT_ID=$ProjectID,GCP_LOCATION=$Region,CLOUD_TASKS_QUEUE_NAME=$CLOUD_TASKS_QUEUE_NAME,EXECUTOR_BASE_URL=$EXECUTOR_BASE_URL"
             
     # Fetch Executor URL
@@ -542,6 +543,8 @@ function Add-InvokerPolicy {
 
 # 7.1 Enable UI service SA to invoke Executor Service
 Add-InvokerPolicy -ServiceName "executor-service" -ServiceAccount "ui-service-sa@$ProjectID.iam.gserviceaccount.com"
+Add-InvokerPolicy -ServiceName "executor-service" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
+
 
 # 7.2 Enable Executor service SA to invoke Agent Services
 Add-InvokerPolicy -ServiceName "agent-audioextract" -ServiceAccount "executor-service-sa@$ProjectID.iam.gserviceaccount.com"
@@ -584,6 +587,20 @@ gcloud projects add-iam-policy-binding $ProjectID `
 gcloud projects add-iam-policy-binding $ProjectID `
     --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
     --role="roles/iam.serviceAccountTokenCreator"
+
+# Grant Cloud Tasks Enqueuer permission to Executor SA
+gcloud projects add-iam-policy-binding $ProjectID `
+    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/cloudtasks.enqueuer" `
+    --quiet
+
+# Grant serviceAccountUser role to Executor SA on itself (required to enqueue Cloud Tasks using OIDC token)
+gcloud iam service-accounts add-iam-policy-binding executor-service-sa@$ProjectID.iam.gserviceaccount.com `
+    --member="serviceAccount:executor-service-sa@$ProjectID.iam.gserviceaccount.com" `
+    --role="roles/iam.serviceAccountUser" `
+    --quiet
+
+
 
 # Grant UI SA permissions on the bucket
 gcloud storage buckets add-iam-policy-binding gs://$BucketName `
