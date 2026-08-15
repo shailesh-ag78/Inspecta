@@ -245,8 +245,7 @@ class WorkflowExecutor:
             if not await self.repo.verify_incident_ownership(company_id, existing_incident_id):
                 raise PermissionError("Access Denied: Incident ownership mismatch.")
             incident_id = existing_incident_id
-        else:
-            # Server generates ID to ensure uniqueness and security
+            
         # 2. PERSISTENCE: Create the initial incident record
         logger.info("Images count: %s", len(images) if images else 0)
         logger.info("Image JSON : " + json.dumps(images or []))
