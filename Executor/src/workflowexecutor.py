@@ -228,7 +228,6 @@ class WorkflowExecutor:
         inspector_id: int, 
         file_url: str, 
         company_storage_id: str, 
-        existing_incident_id: str | None, # Optional: if re-uploading for an ID
         translation_language: str = "",
         gps_coordinates: Optional[tuple] = None,  # (lat, long),
         incident_type: int = 0,
@@ -239,12 +238,6 @@ class WorkflowExecutor:
         is_valid = await self.repo.verify_inspection_ownership(company_id, inspection_id)
         if not is_valid:
             raise PermissionError("Security Violation: Inspection ownership mismatch.")
-
-        # 🛡️ SECURITY STEP 2: Validate the Incident (if ID is provided by UI)
-        if existing_incident_id:
-            if not await self.repo.verify_incident_ownership(company_id, existing_incident_id):
-                raise PermissionError("Access Denied: Incident ownership mismatch.")
-            incident_id = existing_incident_id
             
         # 2. PERSISTENCE: Create the initial incident record
         logger.info("Images count: %s", len(images) if images else 0)
