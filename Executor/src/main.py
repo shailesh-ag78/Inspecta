@@ -46,6 +46,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from google.oauth2 import id_token
 import google.auth.transport.requests
+import re
 
 
 # Configure logging
@@ -345,27 +346,19 @@ async def upload_incident_endpoint(
 
     # Generate incident_id before calling handle_incident_upload
     incident_id = None
-    if ENV_MODE == "local":
+    try:
+        filename = os.path.basename(data.file_url)
+        name, _ = os.path.splitext(filename)
+        uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+        if uuid_pattern.match(name):
+            incident_id = name
+    except Exception as e:
+        logger.warning(f"Could not extract incident ID from GCS path: {e}")
+        
+    # Fallback to random UUID if GCS filename did not contain a valid UUID
+    if not incident_id:
         incident_id = str(uuid.uuid4())
-
-    else:
-        # For GCS: extract UUID from the filename in file_url
-        try:
-            filename = os.path.basename(data.file_url)
-            name, _ = os.path.splitext(filename)
-            import re
-            uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
-            if uuid_pattern.match(name):
-                incident_id = name
-        except Exception as e:
-            logger.warning(f"Could not extract incident ID from GCS path: {e}")
-            
-        # Fallback to random UUID if GCS filename did not contain a valid UUID
-        if not incident_id:
-            incident_id = str(uuid.uuid4())
-
-    # We pass the 'file.file' stream directly to the executor
-    # This avoids loading the entire 100MB+ video into RAM at once
+        
     incident_id = await executor.handle_incident_upload(
         company_id=company_id,
         inspection_id=inspection_id,
@@ -378,16 +371,6 @@ async def upload_incident_endpoint(
         incident_type=data.incident_type if data.incident_type is not None else 0,
         images=image_file_urls
     )
-
-
-    # firebase_token = firebase_token_var.get()
-    # payload = extract_incident_task_payload_from_token(
-    #     firebase_token=firebase_token,
-    #     incident_id=incident_id,
-    #     inspection_id=inspection_id,
-    #     translation_language=translation_language,
-    #     inspector_id=inspector_id
-    # )
 
     return {
         "status": "Success",
