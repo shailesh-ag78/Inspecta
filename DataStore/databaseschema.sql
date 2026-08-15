@@ -70,6 +70,7 @@ CREATE TABLE incidents (
     
     incident_type SMALLINT NOT NULL DEFAULT 0, -- 0: incident (Default), 1: fieldnote
     metadata JSONB DEFAULT '{}'::jsonb,
+    execution_status JSONB DEFAULT '{}'::jsonb,
     images JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );

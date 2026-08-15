@@ -9,6 +9,7 @@ pydantic
 psycopg[binary]>=3.2.0
 httpx
 google-cloud-storage
+google-cloud-tasks
 firebase-admin
 python-dotenv>=1.0.0
 pytest

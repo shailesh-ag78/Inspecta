@@ -1,3 +1,4 @@
+from copy import error
 from httpx import _content
 import os
 import sys
@@ -40,6 +41,7 @@ dotenv.load_dotenv(dotenv_path=env_path)
 
 # Import the Repository
 from DataStore.postgresdb import IncidentRepository, TaskStatus, TaskSeverity, TaskType
+from .task_queue import IncidentTaskPayload, enqueue_incident_task
 
 def extract_bucket_and_blob_from_gs(gs_uri: str) -> Tuple[str, str]:
     """
@@ -160,7 +162,7 @@ class ExternalAgentProxy:
             )
             raise
 
-# --- 1. Define the State ---
+# --- 1. Define the State of the Incident ---
 # This is the "memory" passed between AI nodes
 class IncidentState(TypedDict, total=False):
     company_id: int
@@ -168,14 +170,17 @@ class IncidentState(TypedDict, total=False):
     incident_id: str
     video_url: str
     audio_url: str
-    transcript: str
     transcript_segments_json_url: str
+    tasks_json_url: str
     translation_language: str
-    generated_tasks: List[dict]
     analysisfailed: bool
     status: str
     step: str
     error: Optional[str]
+# Note : state is a dictionary and it may not have all the keys at the time of initialization.
+# Do not use like url = state["audio_url"] 
+#   Instead use url = state.get("audio_url", "") 
+
 
 class WorkflowExecutor:
     @classmethod
@@ -214,6 +219,28 @@ class WorkflowExecutor:
         if self.repo and hasattr(self.repo, 'close_pool'):
             await self.repo.close_pool()
             logger.info("IncidentRepository connection pool closed.")
+            
+    def extract_incident_task_payload_from_token(
+        self, 
+        firebase_token: str, 
+        incident_id: str,
+        inspection_id: str,
+        translation_language: str,
+        inspector_id: Optional[int] = None
+    ) -> IncidentTaskPayload:
+        from firebase_admin import auth
+        decoded_token = auth.verify_id_token(firebase_token)
+        company_id = decoded_token.get("company_id")
+        company_storage_id = decoded_token.get("company_storage_id")
+        
+        return IncidentTaskPayload(
+            incident_id=incident_id,
+            company_id=company_id,
+            company_storage_id=company_storage_id,
+            inspection_id=inspection_id,
+            translation_language=translation_language,
+            inspector_id=inspector_id
+        )
             
     # --- UI ENTRY POINT ---
     async def handle_incident_upload(
@@ -255,93 +282,121 @@ class WorkflowExecutor:
                 images=images
             )
 
-        # 3. BACKGROUND: Trigger LangGraph with LangSmith tracing
-        # config = self.langsmith_config.create_run_config(
-        #     thread_id=incident_id,
-        #     incident_id=incident_id,
-        #     company_id=company_id,
-        #     user_id=inspector_id
-        # )
-        
-        # Tell the type checker: "This dict is specifically an IncidentState"
-        input_state = cast(IncidentState, {
+        # 3. Queue the incident processing
+        execution_status: IncidentState = {
             "company_id": company_id,
             "inspection_id": inspection_id,
             "incident_id": incident_id,
             "video_url": file_url,
-            "audio_url": "",          # Will be populated by extract_audio node
-            "transcript": "",         # Initialize as empty string
-            "transcript_segments_json_url": "", # Initialize as empty string
-            "generated_tasks": [],     # Initialize the list for operator.add
-            "translation_language": translation_language,
-            "analysisfailed": False,
             "status": "queued",
-            "step": "incident_queued"
-        })
-        
-        await self.repo.update_incident_status(company_id, incident_id, input_state)
+            "step": "incident_queued",
+            "analysisfailed": False
+        }
+        await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
         logger.info(f"📝 Incident {incident_id} uploaded and queued for processing")
 
-        # We do NOT 'await' this so the UI response is instant
-        task = asyncio.create_task(self.process_incident(input_state))
-
-        self.background_tasks.add(task)
-        task.add_done_callback(self.background_tasks.discard) # Automatically removes task when done
+        firebase_token = firebase_token_var.get()
+        payload = self.extract_incident_task_payload_from_token(
+            firebase_token=firebase_token,
+            incident_id=incident_id,
+            inspection_id=inspection_id,
+            translation_language=translation_language,
+            inspector_id=inspector_id
+        )
+        
+        enqueue_incident_task(payload)
 
         return incident_id
 
     # --- STATELESS PYTHON WORKFLOW ---
 
-    async def process_incident(self, state: IncidentState):
-        incident_id = state["incident_id"]
-        company_id = state["company_id"]
+    async def process_incident(self, payload: IncidentTaskPayload):
+        incident_id = payload.incident_id
+        company_id = payload.company_id
+        
         try:
-            state["status"] = "processing"
-            state["step"] = "extract_audio"
-            await self.repo.update_incident_status(company_id, incident_id, state)
-            audio_result = await self._extract_audio_node(state)
-            state.update(audio_result)
+            incident = await self.repo.get_incident(company_id, incident_id)
+            if not incident:
+                raise ValueError(f"Incident {incident_id} not found")
+                
+            execution_status = incident.get("execution_status") or {}
+            if isinstance(execution_status, str):
+                execution_status = json.loads(execution_status)
+                
+            video_url = incident.get("video_url")
+            audio_url = incident.get("audio_url")
+            
+            # Step 1: Extract Audio
+            if not audio_url:
+                execution_status.update({"status": "processing", "step": "extract_audio"})
+                await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
+                audio_result = await self._extract_audio_node(execution_status)
+                audio_url = audio_result.get("audio_url")
+                execution_status.update({"audio_url": audio_url})
+                await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
+            else:
+                logger.info(f"⏭️ Skipping audio extraction for {incident_id} (already done)")
+                
+            # Step 2: Transcribe
+            transcript_url = execution_status.get("transcript_segments_json_url")
+            transcript_length = 0 # Just for reporting purpose
+            if not transcript_url:
+                execution_status.update({"status": "processing", "step": "transcribe"})
+                await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
+                transcribe_result = await self._transcribe_node(execution_status)
+                transcript_length = len(transcribe_result.get("transcript", ""))
+                transcript_url = transcribe_result.get("transcript_segments_json_url")
+                execution_status.update({"transcript_segments_json_url": transcript_url})
+                await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
+            else:
+                logger.info(f"⏭️ Skipping transcription for {incident_id} (already done)")
+                
+            # Step 3: Generate Tasks
+            tasks_json_url = execution_status.get("tasks_json_url")
+            if not tasks_json_url:
+                execution_status.update({"status": "processing", "step": "generate_tasks"})
+                await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
+                tasks_result = await self._generate_tasks_node(execution_status, transcript_length)
+                tasks_json_url = tasks_result.get("tasks_json_url")
+                execution_status.update({"tasks_json_url": tasks_json_url})
+                await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
+            else:
+                logger.info(f"⏭️ Skipping task generation for {incident_id} (already done)")
 
-            state["status"] = "processing"
-            state["step"] = "transcribe"
-            await self.repo.update_incident_status(company_id, incident_id, state)
-            transcribe_result = await self._transcribe_node(state)
-            state.update(transcribe_result)
-
-            state["status"] = "processing"
-            state["step"] = "generate_tasks"
-            await self.repo.update_incident_status(company_id, incident_id, state)
-            tasks_result = await self._generate_tasks_node(state)
-            state.update(tasks_result)
-
-            state["status"] = "completed"
-            await self.repo.update_incident_status(company_id, incident_id, state)
+            execution_status.update({"status": "completed", "step": "incident_completed", 
+                                    "analysisfailed": False, "error": None})
+            await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
             logger.info(f"✅ Workflow completed successfully for incident {incident_id}")
+            
         except Exception as e:
             logger.error(f"❌ Background Workflow Error for {incident_id}: {e}", exc_info=True)
             try:
-                state["status"] = "failed"
-                state["error"] = str(e)
-                await self.repo.update_incident_status(company_id, incident_id, state)
+                # Re-fetch incident to get latest execution_status if possible
+                incident = await self.repo.get_incident(company_id, incident_id)
+                execution_status = incident.get("execution_status") or {}
+                if isinstance(execution_status, str):
+                    execution_status = json.loads(execution_status)
+                execution_status.update({"status": "failed", "error": str(e)})
+                await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
             except Exception as db_err:
-                logger.error(f"Failed to update metadata to failed: {db_err}")
+                logger.error(f"Failed to update execution_status to failed: {db_err}")
 
     # --- GRAPH NODES (The 'Intelligence' and 'DB Persistence' steps) ---
 
     async def _extract_audio_node(self, state: IncidentState):
         """Node 1: Extract audio from video file"""
-        incident_id = state["incident_id"]
+        incident_id = state.get("incident_id")
         node_name = EXTRACT_AUDIO_NODE
         start_time = time.time()
         
         try:
             # 1. Prepare data for external agent
             data = {
-                "video_url": state["video_url"],
+                "video_url": state.get("video_url"),
                 "metadata": {
-                    "company_id": state["company_id"],
-                    "inspection_id": state["inspection_id"],
-                    "incident_id": incident_id
+                    "company_id": state.get("company_id"),
+                    "inspection_id": state.get("inspection_id"),
+                    "incident_id": state.get("incident_id")
                 }
             }
             
@@ -362,13 +417,13 @@ class WorkflowExecutor:
                 )
                 
             # 3. PERSISTENCE: Update the record with the audio path
-            await self.repo.update_incident_audio(state['company_id'], incident_id, audio_url)
+            await self.repo.update_incident_audio(state.get("company_id"), state.get("incident_id"), audio_url)
             
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
                 node_name=node_name,
                 incident_id=incident_id,
-                input_data={"video_url": state["video_url"]},
+                input_data={"video_url": state.get("video_url")},
                 output_data={"audio_url": audio_url},
                 duration_ms=duration_ms
             )
@@ -391,10 +446,10 @@ class WorkflowExecutor:
 
     async def _transcribe_node(self, state: IncidentState):
         """Node 2: Call Transcription Agent to transcribe audio to text"""
-        incident_id = state["incident_id"]
+        incident_id = state.get("incident_id")
         node_name = TRANSCRIBE_NODE
         start_time = time.time()
-        transcript = ""
+        transcript_segments_json_url = ""
         
         try:
             if not state.get("audio_url"):
@@ -406,7 +461,7 @@ class WorkflowExecutor:
             industry = "Unknown Industry"  # Fallback if DB lookup fails
             industry_keywords = []
             try:
-                company_info = await self.repo.get_company_info(state["company_id"])
+                company_info = await self.repo.get_company_info(state.get("company_id"))
                 if company_info:
                     company_name = company_info.get("company_name", company_name)
                     industry = company_info.get("industry", industry)
@@ -419,7 +474,7 @@ class WorkflowExecutor:
             input_prompt = f"Industry terms: {industry_keywords_str}"
                 
             data = {
-                "audio_url": state["audio_url"],
+                "audio_url": state.get("audio_url"),
                 "metadata": {
                     "company_name": company_name,
                     "industry": industry,
@@ -467,16 +522,16 @@ class WorkflowExecutor:
             logger.error(f"❌ Transcription failed: {e}", exc_info=True)
             raise
 
-    async def _generate_tasks_node(self, state: IncidentState):
+    async def _generate_tasks_node(self, state: IncidentState, transcript_length):
         """Node 3: Call Task Generator Agent to create inspection tasks"""
-        incident_id = state["incident_id"]
+        incident_id = state.get("incident_id")
         node_name = GENERATE_TASKS_NODE
         start_time = time.time()
         tasks = []
 
         try:
-            transcript = state.get("transcript", "")
-            if not transcript:
+            transcript_segments_json_url = state.get("transcript_segments_json_url", "")
+            if not transcript_segments_json_url:
                 logger.warning(f"⚠️  Empty transcript for {incident_id}. Task generation may be limited.")
                 
             # Prepare data for report generation agent
@@ -485,7 +540,7 @@ class WorkflowExecutor:
             industry = "Unknown Industry"  # Fallback if DB lookup fails
             industry_keywords = []
             try:
-                company_info = await self.repo.get_company_info(state["company_id"])
+                company_info = await self.repo.get_company_info(state.get("company_id"))
                 if company_info:
                     company_name = company_info.get("company_name", company_name)
                     industry = company_info.get("industry", industry)
@@ -521,38 +576,39 @@ class WorkflowExecutor:
             tasks_json_url = result.get("tasks_json_url", "")
             summary, tasks = get_tasklist_from_url(tasks_json_url, 
                                                 video_url=state.get("video_url", ""), 
-                                                translation_language = state["translation_language"],
+                                                translation_language = state.get("translation_language"),
                                                 env_mode=env_mode)
-            # logger.info(f"Extracted summary: {summary}, from tasks JSON URL: {tasks_json_url}")
+            logger.info(f"Extracted summary from tasks JSON URL {tasks_json_url}")
                 
             # PERSISTENCE: Bulk insert final tasks
             await self.repo.bulk_add_incident_tasks(
-                company_id=state['company_id'],
+                company_id=state.get("company_id"),
                 incident_id=incident_id,
-                inspection_id=state['inspection_id'],
+                inspection_id=state.get("inspection_id"),
                 tasks=tasks
             )
             # Update Incident with Summary
-            await self.repo.update_incident_summary(company_id=state['company_id'], incident_id=incident_id, summary=summary)
+            await self.repo.update_incident_summary(company_id=state.get("company_id"), incident_id=incident_id, summary=summary)
             
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
                 node_name=node_name,
                 incident_id=incident_id,
-                input_data={"transcript_length": len(transcript)},
+                input_data={"transcript_length": transcript_length},
                 output_data={"task_count": len(tasks)},
                 duration_ms=duration_ms
             )
             
             logger.info(f"✅ Generated {len(tasks)} task(s) for incident {incident_id}")
-            return {"generated_tasks": tasks}
+            return {"tasks_json_url": tasks_json_url,
+                    "generated_tasks": tasks}
             
         except Exception as e:
             duration_ms = (time.time() - start_time) * 1000
             self.tracer.log_node_execution(
                 node_name=node_name,
                 incident_id=incident_id,
-                input_data={"transcript_length": len(state.get("transcript", ""))},
+                input_data={"transcript_length": transcript_length},
                 output_data={"task_count": len(tasks)},
                 duration_ms=duration_ms,
                 error=e
@@ -566,27 +622,27 @@ class WorkflowExecutor:
         if not db_record:
             raise PermissionError("Unauthorized: Incident does not belong to your company.")
 
-        # 2. STATUS DERIVATION FROM METADATA
-        metadata = db_record.get("metadata")
-        if not metadata:
-            metadata = {}
-        elif isinstance(metadata, str):
+        # 2. STATUS DERIVATION FROM EXECUTION_STATUS
+        execution_status = db_record.get("execution_status")
+        if not execution_status:
+            execution_status = {}
+        elif isinstance(execution_status, str):
             try:
-                metadata = json.loads(metadata)
+                execution_status = json.loads(execution_status)
             except Exception:
-                metadata = {}
-        elif not isinstance(metadata, dict):
-            metadata = {}
+                execution_status = {}
+        elif not isinstance(execution_status, dict):
+            execution_status = {}
 
-        status_key = metadata.get("status", "processing")
-        current_step = metadata.get("step", "extract_audio")
+        status_key = execution_status.get("status", "processing")
+        current_step = execution_status.get("step", "extract_audio")
         
-        has_audio = bool(metadata.get("audio_url"))
-        has_transcript = bool(metadata.get("transcript"))
-        has_tasks = bool(metadata.get("generated_tasks"))
+        has_audio = bool(db_record.get("audio_url"))
+        has_transcript = bool(execution_status.get("transcript"))
+        has_tasks = bool(execution_status.get("generated_tasks"))
         
         if status_key == "failed":
-            message = f"Step - Failed: {metadata.get('error', 'Analysis failed')}"
+            message = f"Step - Failed: {execution_status.get('error', 'Analysis failed')}"
         elif status_key == "completed":
             if has_tasks:
                 message = "Step - Complete: Analysis complete! Tasks generated."

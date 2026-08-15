@@ -258,20 +258,18 @@ class IncidentRepository:
                     )
 
     @neon_retry
-    # ToDo: Update the status column with status details. 
-    #   For testing, re-purposing the metadata column
-    async def update_incident_status(self, company_id: int, incident_id: str, metadata: dict):
-        """Updates incident metadata json."""
+    async def update_incident_execution_status(self, company_id: int, incident_id: str, execution_status: dict):
+        """Updates incident execution_status json."""
         async with self.session(company_id) as conn:
             async with conn.transaction():
                 async with conn.cursor() as cur:
                     await cur.execute(
                         """
                         UPDATE incidents 
-                        SET metadata = %s 
+                        SET execution_status = %s 
                         WHERE id = %s
                         """,
-                        (json.dumps(metadata), incident_id)
+                        (json.dumps(execution_status), incident_id)
                     )
 
     @neon_retry

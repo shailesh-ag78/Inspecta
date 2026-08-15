@@ -28,6 +28,7 @@ import uvicorn
 from pathlib import Path
 
 from .workflowexecutor import WorkflowExecutor, firebase_token_var
+from .task_queue import IncidentTaskPayload
 from langsmith_config import get_langsmith_config
 from pydantic import BaseModel, Field
 from google.cloud import storage
@@ -43,6 +44,8 @@ import firebase_admin
 from firebase_admin import credentials, auth
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from google.oauth2 import id_token
+import google.auth.transport.requests
 
 
 # Configure logging
@@ -355,6 +358,42 @@ async def upload_incident_endpoint(
         "message": "Audio / Video received and processing started.",
         "incident_id": incident_id
     }
+    
+@app.post("/internal/process/incident")
+async def internal_process_incident(payload: IncidentTaskPayload, request: Request):
+    """
+    Cloud Tasks Webhook Endpoint.
+    This endpoint is called by Google Cloud Tasks to process an incident.
+    """
+    # 1. OIDC Verification
+    if ENV_MODE == "gcp":
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+        token = auth_header.split(" ")[1]
+        try:
+            request_obj = google.auth.transport.requests.Request()
+            # Verify the token against the expected audience (this service's URL)
+            # Parse it and rebuild just the base URL
+            raw_url = str(request.url)
+            parsed = urlparse(raw_url)
+            base_audience = f"{parsed.scheme}://{parsed.netloc}"
+
+            id_info = id_token.verify_oauth2_token(token, request_obj, audience=base_audience)
+        except Exception as e:
+            logger.error(f"OIDC token verification failed: {e}")
+            raise HTTPException(status_code=401, detail="Invalid OIDC token")
+
+    executor: WorkflowExecutor = request.app.state.executor
+    
+    try:
+        # 2. Process the incident
+        await executor.process_incident(payload)
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error processing incident {payload.incident_id}: {e}", exc_info=True)
+        # We must raise an HTTPException so Cloud Tasks knows it failed and will retry
+        raise HTTPException(status_code=500, detail=str(e))
    
 @app.get("/incidents/recent")
 async def get_recent_incidents(
