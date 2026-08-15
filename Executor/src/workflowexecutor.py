@@ -71,7 +71,6 @@ extract_audio_agent_url = get_agent_endpoint("AGENT_AUDIOEXTRACT_URL", "http://l
 transcribe_agent_url = get_agent_endpoint("AGENT_TRANSCRIBE_URL", "http://localhost:8002", "/transcribe")
 task_generator_agent_url = get_agent_endpoint("AGENT_TASKGENERATOR_URL", "http://localhost:8003", "/generate_tasks")
 
-
 import contextvars
 firebase_token_var = contextvars.ContextVar("firebase_token_var", default=None)
 
@@ -103,7 +102,7 @@ class ExternalAgentProxy:
 
     async def post(self, payload: dict, incident_id: str = "unknown"):
         """
-        Post to external agent with error handling and LangSmith tracing.
+        Post to external agent with error handling 
         """
         start_time = time.time()
         headers = {}
@@ -209,7 +208,7 @@ class WorkflowExecutor:
         # thereby causing incident processing to randomly halt
         self.background_tasks = set()
     
-        logger.info("✅ WorkflowExecutor initialized with LangSmith tracing (Stateless Python Flow)")
+        logger.info("✅ WorkflowExecutor initialized ")
 
     async def close(self):
         """
@@ -219,36 +218,15 @@ class WorkflowExecutor:
         if self.repo and hasattr(self.repo, 'close_pool'):
             await self.repo.close_pool()
             logger.info("IncidentRepository connection pool closed.")
-            
-    def extract_incident_task_payload_from_token(
-        self, 
-        firebase_token: str, 
-        incident_id: str,
-        inspection_id: str,
-        translation_language: str,
-        inspector_id: Optional[int] = None
-    ) -> IncidentTaskPayload:
-        from firebase_admin import auth
-        decoded_token = auth.verify_id_token(firebase_token)
-        company_id = decoded_token.get("company_id")
-        company_storage_id = decoded_token.get("company_storage_id")
-        
-        return IncidentTaskPayload(
-            incident_id=incident_id,
-            company_id=company_id,
-            company_storage_id=company_storage_id,
-            inspection_id=inspection_id,
-            translation_language=translation_language,
-            inspector_id=inspector_id
-        )
-            
+                        
     # --- UI ENTRY POINT ---
     async def handle_incident_upload(
         self, 
         company_id: int, 
         inspection_id: str, 
         inspector_id: int, 
-        file_url: str,
+        file_url: str, 
+        company_storage_id: str, 
         existing_incident_id: str | None, # Optional: if re-uploading for an ID
         translation_language: str = "",
         gps_coordinates: Optional[tuple] = None,  # (lat, long),
@@ -295,16 +273,17 @@ class WorkflowExecutor:
         await self.repo.update_incident_execution_status(company_id, incident_id, execution_status)
         logger.info(f"📝 Incident {incident_id} uploaded and queued for processing")
 
-        firebase_token = firebase_token_var.get()
-        payload = self.extract_incident_task_payload_from_token(
-            firebase_token=firebase_token,
+        # Add Task in the message queue
+        payload = IncidentTaskPayload(
             incident_id=incident_id,
+            company_id=company_id,
+            company_storage_id=company_storage_id,
             inspection_id=inspection_id,
-            translation_language=translation_language,
-            inspector_id=inspector_id
+            inspector_id=inspector_id,
+            translation_language=translation_language
         )
-        
-        enqueue_incident_task(payload)
+
+        enqueue_incident_task(payload, executor=self)
 
         return incident_id
 
@@ -859,7 +838,6 @@ def get_tasklist_from_url(tasks_json_url: str, video_url : str, translation_lang
 class WorkflowTracer:
     """
     Utility class for manual instrumentation of workflow steps.
-    Use this to create custom spans in LangSmith for better visibility.
     """
     def log_node_execution(
         self,

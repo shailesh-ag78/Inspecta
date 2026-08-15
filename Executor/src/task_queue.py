@@ -12,7 +12,6 @@ import google.auth.transport.requests
 
 logger = logging.getLogger(__name__)
 
-# Note: video_url is removed from payload as it's already in the DB state
 class IncidentTaskPayload(BaseModel):
     incident_id: str
     company_id: int
@@ -24,7 +23,7 @@ class IncidentTaskPayload(BaseModel):
 # Using global to hold the background task queue in local_gcp/local mode
 _local_background_tasks = set()
 
-def enqueue_incident_task(payload: IncidentTaskPayload):
+def enqueue_incident_task(payload: IncidentTaskPayload, executor=None):
     """
     Enqueues a task to process an incident.
     In 'local_gcp' or 'local' mode, this runs it directly as an asyncio task to simulate Cloud Tasks.
@@ -36,12 +35,11 @@ def enqueue_incident_task(payload: IncidentTaskPayload):
         # Local development fallback: execute directly using an asyncio background task
         logger.info(f"[{env_mode}] Simulating Cloud Tasks enqueue for incident {payload.incident_id}")
         
-        # We must import inside to avoid circular dependencies if task_queue is imported by main/workflowexecutor
-        from main import app
-        
         async def _local_task_runner():
             try:
-                executor = app.state.executor
+                if not executor:
+                    logger.error("Executor is required for local task simulation")
+                    return
                 await executor.process_incident(payload)
             except Exception as e:
                 logger.error(f"Local simulated task failed for incident {payload.incident_id}: {e}", exc_info=True)

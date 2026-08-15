@@ -346,12 +346,22 @@ async def upload_incident_endpoint(
         inspection_id=inspection_id,
         inspector_id=data.inspector_id,
         file_url=data.file_url,
+        company_storage_id=company_storage_id,
         existing_incident_id = None,
         translation_language=data.translation_language,
         gps_coordinates=data.gps_coordinates,
         incident_type=data.incident_type if data.incident_type is not None else 0,
         images=image_file_urls
     )
+
+    # firebase_token = firebase_token_var.get()
+    # payload = extract_incident_task_payload_from_token(
+    #     firebase_token=firebase_token,
+    #     incident_id=incident_id,
+    #     inspection_id=inspection_id,
+    #     translation_language=translation_language,
+    #     inspector_id=inspector_id
+    # )
 
     return {
         "status": "Success",
