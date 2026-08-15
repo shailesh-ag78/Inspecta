@@ -678,16 +678,11 @@ export default function InspectionPage() {
             />
 
             {/* Progress/Error Logs */}
-            {uploadProgress && (
-              <div className="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 shadow-sm max-w-[485px]">
-                <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-                <span>{uploadProgress}</span>
-              </div>
-            )}
             <IncidentsUploadList
               incidentUploads={incidentUploads}
               clearLocalBundles={clearLocalBundles}
             />
+
 
           </div>
         </div>

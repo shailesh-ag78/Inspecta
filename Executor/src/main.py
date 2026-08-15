@@ -343,6 +343,27 @@ async def upload_incident_endpoint(
     """
     executor: WorkflowExecutor = request.app.state.executor
 
+    # Generate incident_id before calling handle_incident_upload
+    incident_id = None
+    if ENV_MODE == "local":
+        incident_id = str(uuid.uuid4())
+
+    else:
+        # For GCS: extract UUID from the filename in file_url
+        try:
+            filename = os.path.basename(data.file_url)
+            name, _ = os.path.splitext(filename)
+            import re
+            uuid_pattern = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
+            if uuid_pattern.match(name):
+                incident_id = name
+        except Exception as e:
+            logger.warning(f"Could not extract incident ID from GCS path: {e}")
+            
+        # Fallback to random UUID if GCS filename did not contain a valid UUID
+        if not incident_id:
+            incident_id = str(uuid.uuid4())
+
     # We pass the 'file.file' stream directly to the executor
     # This avoids loading the entire 100MB+ video into RAM at once
     incident_id = await executor.handle_incident_upload(
@@ -351,12 +372,13 @@ async def upload_incident_endpoint(
         inspector_id=data.inspector_id,
         file_url=data.file_url,
         company_storage_id=company_storage_id,
-        existing_incident_id = None,
+        incident_id=incident_id,
         translation_language=data.translation_language,
         gps_coordinates=data.gps_coordinates,
         incident_type=data.incident_type if data.incident_type is not None else 0,
         images=image_file_urls
     )
+
 
     # firebase_token = firebase_token_var.get()
     # payload = extract_incident_task_payload_from_token(

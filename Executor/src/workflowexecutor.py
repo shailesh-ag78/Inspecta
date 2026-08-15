@@ -222,6 +222,7 @@ class WorkflowExecutor:
     # --- UI ENTRY POINT ---
     async def handle_incident_upload(
         self, 
+        incident_id: str,
         company_id: int, 
         inspection_id: str, 
         inspector_id: int, 
@@ -246,19 +247,20 @@ class WorkflowExecutor:
             incident_id = existing_incident_id
         else:
             # Server generates ID to ensure uniqueness and security
-            # 2. PERSISTENCE: Create the initial incident record
-            # This ensures the UI can immediately see the incident exists
-            logger.info("Images count: %s", len(images) if images else 0)
-            logger.info("Image JSON : " + json.dumps(images or []))
-            incident_id = await self.repo.create_incident(
-                company_id=company_id,
-                inspection_id=inspection_id,
-                video_url=file_url,
-                inspector_id=inspector_id,
-                gps_coordinates=gps_coordinates,
-                incident_type=incident_type,
-                images=images
-            )
+        # 2. PERSISTENCE: Create the initial incident record
+        logger.info("Images count: %s", len(images) if images else 0)
+        logger.info("Image JSON : " + json.dumps(images or []))
+        incident_id = await self.repo.create_incident(
+            incident_id=incident_id,
+            company_id=company_id,
+            inspection_id=inspection_id,
+            video_url=file_url,
+            inspector_id=inspector_id,
+            gps_coordinates=gps_coordinates,
+            incident_type=incident_type,
+            images=images
+        )
+
 
         # 3. Queue the incident processing
         execution_status: IncidentState = {

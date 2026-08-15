@@ -129,6 +129,7 @@ class IncidentRepository:
 
     async def create_incident(
         self, 
+        incident_id: Optional[str],
         company_id: int,
         inspection_id: str,
         inspector_id: int, 
@@ -137,7 +138,7 @@ class IncidentRepository:
         audio_url: Optional[str] = None,
         metadata: Optional[dict] = None,
         incident_type: int = 0,
-        images: Optional[List[Dict[str, Any]]] = None
+        images: Optional[List[Dict[str, Any]]] = None,
     ) -> str:
         """Creates the incident record linked to an inspection."""
         result = None
@@ -154,16 +155,17 @@ class IncidentRepository:
                     await cur.execute(
                         """
                         INSERT INTO incidents 
-                        (inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates, incident_type, images) 
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                        (id, inspection_id, company_id, inspector_id, video_url, audio_url, metadata, gps_coordinates, incident_type, images) 
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) 
                         RETURNING id
                         """,
-                        (inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val, incident_type, json.dumps(images or []))
+                        (incident_id, inspection_id, company_id, inspector_id, video_url, audio_url, json.dumps(metadata or {}), gps_val, incident_type, json.dumps(images or []))
                     )
                     result = await cur.fetchone()
                     if result is None:
                         raise RuntimeError(f"Failed to create incident for inspection {inspection_id}: No ID returned.")
             return str(result['id']) 
+
                 
     @neon_retry
     async def bulk_add_incident_tasks(self, company_id: int, incident_id: str, inspection_id: str, tasks: List[Dict[str, Any]]):
