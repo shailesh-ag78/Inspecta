@@ -65,6 +65,8 @@ $MODEL_TEMPERATURE = "0.2"
 $TRANSLATION_MODEL = "qwen/qwen-2.5-7b-instruct"
 $LLM_PROVIDER = "openrouter"
 $OPENROUTER_URL = "https://openrouter.ai/api/v1"
+$CLOUD_TASKS_QUEUE_NAME = "inspecta-incident-queue"
+$EXECUTOR_BASE_URL = "https://executor-service-860462670211"
 
 # Environment variables to be injected
 $EnvVars = @{
@@ -119,7 +121,8 @@ $APIs = @(
     "compute.googleapis.com",
     "iam.googleapis.com",
     "secretmanager.googleapis.com",
-    "iamcredentials.googleapis.com"
+    "iamcredentials.googleapis.com",
+    "cloudtasks.googleapis.com"
 )
 
 foreach ($API in $APIs) {
@@ -156,6 +159,20 @@ if (-not $SubnetExists) {
 }
 else {
     Write-Host "Subnet $SubnetName already exists."
+}
+
+# -------------------------------------------------------------
+# 2.5 Create Cloud Tasks Queue
+# -------------------------------------------------------------
+Write-Host "`n[2.5/7] Setting up Cloud Tasks Queue..." -ForegroundColor Yellow
+
+$QueueExists = gcloud tasks queues list --location=$Region --filter="name=$CLOUD_TASKS_QUEUE_NAME" --format="value(name)"
+if (-not $QueueExists) {
+    Write-Host "Creating Cloud Tasks Queue: $CLOUD_TASKS_QUEUE_NAME in region $Region..."
+    gcloud tasks queues create $CLOUD_TASKS_QUEUE_NAME --location=$Region
+}
+else {
+    Write-Host "Cloud Tasks Queue $CLOUD_TASKS_QUEUE_NAME already exists."
 }
 
 # -------------------------------------------------------------
@@ -450,7 +467,9 @@ if ($DeployAgents) {
         --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest,OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,UI_PROJECT_ID=$UiProjectId,TRANSLATION_MODEL=$TRANSLATION_MODEL,OPENROUTER_URL=$OPENROUTER_URL"
+        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,AGENT_AUDIOEXTRACT_URL=$AgentAudioExtractUrl,AGENT_TRANSCRIBE_URL=$AgentTranscribeUrl,AGENT_TASKGENERATOR_URL=$AgentTaskGeneratorUrl,`
+                        UI_PROJECT_ID=$UiProjectId,TRANSLATION_MODEL=$TRANSLATION_MODEL,OPENROUTER_URL=$OPENROUTER_URL,`
+                        GCP_PROJECT_ID=$ProjectID,GCP_LOCATION=$Region,CLOUD_TASKS_QUEUE_NAME=$CLOUD_TASKS_QUEUE_NAME,EXECUTOR_BASE_URL=$EXECUTOR_BASE_URL"
             
     # Fetch Executor URL
     Write-Host "Retrieving executor endpoint..."
@@ -476,10 +495,10 @@ if ($DeployUI) {
         --subnet=$SubnetName `
         --vpc-egress=private-ranges-only `
         --service-account="ui-service-sa@$ProjectID.iam.gserviceaccount.com" `
-        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest,OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
+        --set-secrets="GEMINI_TRANSLATION_API_KEY=GEMINI_TRANSLATION_API_KEY:latest, OPENROUTER_API_KEY=OPENROUTER_API_KEY:latest" `
         --max-instances=2 `
         --cpu-boost `
-        --set-env-vars="ENV_MODE=$ENV_MODE,DATABASE_URL=$DatabaseURL,TIMEOUT=60,INSPCTA_FILE_BUCKET=$BucketName,UPLOADS_FOLDER=$UPLOADS_FOLDER,BASE_EXECUTOR_URL=$ExecutorUrl,UI_PROJECT_ID=$UiProjectId,TRANSLATION_MODEL=$TRANSLATION_MODEL,OPENROUTER_URL=$OPENROUTER_URL"
+        --set-env-vars="ENV_MODE=$ENV_MODE, DATABASE_URL=$DatabaseURL, TIMEOUT=60, INSPCTA_FILE_BUCKET=$BucketName, UPLOADS_FOLDER=$UPLOADS_FOLDER, BASE_EXECUTOR_URL=$ExecutorUrl, UI_PROJECT_ID=$UiProjectId, TRANSLATION_MODEL=$TRANSLATION_MODEL, OPENROUTER_URL=$OPENROUTER_URL"
 
 
     #$UiUrl = (gcloud run services describe ui-backend-service --region=$Region --format="value(status.url)")
@@ -490,7 +509,7 @@ if ($DeployUI) {
 # -------------------------------------------------------------
 # 7. Configure IAM Security Permissions
 # -------------------------------------------------------------
-Write-Host "`n[7/7] Setting up secure IAM Roles & service-to-service permissions..." -ForegroundColor Yellow
+Write-Host "`n[7/7] Setting up secure IAM Roles and service-to-service permissions..." -ForegroundColor Yellow
 
 # Helper to safely add invoker role only if the target service exists
 function Add-InvokerPolicy {
